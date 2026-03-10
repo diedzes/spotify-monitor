@@ -45,6 +45,7 @@ if (process.env.VERCEL && (!spotifyClientId || !spotifyClientSecret)) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: secret ?? "development-secret-change-in-production",
+  basePath: "/api/auth",
 
   debug: process.env.VERCEL === "1",
   logger: {
