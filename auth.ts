@@ -8,21 +8,25 @@ const SPOTIFY_SCOPES = [
   "playlist-modify-public",
 ].join(" ");
 
-// Vercel sets VERCEL_URL (e.g. spotify-monitor-ten.vercel.app). Auth.js needs a full URL.
-const baseUrl =
-  process.env.AUTH_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
-
+// Zorg dat Auth.js (die intern AUTH_SECRET leest) altijd een waarde ziet
 const rawSecret =
   process.env.AUTH_SECRET ||
   process.env.NEXTAUTH_SECRET ||
   process.env.BETTER_AUTH_SECRET;
 const secret = (typeof rawSecret === "string" ? rawSecret : "").trim() || undefined;
+if (secret && !process.env.AUTH_SECRET) {
+  process.env.AUTH_SECRET = secret;
+}
+
+// Vercel: basis-URL voor Auth.js
+const baseUrl =
+  process.env.AUTH_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
 if (process.env.VERCEL) {
   if (!secret) {
     throw new Error(
-      "AUTH_SECRET is missing. In Vercel: Settings → Environment Variables → add AUTH_SECRET for Production (value from: npx auth secret)."
+      "AUTH_SECRET is missing. In Vercel: Settings → Environment Variables → add AUTH_SECRET or BETTER_AUTH_SECRET for Production/Preview."
     );
   }
   if (secret.length < 32) {
@@ -32,6 +36,14 @@ if (process.env.VERCEL) {
   }
 }
 
+const spotifyClientId = (process.env.AUTH_SPOTIFY_ID ?? "").trim();
+const spotifyClientSecret = (process.env.AUTH_SPOTIFY_SECRET ?? "").trim();
+if (process.env.VERCEL && (!spotifyClientId || !spotifyClientSecret)) {
+  throw new Error(
+    "AUTH_SPOTIFY_ID and AUTH_SPOTIFY_SECRET must be set in Vercel Environment Variables."
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: secret ?? "development-secret-change-in-production",
@@ -39,8 +51,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   providers: [
     Spotify({
-      clientId: process.env.AUTH_SPOTIFY_ID ?? "",
-      clientSecret: process.env.AUTH_SPOTIFY_SECRET ?? "",
+      clientId: spotifyClientId,
+      clientSecret: spotifyClientSecret,
       authorization: {
         params: {
           scope: SPOTIFY_SCOPES,
