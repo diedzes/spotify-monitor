@@ -27,7 +27,7 @@ export default async function AuthErrorPage({
               <li>Lokaal in de terminal: <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">npx auth secret</code></li>
               <li>Kopieer alleen de <strong>waarde</strong> (de lange string na <code>AUTH_SECRET=</code>), geen spaties of aanhalingstekens.</li>
               <li>Vercel → Project → Settings → Environment Variables.</li>
-              <li>Bewerk <strong>AUTH_SECRET</strong> of voeg toe: naam <code>AUTH_SECRET</code>, waarde plakken, scope <strong>Production</strong> (en eventueel Preview).</li>
+              <li>Voeg toe of bewerk: naam <strong>AUTH_SECRET</strong> of <strong>BETTER_AUTH_SECRET</strong>, waarde plakken, scope <strong>Production</strong> (en eventueel Preview).</li>
               <li>Opslaan, daarna Deployments → Redeploy.</li>
             </ol>
           </div>

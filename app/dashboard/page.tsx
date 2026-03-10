@@ -1,19 +1,17 @@
-import { auth, signIn } from "@/auth";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { authOptions } from "@/auth";
 
 export default async function DashboardPage() {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
 
   if (!session?.user) {
     redirect("/");
   }
 
-  type SessionWithTokens = typeof session & { error?: "RefreshTokenError"; access_token?: string };
+  type SessionWithTokens = typeof session & { access_token?: string };
   const s = session as SessionWithTokens;
-  if (s.error === "RefreshTokenError") {
-    await signIn("spotify", { redirectTo: "/dashboard" });
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -29,20 +27,12 @@ export default async function DashboardPage() {
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               {session.user.name ?? session.user.email}
             </span>
-            <form
-              action={async () => {
-                "use server";
-                const { signOut } = await import("@/auth");
-                await signOut({ redirectTo: "/" });
-              }}
+            <Link
+              href="/api/auth/signout?callbackUrl=/"
+              className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             >
-              <button
-                type="submit"
-                className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-              >
-                Uitloggen
-              </button>
-            </form>
+              Uitloggen
+            </Link>
           </div>
         </div>
       </header>
