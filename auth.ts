@@ -13,7 +13,7 @@ const baseUrl =
   process.env.AUTH_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
-const secret = process.env.AUTH_SECRET;
+const secret = (process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "").trim() || undefined;
 if (process.env.VERCEL && !secret) {
   throw new Error(
     "AUTH_SECRET is not set. Add it in Vercel → Project → Settings → Environment Variables (Production)."
@@ -64,6 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   pages: {
     signIn: "/",
+    error: "/auth-error",
   },
 });
 
