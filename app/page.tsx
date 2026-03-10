@@ -2,8 +2,11 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 
-export default async function Home() {
+type Props = { searchParams: Promise<{ error?: string }> };
+
+export default async function Home({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
+  const { error } = await searchParams;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -14,6 +17,27 @@ export default async function Home() {
         <p className="text-center text-zinc-600 dark:text-zinc-400">
           Log in met Spotify om je playlists te beheren.
         </p>
+        {error === "spotify" && (
+          <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="font-medium">Inloggen bij Spotify mislukt.</p>
+            <p className="mt-1">
+              Controleer in het{" "}
+              <a
+                href="https://developer.spotify.com/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Spotify Dashboard
+              </a>{" "}
+              of onder je app → Settings → <strong>Redirect URIs</strong> exact
+              deze URL staat:{" "}
+              <code className="mt-2 block break-all rounded bg-amber-100 px-2 py-1 text-xs dark:bg-amber-900/50">
+                https://spotify-monitor-ten.vercel.app/api/auth/callback/spotify
+              </code>
+            </p>
+          </div>
+        )}
         {session?.user ? (
           <div className="flex w-full flex-col gap-4">
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
