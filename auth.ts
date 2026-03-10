@@ -8,9 +8,22 @@ const SPOTIFY_SCOPES = [
   "playlist-modify-public",
 ].join(" ");
 
+// Vercel sets VERCEL_URL (e.g. spotify-monitor-ten.vercel.app). Auth.js needs a full URL.
+const baseUrl =
+  process.env.AUTH_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+
+const secret = process.env.AUTH_SECRET;
+if (process.env.VERCEL && !secret) {
+  throw new Error(
+    "AUTH_SECRET is not set. Add it in Vercel → Project → Settings → Environment Variables (Production)."
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET,
+  secret: secret ?? "development-secret-change-in-production",
+  ...(baseUrl && { url: baseUrl }),
 
   providers: [
     Spotify({
