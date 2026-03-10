@@ -18,10 +18,13 @@ if (secret && !process.env.AUTH_SECRET) {
   process.env.AUTH_SECRET = secret;
 }
 
-// Vercel: basis-URL voor Auth.js
+// Vercel: basis-URL voor Auth.js (ook NEXTAUTH_URL voor compatibiliteit)
 const baseUrl =
   process.env.AUTH_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+if (baseUrl && !process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = baseUrl;
+}
 
 if (process.env.VERCEL) {
   if (!secret) {
@@ -48,6 +51,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: secret ?? "development-secret-change-in-production",
   ...(baseUrl && { url: baseUrl }),
+
+  debug: process.env.VERCEL === "1",
+  logger: {
+    error(error) {
+      console.error("[Auth.js error]", error);
+    },
+    warn(message) {
+      console.warn("[Auth.js warn]", message);
+    },
+    debug(message) {
+      console.debug("[Auth.js debug]", message);
+    },
+  },
 
   providers: [
     Spotify({
