@@ -2,11 +2,11 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 
-type Props = { searchParams: Promise<{ error?: string }> };
+type Props = { searchParams: Promise<{ error?: string; error_description?: string }> };
 
 export default async function Home({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
-  const { error } = await searchParams;
+  const { error, error_description } = await searchParams;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -20,8 +20,13 @@ export default async function Home({ searchParams }: Props) {
         {error === "spotify" && (
           <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <p className="font-medium">Inloggen bij Spotify mislukt.</p>
-            <p className="mt-1">
-              Controleer in het{" "}
+            {error_description && (
+              <p className="mt-1 font-mono text-xs opacity-90">{error_description}</p>
+            )}
+            <p className="mt-2">
+              Zorg dat je de site opent via{" "}
+              <strong>https://spotify-monitor-ten.vercel.app</strong> (geen preview-URL).
+              In het{" "}
               <a
                 href="https://developer.spotify.com/dashboard"
                 target="_blank"
@@ -30,11 +35,15 @@ export default async function Home({ searchParams }: Props) {
               >
                 Spotify Dashboard
               </a>{" "}
-              of onder je app → Settings → <strong>Redirect URIs</strong> exact
-              deze URL staat:{" "}
+              → je app → Settings → <strong>Redirect URIs</strong> moet exact
+              staan:{" "}
               <code className="mt-2 block break-all rounded bg-amber-100 px-2 py-1 text-xs dark:bg-amber-900/50">
                 https://spotify-monitor-ten.vercel.app/api/auth/callback/spotify
               </code>
+            </p>
+            <p className="mt-2 text-xs">
+              In Vercel → Settings → Environment Variables: zet <strong>NEXTAUTH_URL</strong> op{" "}
+              <code>https://spotify-monitor-ten.vercel.app</code> of verwijder die variabele.
             </p>
           </div>
         )}

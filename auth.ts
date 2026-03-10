@@ -13,7 +13,8 @@ const secret =
   process.env.NEXTAUTH_SECRET ||
   process.env.BETTER_AUTH_SECRET;
 
-if (process.env.VERCEL && process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
+// Op Vercel: altijd de huidige deployment-URL gebruiken, anders klopt de callback niet met Spotify.
+if (process.env.VERCEL && process.env.VERCEL_URL) {
   process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
 }
 
