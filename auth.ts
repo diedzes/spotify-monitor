@@ -18,13 +18,8 @@ if (secret && !process.env.AUTH_SECRET) {
   process.env.AUTH_SECRET = secret;
 }
 
-// Vercel: basis-URL voor Auth.js (ook NEXTAUTH_URL voor compatibiliteit)
-const baseUrl =
-  process.env.AUTH_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
-if (baseUrl && !process.env.NEXTAUTH_URL) {
-  process.env.NEXTAUTH_URL = baseUrl;
-}
+// Geen url/baseUrl doorgeven: AUTH_URL breekt action-parsing in Auth.js v5 (UnknownAction).
+// trustHost: true is genoeg; Auth.js haalt de URL uit de request.
 
 if (process.env.VERCEL) {
   if (!secret) {
@@ -50,7 +45,6 @@ if (process.env.VERCEL && (!spotifyClientId || !spotifyClientSecret)) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: secret ?? "development-secret-change-in-production",
-  ...(baseUrl && { url: baseUrl }),
 
   debug: process.env.VERCEL === "1",
   logger: {
