@@ -19,15 +19,17 @@ export default async function AuthErrorPage({
           Foutcode: <code className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-800">{error ?? "onbekend"}</code>
         </p>
         {error === "Configuration" && (
-          <div className="space-y-2 rounded-lg bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
+          <div className="space-y-3 rounded-lg bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
             <p className="font-medium text-amber-800 dark:text-amber-200">
               Serverconfiguratie-probleem
             </p>
-            <p className="text-amber-700 dark:text-amber-300">
-              Controleer op Vercel → Project → Settings → Environment Variables
-              of <strong>AUTH_SECRET</strong> is ingesteld voor Production. Genereer
-              een waarde met: <code className="text-xs">npx auth secret</code>
-            </p>
+            <ol className="list-inside list-decimal space-y-1 text-amber-700 dark:text-amber-300">
+              <li>Lokaal in de terminal: <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">npx auth secret</code></li>
+              <li>Kopieer alleen de <strong>waarde</strong> (de lange string na <code>AUTH_SECRET=</code>), geen spaties of aanhalingstekens.</li>
+              <li>Vercel → Project → Settings → Environment Variables.</li>
+              <li>Bewerk <strong>AUTH_SECRET</strong> of voeg toe: naam <code>AUTH_SECRET</code>, waarde plakken, scope <strong>Production</strong> (en eventueel Preview).</li>
+              <li>Opslaan, daarna Deployments → Redeploy.</li>
+            </ol>
           </div>
         )}
         <Link

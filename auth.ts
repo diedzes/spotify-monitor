@@ -13,11 +13,23 @@ const baseUrl =
   process.env.AUTH_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
-const secret = (process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "").trim() || undefined;
-if (process.env.VERCEL && !secret) {
-  throw new Error(
-    "AUTH_SECRET is not set. Add it in Vercel → Project → Settings → Environment Variables (Production)."
-  );
+const rawSecret =
+  process.env.AUTH_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  process.env.BETTER_AUTH_SECRET;
+const secret = (typeof rawSecret === "string" ? rawSecret : "").trim() || undefined;
+
+if (process.env.VERCEL) {
+  if (!secret) {
+    throw new Error(
+      "AUTH_SECRET is missing. In Vercel: Settings → Environment Variables → add AUTH_SECRET for Production (value from: npx auth secret)."
+    );
+  }
+  if (secret.length < 32) {
+    throw new Error(
+      "AUTH_SECRET must be at least 32 characters. Run: npx auth secret"
+    );
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -27,8 +39,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   providers: [
     Spotify({
-      clientId: process.env.AUTH_SPOTIFY_ID!,
-      clientSecret: process.env.AUTH_SPOTIFY_SECRET!,
+      clientId: process.env.AUTH_SPOTIFY_ID ?? "",
+      clientSecret: process.env.AUTH_SPOTIFY_SECRET ?? "",
       authorization: {
         params: {
           scope: SPOTIFY_SCOPES,
