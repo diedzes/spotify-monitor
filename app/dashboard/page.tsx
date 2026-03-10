@@ -9,7 +9,8 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  if (session.error === "RefreshTokenError") {
+  const sessionError = "error" in session ? session.error : undefined;
+  if (sessionError === "RefreshTokenError") {
     await signIn("spotify", { redirectTo: "/dashboard" });
   }
 
@@ -72,7 +73,7 @@ export default async function DashboardPage() {
             <div>
               <dt className="text-zinc-500 dark:text-zinc-400">Access token</dt>
               <dd className="truncate font-mono text-zinc-600 dark:text-zinc-400">
-                {session.access_token
+                {"access_token" in session && typeof session.access_token === "string"
                   ? `${session.access_token.slice(0, 20)}…`
                   : "—"}
               </dd>
