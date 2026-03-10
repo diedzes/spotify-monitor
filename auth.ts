@@ -56,6 +56,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 declare module "next-auth" {
   interface Session {
+    error?: "RefreshTokenError";
     access_token?: string;
   }
 }
