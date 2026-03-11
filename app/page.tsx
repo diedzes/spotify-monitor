@@ -2,11 +2,13 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 
-type Props = { searchParams: Promise<{ error?: string; error_description?: string }> };
+type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Home({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
-  const { error, error_description } = await searchParams;
+  const params = await searchParams;
+  const error = params.error;
+  const errorDescription = params.error_description;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -20,31 +22,28 @@ export default async function Home({ searchParams }: Props) {
         {error === "spotify" && (
           <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <p className="font-medium">Inloggen bij Spotify mislukt.</p>
-            {error_description && (
-              <p className="mt-1 font-mono text-xs opacity-90">{error_description}</p>
+            {errorDescription && (
+              <p className="mt-1 font-mono text-xs opacity-90">{errorDescription}</p>
             )}
-            <p className="mt-2">
-              Zorg dat je de site opent via{" "}
-              <strong>https://spotify-monitor-ten.vercel.app</strong> (geen preview-URL).
-              In het{" "}
-              <a
-                href="https://developer.spotify.com/dashboard"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                Spotify Dashboard
-              </a>{" "}
-              → je app → Settings → <strong>Redirect URIs</strong> moet exact
-              staan:{" "}
-              <code className="mt-2 block break-all rounded bg-amber-100 px-2 py-1 text-xs dark:bg-amber-900/50">
-                https://spotify-monitor-ten.vercel.app/api/auth/callback/spotify
-              </code>
-            </p>
-            <p className="mt-2 text-xs">
-              In Vercel → Settings → Environment Variables: zet <strong>NEXTAUTH_URL</strong> op{" "}
-              <code>https://spotify-monitor-ten.vercel.app</code> of verwijder die variabele.
-            </p>
+            <p className="mt-2 font-medium">Controleer het volgende:</p>
+            <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
+              <li>
+                <a href="/api/auth-check" target="_blank" rel="noopener noreferrer" className="underline">
+                  /api/auth-check
+                </a>{" "}
+                openen: bij <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong> moet staan:{" "}
+                <code className="break-all">https://spotify-monitor-ten.vercel.app/api/auth/callback/spotify</code>
+              </li>
+              <li>
+                Spotify Dashboard → je app → <strong>Settings</strong> → <strong>Redirect URIs</strong>: exact diezelfde URL toevoegen en <strong>Save</strong>.
+              </li>
+              <li>
+                Spotify app staat in <strong>Development</strong>? Dan moet je eigen Spotify-account zijn toegevoegd: Dashboard → je app → <strong>Users and Access</strong> → <strong>Add user</strong> → je e-mailadres.
+              </li>
+              <li>
+                Vercel → Environment Variables: <strong>NEXTAUTH_URL</strong> = <code>https://spotify-monitor-ten.vercel.app</code> (alleen Production), daarna <strong>Redeploy</strong>.
+              </li>
+            </ol>
           </div>
         )}
         {session?.user ? (
