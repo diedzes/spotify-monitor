@@ -25,6 +25,14 @@ export default async function Home({ searchParams }: Props) {
             {errorDescription && (
               <p className="mt-1 font-mono text-xs opacity-90">{errorDescription}</p>
             )}
+            {Object.keys(params).length > 0 && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs underline">Alle URL-parameters (voor debug)</summary>
+                <pre className="mt-1 overflow-auto rounded bg-amber-100 p-2 text-xs dark:bg-amber-900/50">
+                  {JSON.stringify(params, null, 2)}
+                </pre>
+              </details>
+            )}
             <p className="mt-2 font-medium">Controleer het volgende:</p>
             <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
               <li>

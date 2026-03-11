@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/",
     error: "/auth-error",
   },
+  debug: process.env.VERCEL === "1",
 };
 
 declare module "next-auth" {
