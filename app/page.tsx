@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { authOptions } from "@/auth";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
@@ -9,6 +10,9 @@ export default async function Home({ searchParams }: Props) {
   const params = await searchParams;
   const error = params.error;
   const errorDescription = params.error_description;
+  const cookieStore = await cookies();
+  const spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
+  const showAuthError = error === "spotify" || error === "Callback" || error === "OAuthCallback";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -19,10 +23,15 @@ export default async function Home({ searchParams }: Props) {
         <p className="text-center text-zinc-600 dark:text-zinc-400">
           Log in met Spotify om je playlists te beheren.
         </p>
-        {error === "spotify" && (
+        {showAuthError && (
           <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <p className="font-medium">Inloggen bij Spotify mislukt.</p>
-            {errorDescription && (
+            {spotifyTokenError && (
+              <p className="mt-2 font-mono text-xs break-all rounded bg-amber-100 p-2 dark:bg-amber-900/50">
+                <strong>Fout van Spotify:</strong> {decodeURIComponent(spotifyTokenError)}
+              </p>
+            )}
+            {!spotifyTokenError && errorDescription && (
               <p className="mt-1 font-mono text-xs opacity-90">{errorDescription}</p>
             )}
             {Object.keys(params).length > 0 && (
@@ -36,26 +45,30 @@ export default async function Home({ searchParams }: Props) {
             <p className="mt-2 font-medium">Controleer het volgende:</p>
             <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
               <li>
+                <strong>Geen request naar /api/auth/callback/spotify in Vercel-logs?</strong> Dan stuurt Spotify je door naar een andere URL. De <strong>Redirect URI</strong> in het Spotify-dashboard moet exact overeenkomen met wat onze app gebruikt.
+              </li>
+              <li>
+                Open{" "}
                 <a href="/api/auth-check" target="_blank" rel="noopener noreferrer" className="underline">
                   /api/auth-check
                 </a>{" "}
-                openen: bij <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong> moet staan:{" "}
-                <code className="break-all">https://spotify-monitor-ten.vercel.app/api/auth/callback/spotify</code>
+                op dezelfde site waar je inlogt (bijv. productie-URL). Bij <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong> staat de URL die je moet gebruiken.
               </li>
               <li>
-                Spotify Dashboard → je app → <strong>Settings</strong> → <strong>Redirect URIs</strong>: exact diezelfde URL toevoegen en <strong>Save</strong>.
+                Spotify Dashboard → je app → <strong>Settings</strong> → <strong>Redirect URIs</strong>: voeg <em>exact</em> die URL toe (kopieer uit auth-check; moet letterlijk overeenkomen, zie{" "}
+                <a href="https://developer.spotify.com/documentation/web-api/concepts/redirect_uri" target="_blank" rel="noopener noreferrer" className="underline">Spotify Redirect URI</a>), dan <strong>Save</strong>.
               </li>
               <li>
                 Spotify app staat in <strong>Development</strong>? Dan moet je eigen Spotify-account zijn toegevoegd: Dashboard → je app → <strong>Users and Access</strong> → <strong>Add user</strong> → je e-mailadres.
               </li>
               <li>
-                Vercel → Environment Variables: <strong>NEXTAUTH_URL</strong> = <code>https://spotify-monitor-ten.vercel.app</code> (alleen Production), daarna <strong>Redeploy</strong>.
+                Vercel → Environment Variables: <strong>NEXTAUTH_URL</strong> = <code>https://spotify-monitor-ten.vercel.app</code> (geen slash aan het eind; alleen Production), daarna <strong>Redeploy</strong>.
               </li>
               <li>
-                <strong>Client Secret opnieuw kopiëren:</strong> Spotify Dashboard → je app → Settings → <strong>Show client secret</strong> → opnieuw kopiëren (geen spaties) → in Vercel <strong>AUTH_SPOTIFY_SECRET</strong> overschrijven → Redeploy.
+                <strong>Token exchange faalt vaak door verkeerde Client Secret.</strong> Spotify Dashboard → je app → Settings → <strong>Show client secret</strong> → opnieuw kopiëren (geen spaties voor/achter) → in Vercel <strong>AUTH_SPOTIFY_SECRET</strong> overschrijven → <strong>Redeploy</strong>. Bij “Regenerate” in Spotify moet je het geheim in Vercel opnieuw invullen.
               </li>
               <li>
-                Na opnieuw proberen: Vercel → Deployments → Logs. Zoek naar <strong>[Spotify callback ontvangen]</strong> – de URL daar laat zien wat Spotify terugstuurde.
+                In Vercel Logs (na opnieuw inloggen): zoek <strong>[Spotify token response]</strong>. Daar staat de echte fout van Spotify (bijv. <code>invalid_client</code> = verkeerde Client ID/Secret).
               </li>
             </ol>
           </div>

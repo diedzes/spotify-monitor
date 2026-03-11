@@ -13,11 +13,51 @@ const secret =
   process.env.NEXTAUTH_SECRET ||
   process.env.BETTER_AUTH_SECRET;
 
-// Op Vercel: alleen NEXTAUTH_URL vullen als die nog niet staat.
-// Zet in Vercel (Production) NEXTAUTH_URL=https://spotify-monitor-ten.vercel.app
-// zodat de callback overeenkomt met je domein (VERCEL_URL is vaak een preview-URL).
+// Redirect URI moet exact overeenkomen met wat in het Spotify-dashboard staat:
+// https://developer.spotify.com/documentation/web-api/concepts/redirect_uri
+// Gebruik HTTPS (behalve loopback); geen trailing slash.
 if (process.env.VERCEL && process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
-  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+  const base = `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
+  process.env.NEXTAUTH_URL = base;
+}
+if (process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL.replace(/\/$/, "");
+}
+
+/** Wordt gezet bij token-fout zodat we die op de pagina kunnen tonen (geen logs nodig). */
+export let lastSpotifyTokenError: string | null = null;
+
+export function clearLastSpotifyTokenError(): void {
+  lastSpotifyTokenError = null;
+}
+
+/** Custom token request: logt de fout en zet lastSpotifyTokenError voor weergave op de pagina. */
+async function spotifyTokenRequest({
+  provider,
+  params,
+}: {
+  provider: { token?: { url?: string }; clientId?: string; clientSecret?: string; callbackUrl?: string };
+  params: Record<string, string>;
+}) {
+  const tokenUrl = provider.token?.url ?? "https://accounts.spotify.com/api/token";
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code: params.code ?? "",
+    redirect_uri: provider.callbackUrl ?? "",
+    client_id: provider.clientId ?? "",
+    client_secret: provider.clientSecret ?? "",
+  });
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    lastSpotifyTokenError = `${res.status}: ${text}`;
+    throw new Error(`Spotify token error ${res.status}: ${text}`);
+  }
+  return { tokens: JSON.parse(text) as Record<string, unknown> };
 }
 
 export const authOptions: NextAuthOptions = {
@@ -29,6 +69,9 @@ export const authOptions: NextAuthOptions = {
         process.env.AUTH_SPOTIFY_SECRET ?? process.env.SPOTIFY_CLIENT_SECRET ?? "",
       authorization: {
         params: { scope: SPOTIFY_SCOPES },
+      },
+      token: {
+        request: spotifyTokenRequest as never,
       },
     }),
   ],
