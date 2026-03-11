@@ -9,8 +9,13 @@ export default async function AuthErrorPage({
   searchParams: Promise<SearchParams>;
 }) {
   const { error } = await searchParams;
-  const cookieStore = await cookies();
-  const spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
+  let spotifyTokenError: string | undefined;
+  try {
+    const cookieStore = await cookies();
+    spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
+  } catch {
+    spotifyTokenError = undefined;
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 font-sans dark:bg-zinc-950">
@@ -23,7 +28,14 @@ export default async function AuthErrorPage({
         </p>
         {spotifyTokenError && (
           <p className="rounded bg-amber-50 p-3 font-mono text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            <strong>Fout van Spotify:</strong> {decodeURIComponent(spotifyTokenError)}
+            <strong>Fout van Spotify:</strong>{" "}
+            {(() => {
+              try {
+                return decodeURIComponent(spotifyTokenError);
+              } catch {
+                return spotifyTokenError;
+              }
+            })()}
           </p>
         )}
         {error === "Configuration" && (

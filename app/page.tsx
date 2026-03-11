@@ -10,8 +10,13 @@ export default async function Home({ searchParams }: Props) {
   const params = await searchParams;
   const error = params.error;
   const errorDescription = params.error_description;
-  const cookieStore = await cookies();
-  const spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
+  let spotifyTokenError: string | undefined;
+  try {
+    const cookieStore = await cookies();
+    spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
+  } catch {
+    spotifyTokenError = undefined;
+  }
   const showAuthError = error === "spotify" || error === "Callback" || error === "OAuthCallback";
 
   return (
@@ -28,7 +33,14 @@ export default async function Home({ searchParams }: Props) {
             <p className="font-medium">Inloggen bij Spotify mislukt.</p>
             {spotifyTokenError && (
               <p className="mt-2 font-mono text-xs break-all rounded bg-amber-100 p-2 dark:bg-amber-900/50">
-                <strong>Fout van Spotify:</strong> {decodeURIComponent(spotifyTokenError)}
+                <strong>Fout van Spotify:</strong>{" "}
+              {(() => {
+                try {
+                  return decodeURIComponent(spotifyTokenError);
+                } catch {
+                  return spotifyTokenError;
+                }
+              })()}
               </p>
             )}
             {!spotifyTokenError && errorDescription && (
