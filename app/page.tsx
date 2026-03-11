@@ -1,23 +1,13 @@
-import { getServerSession } from "next-auth";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { authOptions } from "@/auth";
+import { getSpotifySession } from "@/lib/spotify-auth";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Home({ searchParams }: Props) {
-  const session = await getServerSession(authOptions);
+  const session = await getSpotifySession();
   const params = await searchParams;
   const error = params.error;
   const errorDescription = params.error_description;
-  let spotifyTokenError: string | undefined;
-  try {
-    const cookieStore = await cookies();
-    spotifyTokenError = cookieStore.get("spotify_token_error")?.value;
-  } catch {
-    spotifyTokenError = undefined;
-  }
-  const showAuthError = error === "spotify" || error === "Callback" || error === "OAuthCallback";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -28,68 +18,22 @@ export default async function Home({ searchParams }: Props) {
         <p className="text-center text-zinc-600 dark:text-zinc-400">
           Log in met Spotify om je playlists te beheren.
         </p>
-        {showAuthError && (
+        {error && (
           <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            <p className="font-medium">Inloggen bij Spotify mislukt.</p>
-            <p className="mt-1 text-xs opacity-90">Je komt wél terug op deze site, dus de <strong>token exchange</strong> faalt (meestal verkeerde Client Secret of redirect_uri in Spotify).</p>
-            {spotifyTokenError && (
-              <p className="mt-2 font-mono text-xs break-all rounded bg-amber-100 p-2 dark:bg-amber-900/50">
-                <strong>Fout van Spotify:</strong>{" "}
-              {(() => {
-                try {
-                  return decodeURIComponent(spotifyTokenError);
-                } catch {
-                  return spotifyTokenError;
-                }
-              })()}
-              </p>
+            <p className="font-medium">Inloggen mislukt</p>
+            {errorDescription && (
+              <p className="mt-1 font-mono text-xs opacity-90">{decodeURIComponent(errorDescription)}</p>
             )}
-            {!spotifyTokenError && errorDescription && (
-              <p className="mt-1 font-mono text-xs opacity-90">{errorDescription}</p>
-            )}
-            {Object.keys(params).length > 0 && (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs underline">Alle URL-parameters (voor debug)</summary>
-                <pre className="mt-1 overflow-auto rounded bg-amber-100 p-2 text-xs dark:bg-amber-900/50">
-                  {JSON.stringify(params, null, 2)}
-                </pre>
-              </details>
-            )}
-            <p className="mt-2 font-medium">Controleer het volgende:</p>
-            <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
-              <li>
-                <strong>Geen request naar /api/auth/callback/spotify in Vercel-logs?</strong> Dan stuurt Spotify je door naar een andere URL. De <strong>Redirect URI</strong> in het Spotify-dashboard moet exact overeenkomen met wat onze app gebruikt.
-              </li>
-              <li>
-                Open{" "}
-                <a href="/api/auth-check" target="_blank" rel="noopener noreferrer" className="underline">
-                  /api/auth-check
-                </a>{" "}
-                op dezelfde site waar je inlogt (bijv. productie-URL). Bij <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong> staat de URL die je moet gebruiken.
-              </li>
-              <li>
-                Spotify Dashboard → je app → <strong>Settings</strong> → <strong>Redirect URIs</strong>: voeg <em>exact</em> die URL toe (kopieer uit auth-check; moet letterlijk overeenkomen, zie{" "}
-                <a href="https://developer.spotify.com/documentation/web-api/concepts/redirect_uri" target="_blank" rel="noopener noreferrer" className="underline">Spotify Redirect URI</a>), dan <strong>Save</strong>.
-              </li>
-              <li>
-                Spotify app staat in <strong>Development</strong>? Dan moet je eigen Spotify-account zijn toegevoegd: Dashboard → je app → <strong>Users and Access</strong> → <strong>Add user</strong> → je e-mailadres.
-              </li>
-              <li>
-                Vercel → Environment Variables: <strong>NEXTAUTH_URL</strong> = <code>https://spotify-monitor-ten.vercel.app</code> (geen slash aan het eind; alleen Production), daarna <strong>Redeploy</strong>.
-              </li>
-              <li>
-                <strong>Token exchange faalt vaak door verkeerde Client Secret.</strong> Spotify Dashboard → je app → Settings → <strong>Show client secret</strong> → opnieuw kopiëren (geen spaties voor/achter) → in Vercel <strong>AUTH_SPOTIFY_SECRET</strong> overschrijven → <strong>Redeploy</strong>. Bij “Regenerate” in Spotify moet je het geheim in Vercel opnieuw invullen.
-              </li>
-              <li>
-                <strong>Lokaal:</strong> Open de app via <code>http://127.0.0.1:3000</code> (niet localhost). In Spotify Dashboard → Redirect URIs: voeg <code>http://127.0.0.1:3000/api/auth/callback/spotify</code> toe. In <code>.env.local</code>: <code>NEXTAUTH_URL=http://127.0.0.1:3000</code>. Kijk in de <strong>terminal</strong> waar <code>npm run start</code> draait: na een mislukte login staat daar <strong>[Spotify token response]</strong> met de echte fout (bijv. <code>invalid_client</code>).
-              </li>
-              <li>
-                Vercel: in Logs zoek <strong>[Spotify token response]</strong> voor de echte fout van Spotify.
-              </li>
-            </ol>
+            <p className="mt-2 text-xs">
+              Redirect URI in Spotify Dashboard moet exact zijn: open{" "}
+              <a href="/api/auth-check" target="_blank" rel="noopener noreferrer" className="underline">
+                /api/auth-check
+              </a>{" "}
+              en kopieer <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong>.
+            </p>
           </div>
         )}
-        {session?.user ? (
+        {session ? (
           <div className="flex w-full flex-col gap-4">
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
               Ingelogd als{" "}
@@ -106,7 +50,7 @@ export default async function Home({ searchParams }: Props) {
           </div>
         ) : (
           <Link
-            href="/api/auth/signin/spotify?callbackUrl=/dashboard"
+            href="/api/auth/spotify/login"
             className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-6 font-medium text-white transition-colors hover:bg-[#1ed760]"
           >
             <svg

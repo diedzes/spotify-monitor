@@ -1,17 +1,13 @@
-import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/auth";
+import { getSpotifySession } from "@/lib/spotify-auth";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getSpotifySession();
 
-  if (!session?.user) {
+  if (!session) {
     redirect("/");
   }
-
-  type SessionWithTokens = typeof session & { access_token?: string };
-  const s = session as SessionWithTokens;
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -28,7 +24,7 @@ export default async function DashboardPage() {
               {session.user.name ?? session.user.email}
             </span>
             <Link
-              href="/api/auth/signout?callbackUrl=/"
+              href="/api/auth/spotify/logout"
               className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             >
               Uitloggen
@@ -41,8 +37,7 @@ export default async function DashboardPage() {
           Dashboard
         </h1>
         <p className="mb-8 text-zinc-600 dark:text-zinc-400">
-          Je bent ingelogd. Je Spotify-token is geldig en wordt automatisch
-          ververst.
+          Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
         </p>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">
@@ -64,7 +59,7 @@ export default async function DashboardPage() {
             <div>
               <dt className="text-zinc-500 dark:text-zinc-400">Access token</dt>
               <dd className="truncate font-mono text-zinc-600 dark:text-zinc-400">
-                {s.access_token ? `${s.access_token.slice(0, 20)}…` : "—"}
+                {session.access_token ? `${session.access_token.slice(0, 20)}…` : "—"}
               </dd>
             </div>
           </dl>

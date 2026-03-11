@@ -11,13 +11,13 @@ export async function GET() {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
   const baseNormalized = baseUrl ? baseUrl.replace(/\/$/, "") : null;
   const callbackUrl = baseNormalized
-    ? `${baseNormalized}/api/auth/callback/spotify`
+    ? `${baseNormalized}/api/auth/spotify/callback`
     : "—";
 
   const isLocalhost =
     baseNormalized?.includes("localhost") ?? false;
   const redirectUriWarning = isLocalhost
-    ? "Spotify staat 'localhost' niet toe als redirect URI. Gebruik voor lokaal testen http://127.0.0.1:PORT (bijv. http://127.0.0.1:3000) en voeg die exacte URL + /api/auth/callback/spotify toe in het Spotify-dashboard."
+    ? "Spotify staat 'localhost' niet toe als redirect URI. Gebruik voor lokaal testen http://127.0.0.1:PORT en voeg die exacte URL + /api/auth/spotify/callback toe in het Spotify-dashboard."
     : null;
 
   const vars = {
