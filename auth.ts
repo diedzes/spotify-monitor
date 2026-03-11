@@ -22,6 +22,10 @@ if (process.env.VERCEL && process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
 }
 if (process.env.NEXTAUTH_URL) {
   process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL.replace(/\/$/, "");
+  // Spotify staat 'localhost' niet toe als redirect URI – gebruik 127.0.0.1
+  if (process.env.NEXTAUTH_URL.startsWith("http://localhost") || process.env.NEXTAUTH_URL.startsWith("https://localhost")) {
+    process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL.replace(/localhost/, "127.0.0.1");
+  }
 }
 
 /** Wordt gezet bij token-fout zodat we die op de pagina kunnen tonen (geen logs nodig). */
@@ -55,6 +59,7 @@ async function spotifyTokenRequest({
   const text = await res.text();
   if (!res.ok) {
     lastSpotifyTokenError = `${res.status}: ${text}`;
+    console.error("[Spotify token response]", res.status, text);
     throw new Error(`Spotify token error ${res.status}: ${text}`);
   }
   return { tokens: JSON.parse(text) as Record<string, unknown> };

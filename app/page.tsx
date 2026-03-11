@@ -80,7 +80,10 @@ export default async function Home({ searchParams }: Props) {
                 <strong>Token exchange faalt vaak door verkeerde Client Secret.</strong> Spotify Dashboard → je app → Settings → <strong>Show client secret</strong> → opnieuw kopiëren (geen spaties voor/achter) → in Vercel <strong>AUTH_SPOTIFY_SECRET</strong> overschrijven → <strong>Redeploy</strong>. Bij “Regenerate” in Spotify moet je het geheim in Vercel opnieuw invullen.
               </li>
               <li>
-                In Vercel Logs (na opnieuw inloggen): zoek <strong>[Spotify token response]</strong>. Daar staat de echte fout van Spotify (bijv. <code>invalid_client</code> = verkeerde Client ID/Secret).
+                <strong>Lokaal:</strong> Open de app via <code>http://127.0.0.1:3000</code> (niet localhost). In Spotify Dashboard → Redirect URIs: voeg <code>http://127.0.0.1:3000/api/auth/callback/spotify</code> toe. In <code>.env.local</code>: <code>NEXTAUTH_URL=http://127.0.0.1:3000</code>. Kijk in de <strong>terminal</strong> waar <code>npm run start</code> draait: na een mislukte login staat daar <strong>[Spotify token response]</strong> met de echte fout (bijv. <code>invalid_client</code>).
+              </li>
+              <li>
+                Vercel: in Logs zoek <strong>[Spotify token response]</strong> voor de echte fout van Spotify.
               </li>
             </ol>
           </div>
