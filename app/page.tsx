@@ -31,6 +31,7 @@ export default async function Home({ searchParams }: Props) {
         {showAuthError && (
           <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <p className="font-medium">Inloggen bij Spotify mislukt.</p>
+            <p className="mt-1 text-xs opacity-90">Je komt wél terug op deze site, dus de <strong>token exchange</strong> faalt (meestal verkeerde Client Secret of redirect_uri in Spotify).</p>
             {spotifyTokenError && (
               <p className="mt-2 font-mono text-xs break-all rounded bg-amber-100 p-2 dark:bg-amber-900/50">
                 <strong>Fout van Spotify:</strong>{" "}

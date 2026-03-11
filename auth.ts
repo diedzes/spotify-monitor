@@ -35,7 +35,13 @@ export function clearLastSpotifyTokenError(): void {
   lastSpotifyTokenError = null;
 }
 
-/** Custom token request: logt de fout en zet lastSpotifyTokenError voor weergave op de pagina. */
+/** Bouw redirect_uri altijd uit NEXTAUTH_URL zodat die exact overeenkomt met auth-check en Spotify. */
+function getSpotifyRedirectUri(): string {
+  const base = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
+  return base ? `${base}/api/auth/callback/spotify` : "";
+}
+
+/** Custom token request: vaste redirect_uri uit env, Basic auth voor client (zoals Spotify aanbeveelt). */
 async function spotifyTokenRequest({
   provider,
   params,
@@ -44,16 +50,23 @@ async function spotifyTokenRequest({
   params: Record<string, string>;
 }) {
   const tokenUrl = provider.token?.url ?? "https://accounts.spotify.com/api/token";
+  const redirectUri = getSpotifyRedirectUri() || (provider.callbackUrl ?? "");
+  const clientId = provider.clientId ?? process.env.AUTH_SPOTIFY_ID ?? process.env.SPOTIFY_CLIENT_ID ?? "";
+  const clientSecret = provider.clientSecret ?? process.env.AUTH_SPOTIFY_SECRET ?? process.env.SPOTIFY_CLIENT_SECRET ?? "";
+
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code: params.code ?? "",
-    redirect_uri: provider.callbackUrl ?? "",
-    client_id: provider.clientId ?? "",
-    client_secret: provider.clientSecret ?? "",
+    redirect_uri: redirectUri,
   });
+
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const res = await fetch(tokenUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
     body: body.toString(),
   });
   const text = await res.text();
