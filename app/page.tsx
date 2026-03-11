@@ -51,6 +51,12 @@ export default async function Home({ searchParams }: Props) {
               <li>
                 Vercel → Environment Variables: <strong>NEXTAUTH_URL</strong> = <code>https://spotify-monitor-ten.vercel.app</code> (alleen Production), daarna <strong>Redeploy</strong>.
               </li>
+              <li>
+                <strong>Client Secret opnieuw kopiëren:</strong> Spotify Dashboard → je app → Settings → <strong>Show client secret</strong> → opnieuw kopiëren (geen spaties) → in Vercel <strong>AUTH_SPOTIFY_SECRET</strong> overschrijven → Redeploy.
+              </li>
+              <li>
+                Na opnieuw proberen: Vercel → Deployments → Logs. Zoek naar <strong>[Spotify callback ontvangen]</strong> – de URL daar laat zien wat Spotify terugstuurde.
+              </li>
             </ol>
           </div>
         )}
