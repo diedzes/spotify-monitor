@@ -56,10 +56,11 @@ export async function GET(request: Request) {
     const baseUrl = getBaseUrl();
     const res = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
     res.cookies.set(getStateCookieName(), "", { maxAge: 0, path: "/" });
+    const isProduction = process.env.NODE_ENV === "production";
     res.cookies.set(getSessionCookieName(), encodeSessionId(session.id), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: getSessionCookieMaxAge(),
       path: "/",
     });
