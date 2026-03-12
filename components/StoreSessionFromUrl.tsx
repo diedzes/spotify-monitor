@@ -11,7 +11,7 @@ export function StoreSessionFromUrl() {
     const sid = params.get("sid");
     if (sid) {
       try {
-        sessionStorage.setItem(SID_KEY, sid);
+        localStorage.setItem(SID_KEY, sid);
       } catch {
         // ignore
       }
@@ -26,7 +26,7 @@ export function StoreSessionFromUrl() {
 export function getStoredSessionId(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return sessionStorage.getItem(SID_KEY);
+    return localStorage.getItem(SID_KEY);
   } catch {
     return null;
   }
@@ -35,7 +35,7 @@ export function getStoredSessionId(): string | null {
 export function clearStoredSessionId(): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.removeItem(SID_KEY);
+    localStorage.removeItem(SID_KEY);
   } catch {
     // ignore
   }

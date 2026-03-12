@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSpotifySession } from "@/lib/spotify-auth";
+import { getSpotifySession, getSessionFromSignedValue } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 
-export default async function DashboardPage() {
-  const session = await getSpotifySession();
+type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
+export default async function DashboardPage({ searchParams }: Props) {
+  let session = await getSpotifySession();
+  if (!session) {
+    const params = await searchParams;
+    const sid = params.sid;
+    if (sid) session = await getSessionFromSignedValue(sid);
+  }
   if (!session) {
     redirect("/");
   }

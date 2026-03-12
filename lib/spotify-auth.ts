@@ -134,7 +134,7 @@ export function decodeSessionId(cookieValue: string): string | null {
   return verifySignedCookie(cookieValue);
 }
 
-async function getSessionFromSignedValue(signedValue: string): Promise<SpotifySession | null> {
+export async function getSessionFromSignedValue(signedValue: string): Promise<SpotifySession | null> {
   const { prisma } = await import("@/lib/db");
   const sessionId = decodeSessionId(signedValue);
   if (!sessionId) return null;
