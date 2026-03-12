@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
 function getSessionHeaderValue(): string | null {
+  const fromStorage = getStoredSessionId();
+  if (fromStorage) return fromStorage;
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`${SESSION_HEADER_COOKIE}=([^;]+)`));
   return match ? decodeURIComponent(match[1].trim()) : null;

@@ -55,10 +55,12 @@ export async function GET(request: Request) {
     });
 
     const baseUrl = getBaseUrl();
-    const res = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
+    const signedSessionId = encodeSessionId(session.id);
+    const dashboardUrl = new URL("/dashboard", baseUrl);
+    dashboardUrl.searchParams.set("sid", signedSessionId);
+    const res = NextResponse.redirect(dashboardUrl, 302);
     res.cookies.set(getStateCookieName(), "", { maxAge: 0, path: "/" });
     const isProduction = process.env.NODE_ENV === "production";
-    const signedSessionId = encodeSessionId(session.id);
     res.cookies.set(getSessionCookieName(), signedSessionId, {
       httpOnly: true,
       secure: isProduction,

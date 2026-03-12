@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSpotifySession } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
+import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 
 export default async function DashboardPage() {
   const session = await getSpotifySession();
@@ -16,6 +17,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+      <StoreSessionFromUrl />
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <Link

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSpotifySession } from "@/lib/spotify-auth";
+import { ClearSessionOnHome } from "@/components/StoreSessionFromUrl";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -11,6 +12,7 @@ export default async function Home({ searchParams }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
+      <ClearSessionOnHome />
       <main className="flex w-full max-w-md flex-col items-center gap-8 px-6 py-16">
         <h1 className="text-center text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           Spotify Monitor

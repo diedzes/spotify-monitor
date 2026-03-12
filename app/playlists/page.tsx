@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
 function getSessionHeaderValue(): string | null {
+  const fromStorage = getStoredSessionId();
+  if (fromStorage) return fromStorage;
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`${SESSION_HEADER_COOKIE}=([^;]+)`));
   return match ? decodeURIComponent(match[1].trim()) : null;
@@ -82,10 +85,7 @@ export default function PlaylistsPage() {
             </ul>
           )}
           <p className="mt-4 text-sm font-medium text-amber-800 dark:text-amber-200">
-            Als &quot;Client had cookie: nee&quot; → ga naar de startpagina, klik <strong>Uitloggen</strong>, log daarna opnieuw in met Spotify. De cookie voor de header wordt alleen gezet bij inloggen.
-          </p>
-          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-            Als &quot;Client had cookie: ja&quot; maar &quot;header bij API: nee&quot; → neem contact op met support.
+            Ga naar de startpagina, klik <strong>Uitloggen</strong>, log daarna opnieuw in met Spotify. Na inloggen wordt de sessie in de URL doorgegeven en opgeslagen voor Tracked playlists.
           </p>
           <Link
             href="/"
