@@ -2,13 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function NewPlaylistPage() {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/playlists", { credentials: "include" })
+      .then((res) => {
+        if (res.status === 401) router.replace("/");
+        else setAuthChecked(true);
+      })
+      .catch(() => setAuthChecked(true));
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +52,14 @@ export default function NewPlaylistPage() {
       setError("Er ging iets mis. Probeer het opnieuw.");
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      </div>
+    );
   }
 
   return (

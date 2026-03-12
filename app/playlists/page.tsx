@@ -1,24 +1,60 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getSpotifySession } from "@/lib/spotify-auth";
-import { prisma } from "@/lib/db";
+"use client";
 
-function formatDate(date: Date | null): string {
-  if (!date) return "—";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
   return new Intl.DateTimeFormat("nl-NL", {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(date);
+  }).format(new Date(iso));
 }
 
-export default async function PlaylistsPage() {
-  const session = await getSpotifySession();
-  if (!session) redirect("/");
+type PlaylistRow = {
+  id: string;
+  name: string;
+  ownerName: string;
+  trackCount: number;
+  lastSyncedAt: string | null;
+  spotifyPlaylistId: string;
+};
 
-  const playlists = await prisma.trackedPlaylist.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-  });
+export default function PlaylistsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/playlists", { credentials: "include" })
+      .then((res) => {
+        if (res.status === 401) {
+          router.replace("/");
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) {
+          setUser(data.user);
+          setPlaylists(data.playlists ?? []);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -32,7 +68,7 @@ export default async function PlaylistsPage() {
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {session.user.name ?? session.user.email}
+              {user.name ?? user.email}
             </span>
             <Link
               href="/api/auth/spotify/logout"
