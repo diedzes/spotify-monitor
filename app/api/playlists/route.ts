@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getSpotifySession, getSessionCookieName, decodeSessionId } from "@/lib/spotify-auth";
+import { getSpotifySessionFromRequest, getSessionCookieName, decodeSessionId } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const session = await getSpotifySession();
+export async function GET(request: Request) {
+  const session = await getSpotifySessionFromRequest(request);
   if (session) {
     const playlists = await prisma.trackedPlaylist.findMany({
       where: { userId: session.user.id },
@@ -27,13 +27,17 @@ export async function GET() {
 
   const store = await cookies();
   const cookieValue = store.get(getSessionCookieName())?.value;
-  const sessionId = cookieValue ? decodeSessionId(cookieValue) : null;
+  const headerValue = request.headers.get("x-spotify-session")?.trim() ?? null;
+  const sessionIdFromCookie = cookieValue ? decodeSessionId(cookieValue) : null;
+  const sessionIdFromHeader = headerValue ? decodeSessionId(headerValue) : null;
+  const sessionId = sessionIdFromCookie ?? sessionIdFromHeader;
   const dbRow = sessionId ? await prisma.session.findUnique({ where: { id: sessionId } }) : null;
   return NextResponse.json(
     {
       error: "Niet ingelogd",
       debug: {
         hasCookie: !!cookieValue,
+        hasHeader: !!headerValue,
         hasValidSessionId: !!sessionId,
         sessionFoundInDb: !!dbRow,
       },

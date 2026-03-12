@@ -4,6 +4,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+const SESSION_HEADER_COOKIE = "spotify_session_s";
+
+function getSessionHeaderValue(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`${SESSION_HEADER_COOKIE}=([^;]+)`));
+  return match ? decodeURIComponent(match[1].trim()) : null;
+}
+
+function sessionHeaders(): HeadersInit {
+  const h: HeadersInit = { "Content-Type": "application/json" };
+  const v = getSessionHeaderValue();
+  if (v) (h as Record<string, string>)["X-Spotify-Session"] = v;
+  return h;
+}
+
 export default function NewPlaylistPage() {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -12,7 +27,7 @@ export default function NewPlaylistPage() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetch("/api/playlists", { credentials: "include" })
+    fetch("/api/playlists", { credentials: "include", headers: sessionHeaders() })
       .then((res) => {
         if (res.status === 401) router.replace("/");
         else setAuthChecked(true);
@@ -32,7 +47,7 @@ export default function NewPlaylistPage() {
     try {
       const res = await fetch("/api/playlists/add", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: sessionHeaders(),
         body: JSON.stringify({ playlistUrlOrId: trimmed }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string } | undefined;

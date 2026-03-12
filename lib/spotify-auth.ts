@@ -7,6 +7,8 @@ import { createHmac, randomBytes } from "node:crypto";
 
 const STATE_COOKIE = "spotify_auth_state";
 const SESSION_COOKIE = "spotify_session";
+/** Client-leesbare cookie (zelfde waarde) zodat fetch kan meesturen in header als Cookie niet gaat */
+export const SESSION_HEADER_COOKIE = "spotify_session_s";
 const STATE_MAX_AGE = 60 * 10; // 10 min
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 dagen
 
@@ -132,14 +134,9 @@ export function decodeSessionId(cookieValue: string): string | null {
   return verifySignedCookie(cookieValue);
 }
 
-/** Gebruik in Server Components: leest sessie uit cookie (session-id) en haalt sessie uit DB. */
-export async function getSpotifySession(): Promise<SpotifySession | null> {
-  const { cookies } = await import("next/headers");
+async function getSessionFromSignedValue(signedValue: string): Promise<SpotifySession | null> {
   const { prisma } = await import("@/lib/db");
-  const store = await cookies();
-  const value = store.get(getSessionCookieName())?.value;
-  if (!value) return null;
-  const sessionId = decodeSessionId(value);
+  const sessionId = decodeSessionId(signedValue);
   if (!sessionId) return null;
   const row = await prisma.session.findUnique({ where: { id: sessionId } });
   if (!row || row.expiresAt < new Date()) return null;
@@ -149,4 +146,28 @@ export async function getSpotifySession(): Promise<SpotifySession | null> {
     refresh_token: row.refreshToken ?? undefined,
     expires_at: Math.floor(row.expiresAt.getTime() / 1000),
   };
+}
+
+/** Gebruik in Server Components: leest sessie uit cookie (session-id) en haalt sessie uit DB. */
+export async function getSpotifySession(): Promise<SpotifySession | null> {
+  const { cookies } = await import("next/headers");
+  const store = await cookies();
+  const value = store.get(getSessionCookieName())?.value;
+  if (!value) return null;
+  return getSessionFromSignedValue(value);
+}
+
+/** Voor API routes: probeer cookie, anders X-Spotify-Session header (client stuurt die vanuit leesbare cookie). */
+export async function getSpotifySessionFromRequest(request: Request): Promise<SpotifySession | null> {
+  const cookieHeader = request.headers.get("cookie");
+  const sessionCookie = getSessionCookieName();
+  const match = cookieHeader?.match(new RegExp(`${sessionCookie}=([^;]+)`));
+  const fromCookie = match?.[1] ? decodeURIComponent(match[1].trim()) : null;
+  if (fromCookie) {
+    const s = await getSessionFromSignedValue(fromCookie);
+    if (s) return s;
+  }
+  const fromHeader = request.headers.get("x-spotify-session");
+  if (fromHeader) return getSessionFromSignedValue(fromHeader.trim());
+  return null;
 }

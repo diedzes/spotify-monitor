@@ -11,6 +11,7 @@ import {
   getStateCookieName,
   getSessionCookieName,
   getSessionCookieMaxAge,
+  SESSION_HEADER_COOKIE,
 } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 
@@ -57,8 +58,16 @@ export async function GET(request: Request) {
     const res = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
     res.cookies.set(getStateCookieName(), "", { maxAge: 0, path: "/" });
     const isProduction = process.env.NODE_ENV === "production";
-    res.cookies.set(getSessionCookieName(), encodeSessionId(session.id), {
+    const signedSessionId = encodeSessionId(session.id);
+    res.cookies.set(getSessionCookieName(), signedSessionId, {
       httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: getSessionCookieMaxAge(),
+      path: "/",
+    });
+    res.cookies.set(SESSION_HEADER_COOKIE, signedSessionId, {
+      httpOnly: false,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
       maxAge: getSessionCookieMaxAge(),

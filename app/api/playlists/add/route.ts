@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSpotifySession } from "@/lib/spotify-auth";
+import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import {
   parsePlaylistIdFromInput,
@@ -9,7 +9,7 @@ import {
 import { Prisma } from "@prisma/client";
 
 export async function POST(request: Request) {
-  const session = await getSpotifySession();
+  const session = await getSpotifySessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
   }

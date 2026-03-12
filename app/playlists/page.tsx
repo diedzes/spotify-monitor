@@ -1,8 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const SESSION_HEADER_COOKIE = "spotify_session_s";
+
+function getSessionHeaderValue(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`${SESSION_HEADER_COOKIE}=([^;]+)`));
+  return match ? decodeURIComponent(match[1].trim()) : null;
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -26,10 +33,13 @@ export default function PlaylistsPage() {
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
+  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasHeader: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
 
   useEffect(() => {
-    fetch("/api/playlists", { credentials: "include" })
+    const sessionValue = getSessionHeaderValue();
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (sessionValue) headers["X-Spotify-Session"] = sessionValue;
+    fetch("/api/playlists", { credentials: "include", headers })
       .then((res) => res.json().then((data) => ({ status: res.status, data })))
       .then(({ status, data }) => {
         if (status === 401) {
@@ -64,13 +74,14 @@ export default function PlaylistsPage() {
           </h1>
           {d && (
             <ul className="mt-3 list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
-              <li>Cookie bij API ontvangen: {d.hasCookie ? "ja" : "nee"}</li>
+              <li>Cookie bij API: {d.hasCookie ? "ja" : "nee"}</li>
+              <li>X-Spotify-Session header bij API: {d.hasHeader ? "ja" : "nee"}</li>
               <li>Session-id geldig: {d.hasValidSessionId ? "ja" : "nee"}</li>
               <li>Sessie in DB: {d.sessionFoundInDb ? "ja" : "nee"}</li>
             </ul>
           )}
           <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
-            Als &quot;Cookie bij API: nee&quot; → de browser stuurt de cookie niet mee met de fetch.
+            De client stuurt nu ook een leesbare cookie mee in de header. Log opnieuw in na deze deploy.
           </p>
           <Link
             href="/"
