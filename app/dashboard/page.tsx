@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSpotifySession } from "@/lib/spotify-auth";
+import { prisma } from "@/lib/db";
 
 export default async function DashboardPage() {
   const session = await getSpotifySession();
@@ -8,6 +9,10 @@ export default async function DashboardPage() {
   if (!session) {
     redirect("/");
   }
+
+  const trackedPlaylistCount = await prisma.trackedPlaylist.count({
+    where: { userId: session.user.id },
+  });
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -39,6 +44,22 @@ export default async function DashboardPage() {
         <p className="mb-8 text-zinc-600 dark:text-zinc-400">
           Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
         </p>
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/playlists"
+            className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
+              Tracked playlists
+            </h2>
+            <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {trackedPlaylistCount}
+            </p>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Playlists die je volgt
+            </p>
+          </Link>
+        </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">
             Sessie

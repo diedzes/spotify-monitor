@@ -1,0 +1,31 @@
+// Prisma schema – PostgreSQL
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TrackedPlaylist {
+  id                String    @id @default(cuid())
+  userId            String    // Spotify user id uit sessie
+  spotifyPlaylistId String
+  name              String
+  description       String?
+  ownerName         String
+  imageUrl          String?
+  snapshotId        String?
+  trackCount        Int       @default(0)
+  isPublic          Boolean   @default(true)
+  isCollaborative   Boolean   @default(false)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, spotifyPlaylistId])
+  @@map("tracked_playlists")
+}
