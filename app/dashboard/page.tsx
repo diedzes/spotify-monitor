@@ -47,6 +47,7 @@ export default async function DashboardPage() {
         <div className="mb-8 grid gap-4 sm:grid-cols-2">
           <Link
             href="/playlists"
+            prefetch={false}
             className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
           >
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
