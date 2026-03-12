@@ -45,10 +45,9 @@ export default async function DashboardPage() {
           Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
         </p>
         <div className="mb-8 grid gap-4 sm:grid-cols-2">
-          <Link
+          <a
             href="/playlists"
-            prefetch={false}
-            className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+            className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
           >
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
               Tracked playlists
@@ -59,7 +58,7 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               Playlists die je volgt
             </p>
-          </Link>
+          </a>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">

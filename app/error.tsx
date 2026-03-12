@@ -20,11 +20,13 @@ export default function Error({
           Er ging iets mis
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Controleer of op Vercel de environment variables goed staan (o.a.{" "}
-          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">DATABASE_URL</code>
-          ). Gebruik de <strong>Session pooler</strong>-URL (poort 6543) en zet de
-          variabele ook bij <strong>Build</strong>, niet alleen bij Production.
+          Op Vercel: <strong>Deployments</strong> → klik op de deployment → <strong>Functions</strong> of <strong>Runtime Logs</strong> om de echte foutmelding te zien.
         </p>
+        <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <li><code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">DATABASE_URL</code> = Session pooler (poort 6543) + <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">?sslmode=require</code></li>
+          <li>Variabele voor <strong>Production</strong> én <strong>Preview</strong> aanzetten</li>
+          <li>Ook <strong>AUTH_SECRET</strong>, <strong>AUTH_SPOTIFY_ID</strong>, <strong>AUTH_SPOTIFY_SECRET</strong> moeten gezet zijn</li>
+        </ul>
         <button
           type="button"
           onClick={() => reset()}
