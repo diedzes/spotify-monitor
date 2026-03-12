@@ -6,13 +6,13 @@ import { cookies } from "next/headers";
 import {
   exchangeCodeForTokens,
   getSpotifyProfile,
-  encodeSession,
+  encodeSessionId,
   getBaseUrl,
   getStateCookieName,
   getSessionCookieName,
   getSessionCookieMaxAge,
-  type SpotifySession,
 } from "@/lib/spotify-auth";
+import { prisma } from "@/lib/db";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -40,22 +40,23 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeCodeForTokens(code);
     const profile = await getSpotifyProfile(tokens.access_token);
+    const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000);
 
-    const session: SpotifySession = {
-      user: {
-        id: profile.id,
-        name: profile.display_name,
-        email: profile.email,
+    const session = await prisma.session.create({
+      data: {
+        userId: profile.id,
+        userName: profile.display_name,
+        userEmail: profile.email,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? null,
+        expiresAt,
       },
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_at: Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 3600),
-    };
+    });
 
     const baseUrl = getBaseUrl();
     const res = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
     res.cookies.set(getStateCookieName(), "", { maxAge: 0, path: "/" });
-    res.cookies.set(getSessionCookieName(), encodeSession(session), {
+    res.cookies.set(getSessionCookieName(), encodeSessionId(session.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

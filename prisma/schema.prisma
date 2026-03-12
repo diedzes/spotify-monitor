@@ -10,6 +10,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Session {
+  id           String   @id @default(cuid())
+  userId       String   // Spotify user id
+  userName     String?
+  userEmail    String?
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@map("sessions")
+}
+
 model TrackedPlaylist {
   id                String    @id @default(cuid())
   userId            String    // Spotify user id uit sessie

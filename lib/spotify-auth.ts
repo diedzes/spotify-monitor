@@ -122,25 +122,31 @@ export interface SpotifySession {
   expires_at: number;
 }
 
-export function encodeSession(session: SpotifySession): string {
-  return signCookie(JSON.stringify(session));
+/** Cookie waarde voor server-side sessie: alleen signed session-id (klein, onder 4KB-limiet). */
+export function encodeSessionId(sessionId: string): string {
+  return signCookie(sessionId);
 }
 
-export function decodeSession(cookieValue: string): SpotifySession | null {
-  const raw = verifySignedCookie(cookieValue);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as SpotifySession;
-  } catch {
-    return null;
-  }
+/** Lees session-id uit cookie (geverifieerde handtekening). */
+export function decodeSessionId(cookieValue: string): string | null {
+  return verifySignedCookie(cookieValue);
 }
 
-/** Gebruik in Server Components: leest sessie uit cookie. */
+/** Gebruik in Server Components: leest sessie uit cookie (session-id) en haalt sessie uit DB. */
 export async function getSpotifySession(): Promise<SpotifySession | null> {
   const { cookies } = await import("next/headers");
+  const { prisma } = await import("@/lib/db");
   const store = await cookies();
   const value = store.get(getSessionCookieName())?.value;
   if (!value) return null;
-  return decodeSession(value);
+  const sessionId = decodeSessionId(value);
+  if (!sessionId) return null;
+  const row = await prisma.session.findUnique({ where: { id: sessionId } });
+  if (!row || row.expiresAt < new Date()) return null;
+  return {
+    user: { id: row.userId, name: row.userName, email: row.userEmail },
+    access_token: row.accessToken,
+    refresh_token: row.refreshToken ?? undefined,
+    expires_at: Math.floor(row.expiresAt.getTime() / 1000),
+  };
 }
