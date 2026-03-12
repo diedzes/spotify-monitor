@@ -29,16 +29,16 @@ type PlaylistRow = {
 };
 
 export default function PlaylistsPage() {
-  const router = useRouter();
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasHeader: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
+  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasHeader: boolean; clientHadSessionCookie?: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
 
   useEffect(() => {
     const sessionValue = getSessionHeaderValue();
     const headers: HeadersInit = { "Content-Type": "application/json" };
     if (sessionValue) headers["X-Spotify-Session"] = sessionValue;
+    (headers as Record<string, string>)["X-Debug-Client-Had-Session-Cookie"] = sessionValue ? "1" : "0";
     fetch("/api/playlists", { credentials: "include", headers })
       .then((res) => res.json().then((data) => ({ status: res.status, data })))
       .then(({ status, data }) => {
@@ -76,12 +76,16 @@ export default function PlaylistsPage() {
             <ul className="mt-3 list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
               <li>Cookie bij API: {d.hasCookie ? "ja" : "nee"}</li>
               <li>X-Spotify-Session header bij API: {d.hasHeader ? "ja" : "nee"}</li>
+              <li>Client had cookie spotify_session_s: {d.clientHadSessionCookie ? "ja" : "nee"}</li>
               <li>Session-id geldig: {d.hasValidSessionId ? "ja" : "nee"}</li>
               <li>Sessie in DB: {d.sessionFoundInDb ? "ja" : "nee"}</li>
             </ul>
           )}
-          <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
-            De client stuurt nu ook een leesbare cookie mee in de header. Log opnieuw in na deze deploy.
+          <p className="mt-4 text-sm font-medium text-amber-800 dark:text-amber-200">
+            Als &quot;Client had cookie: nee&quot; → ga naar de startpagina, klik <strong>Uitloggen</strong>, log daarna opnieuw in met Spotify. De cookie voor de header wordt alleen gezet bij inloggen.
+          </p>
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+            Als &quot;Client had cookie: ja&quot; maar &quot;header bij API: nee&quot; → neem contact op met support.
           </p>
           <Link
             href="/"

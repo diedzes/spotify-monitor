@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   const store = await cookies();
   const cookieValue = store.get(getSessionCookieName())?.value;
   const headerValue = request.headers.get("x-spotify-session")?.trim() ?? null;
+  const clientHadCookie = request.headers.get("x-debug-client-had-session-cookie") === "1";
   const sessionIdFromCookie = cookieValue ? decodeSessionId(cookieValue) : null;
   const sessionIdFromHeader = headerValue ? decodeSessionId(headerValue) : null;
   const sessionId = sessionIdFromCookie ?? sessionIdFromHeader;
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
       debug: {
         hasCookie: !!cookieValue,
         hasHeader: !!headerValue,
+        clientHadSessionCookie: clientHadCookie,
         hasValidSessionId: !!sessionId,
         sessionFoundInDb: !!dbRow,
       },
