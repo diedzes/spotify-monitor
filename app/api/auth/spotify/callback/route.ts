@@ -7,6 +7,7 @@ import {
   exchangeCodeForTokens,
   getSpotifyProfile,
   encodeSession,
+  getBaseUrl,
   getStateCookieName,
   getSessionCookieName,
   getSessionCookieMaxAge,
@@ -51,7 +52,8 @@ export async function GET(request: Request) {
       expires_at: Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 3600),
     };
 
-    const res = NextResponse.redirect(new URL("/dashboard", request.url), 302);
+    const baseUrl = getBaseUrl();
+    const res = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
     res.cookies.set(getStateCookieName(), "", { maxAge: 0, path: "/" });
     res.cookies.set(getSessionCookieName(), encodeSession(session), {
       httpOnly: true,

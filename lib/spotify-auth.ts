@@ -10,7 +10,7 @@ const SESSION_COOKIE = "spotify_session";
 const STATE_MAX_AGE = 60 * 10; // 10 min
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 dagen
 
-function getBaseUrl(): string {
+export function getBaseUrl(): string {
   let url = process.env.NEXTAUTH_URL ?? (process.env.VERCEL && process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   url = url.replace(/\/$/, "");
   if (!url) url = "http://127.0.0.1:3000";
