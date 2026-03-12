@@ -26,30 +26,59 @@ export default function PlaylistsPage() {
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
 
   useEffect(() => {
     fetch("/api/playlists", { credentials: "include" })
-      .then((res) => {
-        if (res.status === 401) {
-          router.replace("/");
-          return null;
+      .then((res) => res.json().then((data) => ({ status: res.status, data })))
+      .then(({ status, data }) => {
+        if (status === 401) {
+          setAuthError(data);
+          setLoading(false);
+          return;
         }
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
+        if (data?.user) {
           setUser(data.user);
           setPlaylists(data.playlists ?? []);
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [router]);
+  }, []);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      </div>
+    );
+  }
+
+  if (authError) {
+    const d = authError.debug;
+    return (
+      <div className="min-h-screen bg-zinc-50 p-6 font-sans dark:bg-zinc-950">
+        <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
+          <h1 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+            API gaf 401 – debug (bij fetch naar /api/playlists)
+          </h1>
+          {d && (
+            <ul className="mt-3 list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
+              <li>Cookie bij API ontvangen: {d.hasCookie ? "ja" : "nee"}</li>
+              <li>Session-id geldig: {d.hasValidSessionId ? "ja" : "nee"}</li>
+              <li>Sessie in DB: {d.sessionFoundInDb ? "ja" : "nee"}</li>
+            </ul>
+          )}
+          <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
+            Als &quot;Cookie bij API: nee&quot; → de browser stuurt de cookie niet mee met de fetch.
+          </p>
+          <Link
+            href="/"
+            className="mt-4 inline-block rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
+          >
+            Naar login
+          </Link>
+        </div>
       </div>
     );
   }
