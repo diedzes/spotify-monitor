@@ -33,9 +33,11 @@ export async function GET(request: Request) {
   const sessionIdFromHeader = headerValue ? decodeSessionId(headerValue) : null;
   const sessionId = sessionIdFromCookie ?? sessionIdFromHeader;
   const dbRow = sessionId ? await prisma.session.findUnique({ where: { id: sessionId } }) : null;
+  const validIdButNotInDb = !!sessionId && !dbRow;
   return NextResponse.json(
     {
       error: "Niet ingelogd",
+      hint: validIdButNotInDb ? "session_not_in_db" : undefined,
       debug: {
         hasCookie: !!cookieValue,
         hasHeader: !!headerValue,

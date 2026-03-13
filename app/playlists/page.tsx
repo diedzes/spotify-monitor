@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -39,7 +39,10 @@ export default function PlaylistsPage() {
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasHeader: boolean; clientHadSessionCookie?: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
+  const [authError, setAuthError] = useState<{
+    hint?: string;
+    debug?: { hasCookie: boolean; hasHeader: boolean; clientHadSessionCookie?: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean };
+  } | null>(null);
 
   useEffect(() => {
     const sessionValue = getSessionHeaderValue(sidFromUrl);
@@ -73,29 +76,37 @@ export default function PlaylistsPage() {
 
   if (authError) {
     const d = authError.debug;
+    const sessionNotInDb = authError.hint === "session_not_in_db";
+    if (sessionNotInDb) clearStoredSessionId(); // oude sid weg, straks opnieuw inloggen op deze site
     return (
       <div className="min-h-screen bg-zinc-50 p-6 font-sans dark:bg-zinc-950">
         <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
           <h1 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
-            API gaf 401 – debug (bij fetch naar /api/playlists)
+            {sessionNotInDb ? "Sessie hoort bij andere omgeving" : "API gaf 401"}
           </h1>
+          {sessionNotInDb ? (
+            <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
+              Je sessie staat niet in de database van <strong>deze</strong> site. Dat gebeurt o.a. als je op een andere URL
+              was ingelogd (bijv. localhost vs Vercel, of preview vs productie) of na een nieuwe deploy met andere database.
+            </p>
+          ) : null}
           {d && (
             <ul className="mt-3 list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
               <li>Cookie bij API: {d.hasCookie ? "ja" : "nee"}</li>
               <li>X-Spotify-Session header bij API: {d.hasHeader ? "ja" : "nee"}</li>
-              <li>Client had cookie spotify_session_s: {d.clientHadSessionCookie ? "ja" : "nee"}</li>
               <li>Session-id geldig: {d.hasValidSessionId ? "ja" : "nee"}</li>
               <li>Sessie in DB: {d.sessionFoundInDb ? "ja" : "nee"}</li>
             </ul>
           )}
           <p className="mt-4 text-sm font-medium text-amber-800 dark:text-amber-200">
-            Ga naar de startpagina, klik <strong>Uitloggen</strong>, log daarna opnieuw in met Spotify. Na inloggen wordt de sessie in de URL doorgegeven en opgeslagen voor Tracked playlists.
+            <strong>Oplossing:</strong> Ga naar de startpagina <em>van dezezelfde site</em> (onderstaande knop), klik eventueel
+            eerst op <strong>Uitloggen</strong>, en log daarna opnieuw in met Spotify. Kom daarna via het <strong>Dashboard</strong> → Tracked playlists.
           </p>
           <Link
             href="/"
             className="mt-4 inline-block rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
           >
-            Naar login
+            Naar startpagina
           </Link>
         </div>
       </div>

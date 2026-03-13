@@ -104,6 +104,31 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenResponse
   return JSON.parse(text) as TokenResponse;
 }
 
+/** Vernieuw access token met refresh token (zoals PHP-docs: zonder user interaction). */
+export async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
+  const clientId = process.env.AUTH_SPOTIFY_ID ?? process.env.SPOTIFY_CLIENT_ID ?? "";
+  const clientSecret = process.env.AUTH_SPOTIFY_SECRET ?? process.env.SPOTIFY_CLIENT_SECRET ?? "";
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body: body.toString(),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    console.error("[Spotify refresh token]", res.status, text);
+    throw new Error(`Spotify refresh ${res.status}: ${text}`);
+  }
+  return JSON.parse(text) as TokenResponse;
+}
+
 export async function getSpotifyProfile(accessToken: string): Promise<{ id: string; display_name: string | null; email: string | null }> {
   const res = await fetch("https://api.spotify.com/v1/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -139,13 +164,40 @@ export async function getSessionFromSignedValue(signedValue: string): Promise<Sp
   const sessionId = decodeSessionId(signedValue);
   if (!sessionId) return null;
   const row = await prisma.session.findUnique({ where: { id: sessionId } });
-  if (!row || row.expiresAt < new Date()) return null;
-  return {
-    user: { id: row.userId, name: row.userName, email: row.userEmail },
-    access_token: row.accessToken,
-    refresh_token: row.refreshToken ?? undefined,
-    expires_at: Math.floor(row.expiresAt.getTime() / 1000),
-  };
+  if (!row) return null;
+
+  const now = new Date();
+  const bufferMs = 5 * 60 * 1000; // 5 min – vernieuw net vóór verloop (zoals PHP auto_refresh)
+  if (row.expiresAt.getTime() > now.getTime() + bufferMs) {
+    return {
+      user: { id: row.userId, name: row.userName, email: row.userEmail },
+      access_token: row.accessToken,
+      refresh_token: row.refreshToken ?? undefined,
+      expires_at: Math.floor(row.expiresAt.getTime() / 1000),
+    };
+  }
+
+  if (!row.refreshToken) return null;
+  try {
+    const tokens = await refreshAccessToken(row.refreshToken);
+    const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000);
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? row.refreshToken,
+        expiresAt,
+      },
+    });
+    return {
+      user: { id: row.userId, name: row.userName, email: row.userEmail },
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token ?? row.refreshToken,
+      expires_at: Math.floor(expiresAt.getTime() / 1000),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Gebruik in Server Components: leest sessie uit cookie (session-id) en haalt sessie uit DB. */
