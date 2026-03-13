@@ -33,6 +33,13 @@ type PlaylistRow = {
   spotifyPlaylistId: string;
 };
 
+function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
+  const sessionValue = getSessionHeaderValue(sidFromUrl);
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (sessionValue) (headers as Record<string, string>)["X-Spotify-Session"] = sessionValue;
+  return headers;
+}
+
 export default function PlaylistsPage() {
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
@@ -43,6 +50,8 @@ export default function PlaylistsPage() {
     hint?: string;
     debug?: { hasCookie: boolean; hasHeader: boolean; clientHadSessionCookie?: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean };
   } | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     const sessionValue = getSessionHeaderValue(sidFromUrl);
@@ -150,6 +159,9 @@ export default function PlaylistsPage() {
             Add playlist
           </Link>
         </div>
+        {syncError && (
+          <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{syncError}</p>
+        )}
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <table className="w-full text-left text-sm">
             <thead>
@@ -174,21 +186,59 @@ export default function PlaylistsPage() {
                     key={p.id}
                     className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
                   >
-                    <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{p.name}</td>
+                    <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">
+                      <Link href={`/playlists/${p.id}`} className="hover:underline">
+                        {p.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.ownerName}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.trackCount}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {formatDate(p.lastSyncedAt)}
                     </td>
                     <td className="px-4 py-3">
-                      <a
-                        href={`https://open.spotify.com/playlist/${p.spotifyPlaylistId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#1DB954] hover:underline"
-                      >
-                        Open in Spotify
-                      </a>
+                      <span className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={syncingId === p.id}
+                          onClick={async () => {
+                            setSyncError(null);
+                            setSyncingId(p.id);
+                            try {
+                              const res = await fetch(`/api/playlists/${p.id}/sync`, {
+                                method: "POST",
+                                credentials: "include",
+                                headers: getSessionHeaders(sidFromUrl),
+                              });
+                              const data = (await res.json()) as { ok?: boolean; error?: string };
+                              if (!res.ok || !data.ok) {
+                                setSyncError(data.error ?? "Sync mislukt");
+                                return;
+                              }
+                              const h = getSessionHeaders(sidFromUrl);
+                              (h as Record<string, string>)["X-Debug-Client-Had-Session-Cookie"] = "0";
+                              const listRes = await fetch("/api/playlists", { credentials: "include", headers: h });
+                              const listData = await listRes.json();
+                              if (listData?.playlists) setPlaylists(listData.playlists);
+                            } catch {
+                              setSyncError("Sync mislukt");
+                            } finally {
+                              setSyncingId(null);
+                            }
+                          }}
+                          className="rounded bg-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
+                        >
+                          {syncingId === p.id ? "Sync…" : "Sync now"}
+                        </button>
+                        <a
+                          href={`https://open.spotify.com/playlist/${p.spotifyPlaylistId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#1DB954] hover:underline"
+                        >
+                          Open in Spotify
+                        </a>
+                      </span>
                     </td>
                   </tr>
                 ))

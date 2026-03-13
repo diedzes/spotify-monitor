@@ -24,21 +24,48 @@ model Session {
 }
 
 model TrackedPlaylist {
-  id                String    @id @default(cuid())
-  userId            String    // Spotify user id uit sessie
+  id                String             @id @default(cuid())
+  userId            String             // Spotify user id uit sessie
   spotifyPlaylistId String
   name              String
   description       String?
   ownerName         String
   imageUrl          String?
   snapshotId        String?
-  trackCount        Int       @default(0)
-  isPublic          Boolean   @default(true)
-  isCollaborative   Boolean   @default(false)
+  trackCount        Int                @default(0)
+  isPublic          Boolean            @default(true)
+  isCollaborative   Boolean            @default(false)
   lastSyncedAt      DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  snapshots         PlaylistSnapshot[]
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
+}
+
+model PlaylistSnapshot {
+  id                String         @id @default(cuid())
+  trackedPlaylistId String
+  spotifySnapshotId String
+  syncedAt          DateTime       @default(now())
+  trackedPlaylist   TrackedPlaylist @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+  tracks            SnapshotTrack[]
+
+  @@map("playlist_snapshots")
+}
+
+model SnapshotTrack {
+  id                String           @id @default(cuid())
+  snapshotId        String
+  spotifyTrackId    String
+  spotifyUri        String
+  spotifyUrl        String
+  title             String
+  artistsJson       String           // JSON array of {name, id?}
+  album             String
+  position          Int              // 0-based index in playlist
+  snapshot          PlaylistSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@map("snapshot_tracks")
 }
