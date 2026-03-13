@@ -70,6 +70,28 @@ De tabel `sessions` in Supabase wordt alleen gevuld wanneer je **op de live Verc
 
 Als je daarna in Supabase nog steeds geen rijen in `sessions` ziet, wijst `DATABASE_URL` op Vercel waarschijnlijk naar een andere database, of de callback faalt voordat de sessie wordt opgeslagen (zie de logs).
 
+### Overzicht: wat kan er misgaan tussen Vercel en database?
+
+Als je **"Sessie hoort bij andere omgeving"** ziet (Session-id geldig: ja, Sessie in DB: nee), dan gebruikt de pagina/API een andere database of omgeving dan waar je ingelogd bent. Onderstaande punten kun je nalopen.
+
+| # | Oorzaak | Wat er gebeurt | Controle / oplossing |
+|---|--------|-----------------|----------------------|
+| 1 | **Andere URL gebruikt voor inloggen** | Je logde in op localhost of een preview-URL; de sessie staat in de DB van die omgeving. Op productie is er geen sessie. | Altijd inloggen op **dezelfde** URL als waar je Playlists opent. Gebruik alleen de productie-URL (of alleen localhost) en kom via Dashboard → Tracked playlists. |
+| 2 | **`DATABASE_URL` op Vercel wijst naar andere database** | Production en Preview kunnen verschillende env vars hebben, of de waarde is een ander Supabase-project. | Vercel → Project → **Settings** → **Environment Variables**. Controleer dat **Production** (en **Preview** als je die gebruikt) exact dezelfde `DATABASE_URL` hebben als het Supabase-project waar je in de Table Editor kijkt. |
+| 3 | **Preview vs Production** | Je opent een Preview-deploy (bijv. van een branch) maar logde in op Production, of andersom. | Zet voor **Preview** dezelfde `DATABASE_URL` als voor Production, of gebruik alleen de Production-URL om in te loggen én Playlists te openen. |
+| 4 | **Sessie nooit aangemaakt op deze deploy** | De callback na Spotify-login is niet op deze Vercel-deploy uitgevoerd, of is daar gefaald vóór `prisma.session.create`. | Log op **deze** site opnieuw in (startpagina → Uitloggen → Inloggen met Spotify). Controleer Vercel → **Logs** voor de callback-route; bij fouten staat daar `[Spotify callback]`. |
+| 5 | **Database niet bereikbaar vanaf Vercel** | Time-out of verbindingsfout bij schrijven/lezen (verkeerde pooler, firewall, of wachtwoord). | Gebruik de **Transaction**-pooler-URL (poort 6543, `?pgbouncer=true`) voor serverless. Test de connection string lokaal met `npx prisma db pull` of een kleine query. |
+| 6 | **Tabel `sessions` ontbreekt of ander schema** | Migraties zijn op deze database niet gedraaid. | In Supabase: **Table Editor** → controleer of de tabel `sessions` bestaat. Zo niet: voer de SQL uit `prisma/migrations/.../migration.sql` uit, of run `npx prisma migrate deploy` tegen deze `DATABASE_URL`. |
+| 7 | **Oude sessie-id in browser** | Er staat nog een `sid` in localStorage van een vorige sessie of andere omgeving; die sessie bestaat niet in **deze** DB. | Klik op "Naar startpagina" (die wist de opgeslagen sid). Log daarna op **deze** URL opnieuw in en ga via Dashboard → Tracked playlists. |
+| 8 | **Cookie wordt niet meegestuurd** | Sessie-cookie wordt niet meegestuurd (SameSite, ander domein). De app valt terug op de `sid` in de link; als die van een andere omgeving komt, vindt de API geen sessie. | Ga **via het Dashboard** naar Tracked playlists (link met `?sid=...`), zodat de juiste sid voor deze omgeving wordt gebruikt. Na opnieuw inloggen op deze site is de nieuwe sid correct. |
+
+**Praktische checklist als het blijft misgaan**
+
+1. Gebruik **één vaste URL** (bijv. `https://jouw-app.vercel.app`) voor inloggen én voor Playlists.
+2. In Vercel: **Production** en **Preview** dezelfde `DATABASE_URL` (zelfde Supabase-project).
+3. In Supabase: in **dat** project de tabel `sessions` controleren; na een geslaagde login op die URL moet daar een rij bijkomen.
+4. Na wijziging van env vars op Vercel: **Redeploy** doen (env wordt bij build geladen).
+
 ## Prisma (database)
 
 De app gebruikt [Prisma](https://www.prisma.io/) met PostgreSQL.

@@ -42,12 +42,12 @@ export default async function DashboardPage({ searchParams }: Props) {
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               {session.user.name ?? session.user.email}
             </span>
-            <Link
+            <a
               href="/api/auth/spotify/logout"
               className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             >
               Uitloggen
-            </Link>
+            </a>
           </div>
         </div>
       </header>
