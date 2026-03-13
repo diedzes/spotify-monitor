@@ -50,6 +50,7 @@ type PlaylistDetail = {
     trackCount: number;
     lastSyncedAt: string | null;
     snapshotId: string | null;
+    groups?: Array<{ id: string; name: string }>;
   };
   snapshots: Array<{
     id: string;
@@ -213,6 +214,39 @@ export default function PlaylistDetailPage() {
             {syncMessage}
           </p>
         )}
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">
+            Groepen
+          </h2>
+          <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Deze playlist zit in de volgende groepen.
+          </p>
+          {(playlist.groups?.length ?? 0) === 0 ? (
+            <p className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+              Nog in geen groep. Voeg toe via &quot;Add to group&quot; op het playlists-overzicht of hieronder.
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {playlist.groups?.map((g) => (
+                <li key={g.id}>
+                  <Link
+                    href={`/groups/${g.id}`}
+                    className="rounded bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
+                  >
+                    {g.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href={`/playlists/${id}/add-to-group`}
+            className="mt-2 inline-block text-sm text-[#1DB954] hover:underline"
+          >
+            Add to group
+          </Link>
+        </section>
 
         <section className="mb-8">
           <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">

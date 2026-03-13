@@ -22,6 +22,10 @@ export async function GET(
         take: 50,
         select: { id: true, spotifySnapshotId: true, syncedAt: true, _count: { select: { tracks: true } } },
       },
+      groupPlaylists: {
+        where: { group: { userId: session.user.id } },
+        include: { group: { select: { id: true, name: true } } },
+      },
     },
   });
 
@@ -66,6 +70,7 @@ export async function GET(
       trackCount: playlist.trackCount,
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
+      groups: playlist.groupPlaylists.map((gp) => ({ id: gp.group.id, name: gp.group.name })),
     },
     snapshots: playlist.snapshots.map((s) => ({
       id: s.id,

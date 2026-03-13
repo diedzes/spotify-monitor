@@ -39,9 +39,35 @@ model TrackedPlaylist {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   snapshots         PlaylistSnapshot[]
+  groupPlaylists    GroupPlaylist[]
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
+}
+
+model PlaylistGroup {
+  id             String          @id @default(cuid())
+  userId         String
+  name           String
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  groupPlaylists GroupPlaylist[]
+
+  @@unique([userId, name])
+  @@map("playlist_groups")
+}
+
+model GroupPlaylist {
+  id                String         @id @default(cuid())
+  groupId           String
+  trackedPlaylistId String
+  createdAt         DateTime       @default(now())
+  group             PlaylistGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  trackedPlaylist   TrackedPlaylist @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, trackedPlaylistId])
+  @@map("group_playlists")
 }
 
 model PlaylistSnapshot {

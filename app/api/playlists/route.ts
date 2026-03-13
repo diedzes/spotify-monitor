@@ -12,6 +12,22 @@ export async function GET(request: Request) {
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     });
+    const playlistIds = playlists.map((p) => p.id);
+    const groupLinks = playlistIds.length
+      ? await prisma.groupPlaylist.findMany({
+          where: {
+            trackedPlaylistId: { in: playlistIds },
+            group: { userId: session.user.id },
+          },
+          include: { group: { select: { id: true, name: true } } },
+        })
+      : [];
+    const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string }>>();
+    for (const link of groupLinks) {
+      const list = groupsByPlaylistId.get(link.trackedPlaylistId) ?? [];
+      list.push({ id: link.group.id, name: link.group.name });
+      groupsByPlaylistId.set(link.trackedPlaylistId, list);
+    }
     return NextResponse.json({
       user: session.user,
       playlists: playlists.map((p) => ({
@@ -21,6 +37,7 @@ export async function GET(request: Request) {
         trackCount: p.trackCount,
         lastSyncedAt: p.lastSyncedAt?.toISOString() ?? null,
         spotifyPlaylistId: p.spotifyPlaylistId,
+        groups: groupsByPlaylistId.get(p.id) ?? [],
       })),
     });
   }

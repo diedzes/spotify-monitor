@@ -73,6 +73,17 @@ export default async function DashboardPage({ searchParams }: Props) {
               Playlists die je volgt
             </p>
           </a>
+          <a
+            href={signedId ? `/groups?sid=${encodeURIComponent(signedId)}` : "/groups"}
+            className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+          >
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
+              Playlistgroepen
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Groepen om playlists in te organiseren
+            </p>
+          </a>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">

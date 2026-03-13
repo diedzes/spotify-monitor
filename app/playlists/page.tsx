@@ -31,6 +31,7 @@ type PlaylistRow = {
   trackCount: number;
   lastSyncedAt: string | null;
   spotifyPlaylistId: string;
+  groups: Array<{ id: string; name: string }>;
 };
 
 function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
@@ -168,6 +169,7 @@ export default function PlaylistsPage() {
               <tr className="border-b border-zinc-200 dark:border-zinc-700">
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Naam</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Owner</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groepen</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Laatste sync</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Acties</th>
@@ -176,7 +178,7 @@ export default function PlaylistsPage() {
             <tbody>
               {playlists.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Nog geen playlists. Klik op &quot;Add playlist&quot; om een Spotify playlist toe te voegen.
                   </td>
                 </tr>
@@ -192,6 +194,29 @@ export default function PlaylistsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.ownerName}</td>
+                    <td className="px-4 py-3">
+                      <span className="flex flex-wrap gap-1">
+                        {p.groups.length === 0 ? (
+                          <span className="text-zinc-400 dark:text-zinc-500">—</span>
+                        ) : (
+                          p.groups.map((g) => (
+                            <Link
+                              key={g.id}
+                              href={`/groups/${g.id}`}
+                              className="rounded bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
+                            >
+                              {g.name}
+                            </Link>
+                          ))
+                        )}
+                        <Link
+                          href={`/playlists/${p.id}/add-to-group`}
+                          className="rounded border border-dashed border-zinc-400 px-2 py-0.5 text-xs text-zinc-500 hover:border-zinc-600 hover:text-zinc-700 dark:border-zinc-500 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-300"
+                        >
+                          Add to group
+                        </Link>
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.trackCount}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {formatDate(p.lastSyncedAt)}
