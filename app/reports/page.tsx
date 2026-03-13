@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
@@ -33,7 +33,7 @@ type ReportRow = {
   resultCount: number;
 };
 
-export default function ReportsPage() {
+function ReportsPageContent() {
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
   const [reports, setReports] = useState<ReportRow[]>([]);
@@ -140,6 +140,20 @@ export default function ReportsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
+      }
+    >
+      <ReportsPageContent />
+    </Suspense>
   );
 }
 

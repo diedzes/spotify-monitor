@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
@@ -24,7 +24,7 @@ function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
   return headers;
 }
 
-export default function NewReportPage() {
+function NewReportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
@@ -129,5 +129,19 @@ export default function NewReportPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function NewReportPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
+      }
+    >
+      <NewReportPageContent />
+    </Suspense>
   );
 }
