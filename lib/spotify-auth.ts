@@ -157,6 +157,14 @@ export async function getSpotifySession(): Promise<SpotifySession | null> {
   return getSessionFromSignedValue(value);
 }
 
+/** Geef de signed session-id terug (cookie-waarde) voor links naar bv. /playlists?sid=... */
+export async function getSessionSignedIdFromCookie(): Promise<string | null> {
+  const { cookies } = await import("next/headers");
+  const store = await cookies();
+  const value = store.get(getSessionCookieName())?.value;
+  return value ?? null;
+}
+
 /** Voor API routes: probeer cookie, anders X-Spotify-Session header (client stuurt die vanuit leesbare cookie). */
 export async function getSpotifySessionFromRequest(request: Request): Promise<SpotifySession | null> {
   const cookieHeader = request.headers.get("cookie");

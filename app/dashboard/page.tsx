@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSpotifySession, getSessionFromSignedValue } from "@/lib/spotify-auth";
+import { getSpotifySession, getSessionFromSignedValue, getSessionSignedIdFromCookie } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 
@@ -8,10 +8,16 @@ type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function DashboardPage({ searchParams }: Props) {
   let session = await getSpotifySession();
+  let signedId: string | null = null;
   if (!session) {
     const params = await searchParams;
     const sid = params.sid;
-    if (sid) session = await getSessionFromSignedValue(sid);
+    if (sid) {
+      session = await getSessionFromSignedValue(sid);
+      signedId = sid;
+    }
+  } else {
+    signedId = await getSessionSignedIdFromCookie();
   }
   if (!session) {
     redirect("/");
@@ -54,7 +60,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         </p>
         <div className="mb-8 grid gap-4 sm:grid-cols-2">
           <a
-            href="/playlists"
+            href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"}
             className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
           >
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">

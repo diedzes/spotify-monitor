@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
-function getSessionHeaderValue(): string | null {
+function getSessionHeaderValue(sidFromUrl: string | null): string | null {
+  if (sidFromUrl) return sidFromUrl;
   const fromStorage = getStoredSessionId();
   if (fromStorage) return fromStorage;
   if (typeof document === "undefined") return null;
@@ -32,13 +34,15 @@ type PlaylistRow = {
 };
 
 export default function PlaylistsPage() {
+  const searchParams = useSearchParams();
+  const sidFromUrl = searchParams.get("sid");
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<{ debug?: { hasCookie: boolean; hasHeader: boolean; clientHadSessionCookie?: boolean; hasValidSessionId: boolean; sessionFoundInDb: boolean } } | null>(null);
 
   useEffect(() => {
-    const sessionValue = getSessionHeaderValue();
+    const sessionValue = getSessionHeaderValue(sidFromUrl);
     const headers: HeadersInit = { "Content-Type": "application/json" };
     if (sessionValue) headers["X-Spotify-Session"] = sessionValue;
     (headers as Record<string, string>)["X-Debug-Client-Had-Session-Cookie"] = sessionValue ? "1" : "0";
@@ -57,7 +61,7 @@ export default function PlaylistsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [sidFromUrl]);
 
   if (loading) {
     return (

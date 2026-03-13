@@ -1,3 +1,5 @@
+import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
+
 export const dynamic = "force-dynamic";
 
 export default function PlaylistsLayout({
@@ -5,5 +7,10 @@ export default function PlaylistsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      <StoreSessionFromUrl />
+      {children}
+    </>
+  );
 }

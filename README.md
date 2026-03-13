@@ -48,6 +48,28 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 
 **Tip:** Je kunt dezelfde Supabase-database voor lokaal én Vercel gebruiken, of lokaal een eigen PostgreSQL gebruiken en alleen op Vercel Supabase.
 
+### Sessies testen: één keer inloggen op de live app (Vercel)
+
+De tabel `sessions` in Supabase wordt alleen gevuld wanneer je **op de live Vercel-URL** inlogt. Als je alleen op `localhost` inlogt, draait de callback lokaal en schrijft die naar je lokale (of geconfigureerde) database. Om te controleren of sessies op Supabase worden aangemaakt:
+
+1. **Open je app op Vercel**  
+   Ga in je browser naar de echte productie-URL van je app, bijvoorbeeld:
+   - `https://spotify-monitor-ten.vercel.app`  
+   of wat jouw Vercel-project ook is (te vinden onder **Vercel → je project → Domains**).  
+   Gebruik **niet** `http://localhost:3000`.
+
+2. **Klik op “Login with Spotify”**  
+   Op de homepage van de live app: klik op de knop om met Spotify in te loggen.
+
+3. **Voltooi de Spotify-inlog**  
+   Spotify opent (in dezelfde tab of popup). Log in bij Spotify als dat moet en **sta de app toe** (“Agree” / “Toestaan”). Daarna stuurt Spotify je terug naar je app.
+
+4. **Kijk waar je terechtkomt**
+   - **Dashboard** (bijv. `/dashboard` of `/dashboard?sid=...`) → de callback is gelukt; er zou nu een rij in de tabel `sessions` in Supabase moeten staan. Controleer dat in Supabase → **Table Editor** → `sessions`.
+   - **Homepage met fout in de URL** (bijv. `/?error=spotify&error_description=...`) → er is iets misgegaan (token-uitwisseling of database). Noteer de `error_description` en kijk in **Vercel → Logs** naar `[Spotify callback]` voor de details.
+
+Als je daarna in Supabase nog steeds geen rijen in `sessions` ziet, wijst `DATABASE_URL` op Vercel waarschijnlijk naar een andere database, of de callback faalt voordat de sessie wordt opgeslagen (zie de logs).
+
 ## Prisma (database)
 
 De app gebruikt [Prisma](https://www.prisma.io/) met PostgreSQL.

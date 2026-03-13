@@ -78,6 +78,8 @@ export async function GET(request: Request) {
     return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : "token_exchange_failed";
+    // Log zodat je in Vercel Function Logs ziet wat er misgaat (bijv. DB/session create)
+    console.error("[Spotify callback]", message, err);
     return NextResponse.redirect(new URL(`/?error=spotify&error_description=${encodeURIComponent(message)}`, request.url), 302);
   }
 }

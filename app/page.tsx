@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSpotifySession } from "@/lib/spotify-auth";
+import { getSpotifySession, getRedirectUri } from "@/lib/spotify-auth";
 import { ClearSessionOnHome } from "@/components/StoreSessionFromUrl";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
@@ -9,6 +9,7 @@ export default async function Home({ searchParams }: Props) {
   const params = await searchParams;
   const error = params.error;
   const errorDescription = params.error_description;
+  const callbackUrlForSpotify = getRedirectUri();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -27,11 +28,15 @@ export default async function Home({ searchParams }: Props) {
               <p className="mt-1 font-mono text-xs opacity-90">{decodeURIComponent(errorDescription)}</p>
             )}
             <p className="mt-2 text-xs">
-              Redirect URI in Spotify Dashboard moet exact zijn: open{" "}
-              <a href="/api/auth-check" target="_blank" rel="noopener noreferrer" className="underline">
-                /api/auth-check
-              </a>{" "}
-              en kopieer <strong>CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS</strong>.
+              Voeg in het Spotify Developer Dashboard onder <strong>Redirect URIs</strong> exact deze URL toe (kopieer de hele regel):
+            </p>
+            <p className="mt-1 break-all font-mono text-xs bg-amber-100/80 dark:bg-amber-900/30 px-2 py-1.5 rounded">
+              {callbackUrlForSpotify}
+            </p>
+            <p className="mt-2 text-xs">
+              <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline">
+                Spotify Dashboard
+              </a> → jouw app → Settings → Redirect URIs → Add → plak de URL → Save.
             </p>
           </div>
         )}
