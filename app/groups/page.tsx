@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 
@@ -31,7 +31,7 @@ type GroupRow = {
   playlistCount: number;
 };
 
-export default function GroupsPage() {
+function GroupsPageContent() {
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
   const [groups, setGroups] = useState<GroupRow[]>([]);
@@ -138,5 +138,19 @@ export default function GroupsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function GroupsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
+      }
+    >
+      <GroupsPageContent />
+    </Suspense>
   );
 }

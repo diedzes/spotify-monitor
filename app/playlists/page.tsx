@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 
@@ -41,7 +41,7 @@ function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
   return headers;
 }
 
-export default function PlaylistsPage() {
+function PlaylistsPageContent() {
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
@@ -273,5 +273,19 @@ export default function PlaylistsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function PlaylistsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
+      }
+    >
+      <PlaylistsPageContent />
+    </Suspense>
   );
 }

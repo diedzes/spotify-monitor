@@ -19,7 +19,10 @@ export function getBaseUrl(): string {
   return url;
 }
 
+/** Callback URL voor Spotify OAuth. Gebruik SPOTIFY_REDIRECT_URI of NEXTAUTH_URL op Vercel om een vaste URL te hebben. */
 export function getRedirectUri(): string {
+  const explicit = process.env.SPOTIFY_REDIRECT_URI ?? process.env.AUTH_SPOTIFY_REDIRECT_URI;
+  if (explicit?.trim()) return explicit.trim().replace(/\/$/, "");
   return `${getBaseUrl()}/api/auth/spotify/callback`;
 }
 

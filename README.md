@@ -8,7 +8,10 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 - **`AUTH_SPOTIFY_ID`** of **`SPOTIFY_CLIENT_ID`** – Spotify app Client ID
 - **`AUTH_SPOTIFY_SECRET`** of **`SPOTIFY_CLIENT_SECRET`** – Spotify app Client Secret
 - **`AUTH_SECRET`**, **`NEXTAUTH_SECRET`** of **`BETTER_AUTH_SECRET`** – Geheim voor cookie/sessie-encryptie
-- **`NEXTAUTH_URL`** (optioneel) – Base URL van de app, bijv. `http://localhost:3000`
+- **`NEXTAUTH_URL`** (optioneel) – Base URL van de app, bijv. `http://localhost:3000`. **Op Vercel:** zet dit op je productie-URL (bijv. `https://spotify-monitor-ten.vercel.app`) zodat de Spotify redirect URI niet per deployment wisselt.
+- **`SPOTIFY_REDIRECT_URI`** of **`AUTH_SPOTIFY_REDIRECT_URI`** (optioneel) – Volledige callback-URL voor Spotify (bijv. `https://spotify-monitor-ten.vercel.app/api/auth/spotify/callback`). Overschrijft de afgeleide URL; handig als inloggen op Vercel “plotseling” faalt.
+
+**Spotify “Inloggen mislukt” op Vercel:** Voeg in het [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) bij jouw app → Settings → **Redirect URIs** exact de URL toe die de app toont (bijv. `https://jouw-project.vercel.app/api/auth/spotify/callback`). Zet op Vercel **NEXTAUTH_URL** of **SPOTIFY_REDIRECT_URI** op diezelfde basis-URL/callback zodat de waarde stabiel blijft.
 
 ## Database op Supabase (stap voor stap)
 

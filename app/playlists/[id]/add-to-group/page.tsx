@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
+const FETCH_TIMEOUT_MS = 15000;
 
 function getSessionHeaderValue(): string | null {
   const fromStorage = getStoredSessionId();
@@ -20,6 +21,13 @@ function getSessionHeaders(): HeadersInit {
   const v = getSessionHeaderValue();
   if (v) (h as Record<string, string>)["X-Spotify-Session"] = v;
   return h;
+}
+
+function fetchWithTimeout(url: string, opts: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = FETCH_TIMEOUT_MS, ...rest } = opts;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...rest, signal: controller.signal }).finally(() => clearTimeout(id));
 }
 
 type GroupOption = {
@@ -39,21 +47,42 @@ export default function AddPlaylistToGroupPage() {
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
     const headers = getSessionHeaders();
     Promise.all([
-      fetch(`/api/playlists/${playlistId}`, { credentials: "include", headers }).then((r) => r.json()),
-      fetch("/api/groups", { credentials: "include", headers }).then((r) => r.json()),
+      fetchWithTimeout(`/api/playlists/${playlistId}`, { credentials: "include", headers }).then(async (r) => {
+        const data = await r.json();
+        if (r.status === 401) return { _401: true };
+        return data;
+      }),
+      fetchWithTimeout("/api/groups", { credentials: "include", headers }).then(async (r) => {
+        const data = await r.json();
+        if (r.status === 401) return { _401: true };
+        return data;
+      }),
     ])
       .then(([playlistRes, groupsRes]) => {
-        if (playlistRes.playlist) {
+        if (playlistRes && "_401" in playlistRes) {
+          setAuthFailed(true);
+          setLoading(false);
+          return;
+        }
+        if (groupsRes && "_401" in groupsRes) {
+          setAuthFailed(true);
+          setLoading(false);
+          return;
+        }
+        if (playlistRes?.playlist) {
           setPlaylistName(playlistRes.playlist.name);
           setPlaylistGroupIds(new Set((playlistRes.playlist.groups ?? []).map((g: { id: string }) => g.id)));
         }
-        if (groupsRes.groups) setGroups(groupsRes.groups);
+        if (groupsRes?.groups) setGroups(groupsRes.groups);
       })
-      .catch(() => setError("Kon data niet laden"))
+      .catch((err) => {
+        setError(err?.name === "AbortError" ? "Verzoek duurde te lang. Probeer opnieuw." : "Kon data niet laden");
+      })
       .finally(() => setLoading(false));
   }, [playlistId]);
 
@@ -85,6 +114,22 @@ export default function AddPlaylistToGroupPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      </div>
+    );
+  }
+
+  if (authFailed) {
+    return (
+      <div className="min-h-screen bg-zinc-50 p-6 dark:bg-zinc-950">
+        <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
+          <p className="font-medium text-amber-800 dark:text-amber-200">Niet ingelogd</p>
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+            Log in op de startpagina en ga dan via Dashboard → Playlists naar deze pagina.
+          </p>
+          <Link href="/" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 underline">
+            Naar startpagina
+          </Link>
+        </div>
       </div>
     );
   }
