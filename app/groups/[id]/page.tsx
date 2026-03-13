@@ -22,6 +22,11 @@ function getSessionHeaders(): HeadersInit {
   return h;
 }
 
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+}
+
 type PlaylistInGroup = {
   id: string;
   trackedPlaylistId: string;
@@ -29,6 +34,8 @@ type PlaylistInGroup = {
   ownerName: string;
   trackCount: number;
   spotifyPlaylistId: string;
+  lastSyncedAt: string | null;
+  snapshotCount: number;
 };
 
 type GroupDetail = {
@@ -170,7 +177,7 @@ export default function GroupDetailPage() {
             {playlists.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0 flex-1">
                   <Link href={`/playlists/${p.trackedPlaylistId}`} className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
@@ -179,8 +186,23 @@ export default function GroupDetailPage() {
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {p.ownerName} · {p.trackCount} tracks
                   </p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                    Laatste sync: {formatDate(p.lastSyncedAt)} · {p.snapshotCount} snapshot{p.snapshotCount !== 1 ? "s" : ""}
+                  </p>
                 </div>
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/playlists/${p.trackedPlaylistId}`}
+                    className="rounded bg-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
+                  >
+                    Detail
+                  </Link>
+                  <Link
+                    href={`/playlists/${p.trackedPlaylistId}#changes`}
+                    className="rounded bg-[#1DB954] px-2 py-1 text-xs font-medium text-white hover:bg-[#1ed760]"
+                  >
+                    View changes
+                  </Link>
                   <a
                     href={`https://open.spotify.com/playlist/${p.spotifyPlaylistId}`}
                     target="_blank"

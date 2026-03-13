@@ -68,6 +68,20 @@ type PlaylistDetail = {
   }>;
 };
 
+type ChangeItem = {
+  spotifyTrackId: string;
+  title: string;
+  artists: string;
+  album: string;
+  currentPosition: number | null;
+  previousPosition: number | null;
+  status: "new" | "removed" | "up" | "down" | "unchanged";
+  movement: number | null;
+  spotifyUrl: string;
+};
+
+type ChangeFilter = "all" | "new" | "removed" | "up" | "down" | "unchanged";
+
 export default function PlaylistDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -77,6 +91,11 @@ export default function PlaylistDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"tracks" | "changes">("tracks");
+  const [changes, setChanges] = useState<ChangeItem[]>([]);
+  const [changesLoading, setChangesLoading] = useState(false);
+  const [hasEnoughSnapshots, setHasEnoughSnapshots] = useState(true);
+  const [changeFilter, setChangeFilter] = useState<ChangeFilter>("all");
 
   const load = () => {
     setError(null);
@@ -101,6 +120,25 @@ export default function PlaylistDetailPage() {
     if (!id) return;
     load();
   }, [id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.slice(1);
+    if (hash === "changes") setActiveTab("changes");
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "changes" || !id) return;
+    setChangesLoading(true);
+    fetch(`/api/playlists/${id}/changes`, { credentials: "include", headers: getSessionHeaders() })
+      .then((res) => res.json())
+      .then((body) => {
+        setChanges(body.changes ?? []);
+        setHasEnoughSnapshots(body.hasEnoughSnapshots !== false);
+      })
+      .catch(() => setChanges([]))
+      .finally(() => setChangesLoading(false));
+  }, [activeTab, id]);
 
   const handleSync = async () => {
     setSyncMessage(null);
@@ -275,56 +313,189 @@ export default function PlaylistDetailPage() {
           )}
         </section>
 
-        <section>
-          <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">
-            Current tracks
-          </h2>
-          <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-            Tracks uit de laatste snapshot.
-          </p>
-          {latestTracks.length === 0 ? (
-            <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-              Geen tracks. Sync de playlist om een snapshot te maken.
-            </p>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                    <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">#</th>
-                    <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
-                    <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
-                    <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Album</th>
-                    <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Link</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {latestTracks.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
-                    >
-                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{t.position + 1}</td>
-                      <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
-                        {parseArtists(t.artistsJson)}
-                      </td>
-                      <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{t.title}</td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.album}</td>
-                      <td className="px-4 py-3">
-                        <a
-                          href={t.spotifyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#1DB954] hover:underline"
+        <section id="changes">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("tracks")}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${activeTab === "tracks" ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-600 dark:text-zinc-100" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"}`}
+            >
+              Current tracks
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("changes")}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${activeTab === "changes" ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-600 dark:text-zinc-100" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"}`}
+            >
+              Changes
+            </button>
+          </div>
+
+          {activeTab === "tracks" && (
+            <>
+              <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+                Tracks uit de laatste snapshot.
+              </p>
+              {latestTracks.length === 0 ? (
+                <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                  Geen tracks. Sync de playlist om een snapshot te maken.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">#</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Album</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Link</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {latestTracks.map((t) => (
+                        <tr
+                          key={t.id}
+                          className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
                         >
-                          Spotify
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{t.position + 1}</td>
+                          <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                            {parseArtists(t.artistsJson)}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{t.title}</td>
+                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.album}</td>
+                          <td className="px-4 py-3">
+                            <a
+                              href={t.spotifyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#1DB954] hover:underline"
+                            >
+                              Spotify
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "changes" && (
+            <>
+              <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+                Vergelijking tussen de twee meest recente snapshots.
+              </p>
+              {changesLoading ? (
+                <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                  Laden…
+                </p>
+              ) : !hasEnoughSnapshots ? (
+                <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                  Er zijn minimaal 2 snapshots nodig om wijzigingen te vergelijken. Sync de playlist nog een keer om een tweede snapshot te maken.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-3 flex flex-wrap gap-1">
+                    {(["all", "new", "removed", "up", "down", "unchanged"] as const).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setChangeFilter(f)}
+                        className={`rounded px-2 py-1 text-xs font-medium capitalize ${changeFilter === f ? "bg-zinc-700 text-white dark:bg-zinc-500" : "bg-zinc-200 text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"}`}
+                      >
+                        {f === "all" ? "All" : f}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const filtered =
+                      changeFilter === "all"
+                        ? changes
+                        : changes.filter((c) => c.status === changeFilter);
+                    if (filtered.length === 0) {
+                      return (
+                        <p className="rounded-xl border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                          Geen wijzigingen in deze filter.
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Status</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Vorige pos.</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Huidige pos.</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Beweging</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Link</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filtered.map((c) => (
+                              <tr
+                                key={`${c.spotifyTrackId}-${c.previousPosition ?? ""}-${c.currentPosition ?? ""}`}
+                                className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
+                              >
+                                <td className="px-4 py-3">
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                                      c.status === "new"
+                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                                        : c.status === "removed"
+                                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200"
+                                          : c.status === "up"
+                                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+                                            : c.status === "down"
+                                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                                              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
+                                    }`}
+                                  >
+                                    {c.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">{c.artists || "—"}</td>
+                                <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{c.title}</td>
+                                <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
+                                  {c.previousPosition != null ? c.previousPosition + 1 : "—"}
+                                </td>
+                                <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
+                                  {c.currentPosition != null ? c.currentPosition + 1 : "—"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {c.movement != null ? (
+                                    <span className={c.movement < 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"}>
+                                      {c.movement > 0 ? "+" : ""}{c.movement}
+                                    </span>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <a
+                                    href={c.spotifyUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#1DB954] hover:underline"
+                                  >
+                                    Spotify
+                                  </a>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </>
           )}
         </section>
       </main>

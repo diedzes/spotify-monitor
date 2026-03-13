@@ -32,6 +32,8 @@ export async function GET(
       ownerName: gp.trackedPlaylist.ownerName,
       trackCount: gp.trackedPlaylist.trackCount,
       spotifyPlaylistId: gp.trackedPlaylist.spotifyPlaylistId,
+      lastSyncedAt: gp.trackedPlaylist.lastSyncedAt?.toISOString() ?? null,
+      snapshotCount: gp.trackedPlaylist._count.snapshots,
     })),
   });
 }

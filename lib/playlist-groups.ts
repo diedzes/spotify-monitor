@@ -36,7 +36,9 @@ export async function getPlaylistGroupById(userId: string, groupId: string) {
     include: {
       groupPlaylists: {
         include: {
-          trackedPlaylist: true,
+          trackedPlaylist: {
+            include: { _count: { select: { snapshots: true } } },
+          },
         },
         orderBy: { createdAt: "asc" },
       },
