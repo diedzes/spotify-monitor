@@ -23,9 +23,10 @@ export default async function DashboardPage({ searchParams }: Props) {
     redirect("/");
   }
 
-  const trackedPlaylistCount = await prisma.trackedPlaylist.count({
-    where: { userId: session.user.id },
-  });
+  const [trackedPlaylistCount, reportCount] = await Promise.all([
+    prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
+    prisma.report.count({ where: { userId: session.user.id } }),
+  ]);
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -82,6 +83,20 @@ export default async function DashboardPage({ searchParams }: Props) {
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               Groepen om playlists in te organiseren
+            </p>
+          </a>
+          <a
+            href={signedId ? `/reports?sid=${encodeURIComponent(signedId)}` : "/reports"}
+            className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+          >
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
+              Reports
+            </h2>
+            <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {reportCount}
+            </p>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Gewogen charts uit playlists en groepen
             </p>
           </a>
         </div>

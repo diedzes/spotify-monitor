@@ -40,6 +40,7 @@ model TrackedPlaylist {
   updatedAt         DateTime           @updatedAt
   snapshots         PlaylistSnapshot[]
   groupPlaylists    GroupPlaylist[]
+  reportSources     ReportSource[]
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
@@ -53,6 +54,7 @@ model PlaylistGroup {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   groupPlaylists GroupPlaylist[]
+  reportSources  ReportSource[]
 
   @@unique([userId, name])
   @@map("playlist_groups")
@@ -94,4 +96,41 @@ model SnapshotTrack {
   snapshot          PlaylistSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 
   @@map("snapshot_tracks")
+}
+
+model Report {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  sources     ReportSource[]
+  results     ReportResult[]
+
+  @@map("reports")
+}
+
+model ReportSource {
+  id                String         @id @default(cuid())
+  reportId          String
+  trackedPlaylistId String?
+  playlistGroupId  String?
+  weight            Float          @default(1)
+  include           Boolean        @default(true)
+  report            Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  trackedPlaylist   TrackedPlaylist? @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+  playlistGroup     PlaylistGroup?  @relation(fields: [playlistGroupId], references: [id], onDelete: Cascade)
+
+  @@map("report_sources")
+}
+
+model ReportResult {
+  id          String   @id @default(cuid())
+  reportId    String
+  generatedAt DateTime @default(now())
+  rowsJson    String   // JSON array of chart rows
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_results")
 }
