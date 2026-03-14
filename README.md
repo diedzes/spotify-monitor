@@ -125,6 +125,20 @@ Volg deze stappen om een migratie uit `supabase/migrations/` op je (remote) Supa
 
 Gebruik **geen** `prisma migrate deploy`; migraties lopen alleen via de Supabase CLI.
 
+### Nieuwe migratie toevoegen (toekomst)
+
+Elke keer als je een schemawijziging wilt doen, volg je dit stramien. De AI/codebase doet waar mogelijk stap 1–3 voor je; jij voert stap 4 en 5 lokaal uit.
+
+| Stap | Wie | Wat |
+|------|-----|-----|
+| 1 | AI / jij | Nieuw bestand in `supabase/migrations/` met datum-prefix (bijv. `20260315120000_beschrijving.sql`) en idempotente SQL (`IF NOT EXISTS` waar mogelijk). |
+| 2 | AI / jij | `prisma/schema.prisma` bijwerken zodat het overeenkomt met de gewenste database-structuur. |
+| 3 | AI / jij | Code die het nieuwe schema gebruikt aanpassen (indien nodig). |
+| 4 | Jij (lokaal) | **`npm run db:migrate:apply`** uitvoeren (of handmatig: `supabase db push` daarna `npx prisma generate`). Eerste keer: `supabase login` en `supabase link --project-ref <PROJECT_REF>`. |
+| 5 | Jij | Commit + push; deploy (Vercel bouwt zonder migraties). |
+
+**Script:** `npm run db:migrate:apply` = `supabase db push` + `npx prisma generate`. Zo hoef je na het toevoegen van een migratie maar één command te draaien.
+
 ## Prisma (runtime only)
 
 De app gebruikt [Prisma](https://www.prisma.io/) als ORM voor runtime-queries tegen PostgreSQL. Prisma wordt alleen gebruikt voor de gegenereerde client en types; migraties lopen via Supabase (zie **Database Migrations Strategy**).

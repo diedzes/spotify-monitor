@@ -1,0 +1,17 @@
+---
+description: Supabase/Prisma migration workflow – do steps 1–3; user runs step 4–5
+globs: supabase/migrations/**/*.sql,prisma/schema.prisma
+alwaysApply: false
+---
+
+# Database migrations (Supabase SQL)
+
+When adding or changing database schema in this project:
+
+1. **Create/update** `supabase/migrations/YYYYMMDDHHMMSS_beschrijving.sql` with idempotent SQL (`ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc.). Use the real table name from Prisma `@@map()` (e.g. `report_results` not `ReportResult`).
+2. **Update** `prisma/schema.prisma` so the model matches the new schema (e.g. new column with correct type like `Json?`, `String`, etc.).
+3. **Adjust app code** if it uses the new/changed columns (types, queries).
+4. **Tell the user** to run locally: `npm run db:migrate:apply` (or `supabase db push` then `npx prisma generate`). First-time: `supabase login` and `supabase link --project-ref <PROJECT_REF>`.
+5. Remind them to commit the migration file + schema changes and then deploy. No `prisma migrate deploy`; migrations are applied only via Supabase CLI.
+
+Full reference: README section "Database Migrations Strategy" and "Nieuwe migratie toevoegen (toekomst)".

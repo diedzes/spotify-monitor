@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
+    "db:migrate:apply": "supabase db push && prisma generate",
     "db:studio": "prisma studio"
   },
   "dependencies": {
