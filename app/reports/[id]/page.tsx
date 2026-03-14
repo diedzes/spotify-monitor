@@ -86,12 +86,14 @@ export default function ReportDetailPage() {
   const loadReport = () => {
     setError(null);
     fetch(`/api/reports/${id}`, { credentials: "include", headers: getSessionHeaders() })
-      .then((res) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
         if (res.status === 401) router.replace("/reports");
         else if (res.status === 404) setError("Report niet gevonden");
-        else return res.json().then((data) => setReport(data));
+        else if (!res.ok) setError((data as { error?: string }).error ?? "Kon report niet laden");
+        else setReport(data);
       })
-      .catch(() => setError("Kon report niet laden"))
+      .catch(() => setError("Kon report niet laden (netwerk- of serverfout)"))
       .finally(() => setLoading(false));
   };
 

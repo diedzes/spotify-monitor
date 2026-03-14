@@ -13,30 +13,31 @@ export async function GET(
     return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
   }
   const { id } = await params;
-  const report = await prisma.report.findFirst({
-    where: { id, userId: session.user.id },
-    include: {
-      sources: {
-        include: {
-          trackedPlaylist: { select: { id: true, name: true } },
-          playlistGroup: {
-            select: { id: true, name: true },
-            include: {
-              groupPlaylists: {
-                include: { trackedPlaylist: { select: { name: true } } },
+  try {
+    const report = await prisma.report.findFirst({
+      where: { id, userId: session.user.id },
+      include: {
+        sources: {
+          include: {
+            trackedPlaylist: { select: { id: true, name: true } },
+            playlistGroup: {
+              select: { id: true, name: true },
+              include: {
+                groupPlaylists: {
+                  include: { trackedPlaylist: { select: { name: true } } },
+                },
               },
             },
           },
         },
+        results: { orderBy: { generatedAt: "desc" }, take: 1 },
       },
-      results: { orderBy: { generatedAt: "desc" }, take: 1 },
-    },
-  });
-  if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
-  }
-  const latestResult = report.results[0] ?? null;
-  return NextResponse.json({
+    });
+    if (!report) {
+      return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    }
+    const latestResult = report.results[0] ?? null;
+    return NextResponse.json({
     report: {
       id: report.id,
       name: report.name,
@@ -64,6 +65,14 @@ export async function GET(
         }
       : null,
   });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Databasefout";
+    console.error("[GET /api/reports/[id]]", message);
+    return NextResponse.json(
+      { error: "Kon report niet laden. Controleer of alle migraties in Supabase zijn uitgevoerd (o.a. kolom editedRowsJson)." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(
