@@ -37,6 +37,7 @@ export async function GET(request: Request) {
         trackCount: p.trackCount,
         lastSyncedAt: p.lastSyncedAt?.toISOString() ?? null,
         spotifyPlaylistId: p.spotifyPlaylistId,
+        isPublic: p.isPublic,
         groups: groupsByPlaylistId.get(p.id) ?? [],
       })),
     });
