@@ -1,5 +1,7 @@
 # Supabase: Reports-tabellen toevoegen
 
+**Let op:** De reports-tabellen hebben `tracked_playlists` en `playlist_groups` nodig. Als je die nog niet hebt, voer eerst **`docs/SUPABASE_CORE_TABLES.md`** uit.
+
 Voer onderstaande SQL **één keer** uit in Supabase om de reports-tabellen aan te maken.
 
 **Waar:** Supabase → jouw project → **SQL Editor** → New query → plak de SQL → Run.

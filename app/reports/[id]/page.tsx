@@ -30,6 +30,7 @@ type SourceRow = {
   include: boolean;
   type: "playlist" | "group";
   name: string;
+  expandedPlaylists?: string[];
 };
 
 type ChartRow = {
@@ -50,6 +51,7 @@ type ReportDetail = {
     id: string;
     generatedAt: string;
     rowsJson: string;
+    editedRowsJson?: string | null;
   } | null;
 };
 
@@ -76,6 +78,10 @@ export default function ReportDetailPage() {
   const [addWeight, setAddWeight] = useState(1);
   const [addInclude, setAddInclude] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [viewMode, setViewMode] = useState<"original" | "edited">("edited");
+  const [editMode, setEditMode] = useState(false);
+  const [editingRows, setEditingRows] = useState<ChartRow[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadReport = () => {
     setError(null);
@@ -197,6 +203,60 @@ export default function ReportDetailPage() {
     }
   };
 
+  const startEditMode = (rowsToEdit: ChartRow[]) => {
+    setEditingRows(rowsToEdit.map((r) => ({ ...r })));
+    setEditMode(true);
+  };
+
+  const removeRow = (index: number) => {
+    setEditingRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const moveRowUp = (index: number) => {
+    if (index <= 0) return;
+    setEditingRows((prev) => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  };
+
+  const moveRowDown = (index: number) => {
+    setEditingRows((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+  };
+
+  const handleSaveEditedChart = async () => {
+    if (!report?.latestResult) return;
+    setSavingEdit(true);
+    setSuccess(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/reports/${id}/results/${report.latestResult.id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({ editedRowsJson: JSON.stringify(editingRows) }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Kon bewerking niet opslaan");
+        return;
+      }
+      setSuccess("Bewerkte chart opgeslagen.");
+      setEditMode(false);
+      loadReport();
+    } catch {
+      setError("Kon bewerking niet opslaan");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
@@ -220,9 +280,19 @@ export default function ReportDetailPage() {
 
   if (!report) return null;
 
-  const rows: ChartRow[] = report.latestResult
+  const originalRows: ChartRow[] = report.latestResult
     ? (JSON.parse(report.latestResult.rowsJson) as ChartRow[])
     : [];
+  const hasEdited = !!(report.latestResult?.editedRowsJson ?? null);
+  const editedRows: ChartRow[] = report.latestResult?.editedRowsJson
+    ? (JSON.parse(report.latestResult.editedRowsJson) as ChartRow[])
+    : [];
+  const displayRows: ChartRow[] = editMode
+    ? editingRows
+    : hasEdited && viewMode === "edited"
+      ? editedRows
+      : originalRows;
+  const groupSources = report.sources.filter((s) => s.type === "group" && (s.expandedPlaylists?.length ?? 0) > 0);
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -412,14 +482,86 @@ export default function ReportDetailPage() {
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">
               Resultaat (gegenereerd {new Date(report.latestResult.generatedAt).toLocaleString("nl-NL")})
             </h2>
-            {rows.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Geen tracks in dit resultaat.</p>
+
+            {groupSources.length > 0 && (
+              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  Playlists indirect meegenomen via groepen
+                </p>
+                <ul className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
+                  {groupSources.map((s) => (
+                    <li key={s.id}>
+                      <span className="font-medium">{s.name}</span>
+                      {s.expandedPlaylists?.length ? (
+                        <span>: {s.expandedPlaylists.join(", ")}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {hasEdited && !editMode && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Weergave:</span>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("original")}
+                  className={`rounded px-2 py-1 text-sm ${viewMode === "original" ? "bg-zinc-200 dark:bg-zinc-700 font-medium" : "text-zinc-600 dark:text-zinc-400 hover:underline"}`}
+                >
+                  Bekijk original
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("edited")}
+                  className={`rounded px-2 py-1 text-sm ${viewMode === "edited" ? "bg-zinc-200 dark:bg-zinc-700 font-medium" : "text-zinc-600 dark:text-zinc-400 hover:underline"}`}
+                >
+                  Bekijk edited
+                </button>
+              </div>
+            )}
+
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {!editMode ? (
+                <button
+                  type="button"
+                  onClick={() => startEditMode(displayRows)}
+                  className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                >
+                  Edit chart
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                  >
+                    Annuleren
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditedChart}
+                    disabled={savingEdit || editingRows.length === 0}
+                    className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+                  >
+                    {savingEdit ? "Opslaan…" : "Save edited chart"}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {displayRows.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {editMode ? "Geen tracks meer in bewerkte versie. Sla op of annuleer." : "Geen tracks in dit resultaat."}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-200 text-left text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                       <th className="pb-2 pr-2">#</th>
+                      {editMode && <th className="pb-2 pr-2 w-24">Acties</th>}
                       <th className="pb-2 pr-2">Artiest</th>
                       <th className="pb-2 pr-2">Titel</th>
                       <th className="pb-2 pr-2">Score</th>
@@ -428,9 +570,41 @@ export default function ReportDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, idx) => (
-                      <tr key={row.spotifyTrackId} className="border-b border-zinc-100 dark:border-zinc-800">
+                    {displayRows.map((row, idx) => (
+                      <tr key={editMode ? `${row.spotifyTrackId}-${idx}` : row.spotifyTrackId} className="border-b border-zinc-100 dark:border-zinc-800">
                         <td className="py-2 pr-2 font-medium text-zinc-900 dark:text-zinc-100">{idx + 1}</td>
+                        {editMode && (
+                          <td className="py-2 pr-2">
+                            <div className="flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveRowUp(idx)}
+                                disabled={idx === 0}
+                                className="rounded border border-zinc-300 px-1.5 py-0.5 text-xs disabled:opacity-40 dark:border-zinc-600"
+                                title="Omhoog"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveRowDown(idx)}
+                                disabled={idx === displayRows.length - 1}
+                                className="rounded border border-zinc-300 px-1.5 py-0.5 text-xs disabled:opacity-40 dark:border-zinc-600"
+                                title="Omlaag"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeRow(idx)}
+                                className="rounded border border-red-300 px-1.5 py-0.5 text-xs text-red-600 dark:border-red-700 dark:text-red-400"
+                                title="Verwijderen"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </td>
+                        )}
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.artists}</td>
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.title}</td>
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.score.toFixed(3)}</td>

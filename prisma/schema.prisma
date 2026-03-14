@@ -126,11 +126,12 @@ model ReportSource {
 }
 
 model ReportResult {
-  id          String   @id @default(cuid())
-  reportId    String
-  generatedAt DateTime @default(now())
-  rowsJson    String   // JSON array of chart rows
-  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  reportId       String
+  generatedAt    DateTime @default(now())
+  rowsJson       String   // JSON array of chart rows (origineel)
+  editedRowsJson String?  // handmatig bewerkte versie; rowsJson blijft ongewijzigd
+  report         Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@map("report_results")
 }

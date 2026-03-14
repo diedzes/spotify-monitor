@@ -19,7 +19,14 @@ export async function GET(
       sources: {
         include: {
           trackedPlaylist: { select: { id: true, name: true } },
-          playlistGroup: { select: { id: true, name: true } },
+          playlistGroup: {
+            select: { id: true, name: true },
+            include: {
+              groupPlaylists: {
+                include: { trackedPlaylist: { select: { name: true } } },
+              },
+            },
+          },
         },
       },
       results: { orderBy: { generatedAt: "desc" }, take: 1 },
@@ -45,12 +52,15 @@ export async function GET(
       include: s.include,
       type: s.trackedPlaylistId ? "playlist" : "group",
       name: s.trackedPlaylist?.name ?? s.playlistGroup?.name ?? "",
+      expandedPlaylists:
+        s.playlistGroup?.groupPlaylists?.map((gp) => gp.trackedPlaylist?.name ?? "").filter(Boolean) ?? [],
     })),
     latestResult: latestResult
       ? {
           id: latestResult.id,
           generatedAt: latestResult.generatedAt.toISOString(),
           rowsJson: latestResult.rowsJson,
+          editedRowsJson: latestResult.editedRowsJson,
         }
       : null,
   });

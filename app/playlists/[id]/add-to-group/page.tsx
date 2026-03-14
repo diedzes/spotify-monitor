@@ -53,13 +53,13 @@ export default function AddPlaylistToGroupPage() {
     const headers = getSessionHeaders();
     Promise.all([
       fetchWithTimeout(`/api/playlists/${playlistId}`, { credentials: "include", headers }).then(async (r) => {
-        const data = await r.json();
         if (r.status === 401) return { _401: true };
+        const data = await r.json().catch(() => ({}));
         return data;
       }),
       fetchWithTimeout("/api/groups", { credentials: "include", headers }).then(async (r) => {
-        const data = await r.json();
         if (r.status === 401) return { _401: true };
+        const data = await r.json().catch(() => ({}));
         return data;
       }),
     ])
@@ -81,7 +81,11 @@ export default function AddPlaylistToGroupPage() {
         if (groupsRes?.groups) setGroups(groupsRes.groups);
       })
       .catch((err) => {
-        setError(err?.name === "AbortError" ? "Verzoek duurde te lang. Probeer opnieuw." : "Kon data niet laden");
+        if (err?.name === "AbortError") {
+          setError("Verzoek duurde te lang. Probeer opnieuw.");
+        } else {
+          setError("Kon data niet laden. Log in op de startpagina en probeer het opnieuw.");
+        }
       })
       .finally(() => setLoading(false));
   }, [playlistId]);
@@ -156,9 +160,12 @@ export default function AddPlaylistToGroupPage() {
           Kies een groep om &quot;{playlistName || "deze playlist"}&quot; aan toe te voegen.
         </p>
         {error && (
-          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            {error}
-          </p>
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <p>{error}</p>
+            <Link href="/" className="mt-2 inline-block text-amber-700 dark:text-amber-300 underline">
+              Naar startpagina om in te loggen
+            </Link>
+          </div>
         )}
         {availableGroups.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">

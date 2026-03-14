@@ -48,6 +48,7 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 4. **Op Vercel**
    - Zelfde connection string: in Vercel → je project → **Settings** → **Environment Variables** → **Add** → Name: `DATABASE_URL`, Value: dezelfde URI. Kies Environment **Production** (en eventueel Preview).
    - Na deploy gebruikt de app op Vercel deze Supabase-database.
+   - **Migraties:** Het build-commando voert `prisma migrate deploy` uit, dus nieuwe Prisma-migraties worden automatisch op Supabase toegepast. Als je de database eerder handmatig hebt opgezet, doe dan één keer de stappen in **`docs/SUPABASE_PRISMA_SYNC.md`** om de migratie-historie te syncen.
 
 **Tip:** Je kunt dezelfde Supabase-database voor lokaal én Vercel gebruiken, of lokaal een eigen PostgreSQL gebruiken en alleen op Vercel Supabase.
 
