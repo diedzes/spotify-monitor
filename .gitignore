@@ -20,6 +20,9 @@
 # production
 /build
 
+# Supabase CLI local state
+/supabase/.temp/
+
 # misc
 .DS_Store
 *.pem

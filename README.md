@@ -4,8 +4,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Create a `.env` or `.env.local` file in the project root (voor lokaal development volstaat `.env.local`). Required variables:
 
-- **`DATABASE_URL`** – PostgreSQL connection string voor **runtime** (Next.js/Prisma queries). Lokaal en op Vercel: gebruik de **pooler**-URL (poort 6543) voor Supabase.
-- **`DIRECT_URL`** – Alleen nodig voor **migraties** (Prisma CLI). Directe database-verbinding (geen pooler), bij Supabase poort **5432**. Gebruik je Supabase: zet deze lokaal in `.env` en in GitHub Secrets; **niet** op Vercel.
+- **`DATABASE_URL`** – PostgreSQL connection string voor runtime (Next.js/Prisma queries). Lokaal en op Vercel: gebruik de **pooler**-URL (poort 6543) voor Supabase.
 - **`AUTH_SPOTIFY_ID`** of **`SPOTIFY_CLIENT_ID`** – Spotify app Client ID
 - **`AUTH_SPOTIFY_SECRET`** of **`SPOTIFY_CLIENT_SECRET`** – Spotify app Client Secret
 - **`AUTH_SECRET`**, **`NEXTAUTH_SECRET`** of **`BETTER_AUTH_SECRET`** – Geheim voor cookie/sessie-encryptie
@@ -26,39 +25,24 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
      - **Region**: kies het dichtst bij jou (bijv. West EU).
    - Klik op **Create new project** en wacht tot het project klaar is (1–2 min).
 
-2. **Connection strings ophalen**
+2. **Connection string ophalen**
    - In het linkermenu: **Project Settings** (tandwiel) → **Database**.
    - Scroll naar **Connection string**; kies **URI**.
-   - Je hebt twee URLs nodig:
-     - **Pooler (runtime):** host met `pooler.supabase.com`, poort **6543**. Voor `DATABASE_URL` (Vercel + lokaal runtime).
-     - **Direct (migraties):** host `db.[project-ref].supabase.co`, poort **5432**. Voor `DIRECT_URL` (lokaal CLI + GitHub Actions).
-   - Vervang overal **`[YOUR-PASSWORD]`** door je database-wachtwoord.
+   - Gebruik de **pooler**-URL (host `pooler.supabase.com`, poort **6543**) voor `DATABASE_URL`. Vervang **`[YOUR-PASSWORD]`** door je database-wachtwoord.
 
 3. **Lokaal (`.env` of `.env.local`)**
-   - Zet **beide** URLs, bijvoorbeeld:
+   - Zet **`DATABASE_URL`** op de pooler-URL, bijvoorbeeld:
      ```env
      DATABASE_URL="postgresql://postgres.[ref]:WACHTWOORD@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-     DIRECT_URL="postgresql://postgres.[ref]:WACHTWOORD@db.[ref].supabase.co:5432/postgres"
      ```
-   - Daarna: `npx prisma migrate dev --name init` (of bestaande migratie). Tabellen komen in Supabase; migraties gebruiken `DIRECT_URL`.
+   - Schema-wijzigingen worden niet meer via Prisma Migrate gedaan; zie **Database Migrations Strategy** hieronder.
 
-4. **Op Vercel (alleen runtime)**
+4. **Op Vercel**
    - Vercel → je project → **Settings** → **Environment Variables**.
-   - Zet **alleen** **`DATABASE_URL`** = de **pooler**-URL (poort 6543, `?pgbouncer=true`). Kies Environment **Production** (en eventueel Preview).
-   - **`DIRECT_URL` hoef je op Vercel niet te zetten.** De build draait geen migraties; alle runtime-queries gebruiken `DATABASE_URL`.
+   - Zet **`DATABASE_URL`** = de pooler-URL (poort 6543, `?pgbouncer=true`). Kies Environment **Production** (en eventueel Preview).
+   - **Build:** De build command moet **geen** database-migraties uitvoeren. Gebruik de standaard build (zie hieronder onder *Vercel build*).
 
-5. **GitHub Secrets (voor migraties in productie)**
-   - GitHub → je repo → **Settings** → **Secrets and variables** → **Actions**.
-   - Voeg een secret toe: **Name:** `DIRECT_URL`, **Value:** zie hieronder.
-   - Bij elke push naar `main` draait de workflow **Run database migrations** (`.github/workflows/migrate.yml`) en voert `npx prisma migrate deploy` uit.
-
-   **Waarde voor `DIRECT_URL` in GitHub:**  
-   GitHub Actions heeft geen volledige IPv6-ondersteuning; de directe Supabase-host (`db.xxx.supabase.co:5432`) is vaak alleen via IPv6 bereikbaar, waardoor je **P1001: Can't reach database server** krijgt. Kies één van deze twee:
-
-   - **Optie A (aanbevolen, geen extra kosten):** Zet in GitHub Secrets **`DIRECT_URL`** = je **pooler**-URL (zelfde als `DATABASE_URL`: host `pooler.supabase.com`, poort **6543**, met `?pgbouncer=true`). De workflow maakt dan verbinding via de pooler (IPv4-compatible). Migraties werken hiermee; lokaal kun je gewoon de echte directe URL in `.env` blijven gebruiken.
-   - **Optie B:** Schakel in Supabase de **IPv4 add-on** in (Project Settings → Add-ons). Dan blijft de **directe** URL (poort 5432) ook vanaf GitHub bereikbaar; je kunt die dan als `DIRECT_URL` in GitHub Secrets zetten.
-
-**Tip:** Je kunt dezelfde Supabase-database voor lokaal én Vercel gebruiken, of lokaal een eigen PostgreSQL gebruiken en alleen op Vercel Supabase.
+**Tip:** Je kunt dezelfde Supabase-database voor lokaal én Vercel gebruiken.
 
 ### Sessies testen: één keer inloggen op de live app (Vercel)
 
@@ -93,7 +77,7 @@ Als je **"Sessie hoort bij andere omgeving"** ziet (Session-id geldig: ja, Sessi
 | 3 | **Preview vs Production** | Je opent een Preview-deploy (bijv. van een branch) maar logde in op Production, of andersom. | Zet voor **Preview** dezelfde `DATABASE_URL` als voor Production, of gebruik alleen de Production-URL om in te loggen én Playlists te openen. |
 | 4 | **Sessie nooit aangemaakt op deze deploy** | De callback na Spotify-login is niet op deze Vercel-deploy uitgevoerd, of is daar gefaald vóór `prisma.session.create`. | Log op **deze** site opnieuw in (startpagina → Uitloggen → Inloggen met Spotify). Controleer Vercel → **Logs** voor de callback-route; bij fouten staat daar `[Spotify callback]`. |
 | 5 | **Database niet bereikbaar vanaf Vercel** | Time-out of verbindingsfout bij schrijven/lezen (verkeerde pooler, firewall, of wachtwoord). | Gebruik de **Transaction**-pooler-URL (poort 6543, `?pgbouncer=true`) voor serverless. Test de connection string lokaal met `npx prisma db pull` of een kleine query. |
-| 6 | **Tabel `sessions` ontbreekt of ander schema** | Migraties zijn op deze database niet gedraaid. | In Supabase: **Table Editor** → controleer of de tabel `sessions` bestaat. Zo niet: voer de SQL uit `prisma/migrations/.../migration.sql` uit, of run `npx prisma migrate deploy` tegen deze `DATABASE_URL`. |
+| 6 | **Tabel `sessions` ontbreekt of ander schema** | Migraties zijn op deze database niet gedraaid. | In Supabase: **Table Editor** → controleer of de tabel `sessions` bestaat. Zo niet: voer lokaal `supabase db push` uit (zie **Database Migrations Strategy**), of voer de SQL uit `supabase/migrations/*.sql` handmatig in de Supabase SQL Editor uit. |
 | 7 | **Oude sessie-id in browser** | Er staat nog een `sid` in localStorage van een vorige sessie of andere omgeving; die sessie bestaat niet in **deze** DB. | Klik op "Naar startpagina" (die wist de opgeslagen sid). Log daarna op **deze** URL opnieuw in en ga via Dashboard → Tracked playlists. |
 | 8 | **Cookie wordt niet meegestuurd** | Sessie-cookie wordt niet meegestuurd (SameSite, ander domein). De app valt terug op de `sid` in de link; als die van een andere omgeving komt, vindt de API geen sessie. | Ga **via het Dashboard** naar Tracked playlists (link met `?sid=...`), zodat de juiste sid voor deze omgeving wordt gebruikt. Na opnieuw inloggen op deze site is de nieuwe sid correct. |
 
@@ -104,42 +88,65 @@ Als je **"Sessie hoort bij andere omgeving"** ziet (Session-id geldig: ja, Sessi
 3. In Supabase: in **dat** project de tabel `sessions` controleren; na een geslaagde login op die URL moet daar een rij bijkomen.
 4. Na wijziging van env vars op Vercel: **Redeploy** doen (env wordt bij build geladen).
 
-## Prisma (database)
+## Database Migrations Strategy
 
-De app gebruikt [Prisma](https://www.prisma.io/) met PostgreSQL.
+- **Prisma wordt niet meer gebruikt voor production migrations.** Het schema in productie wordt uitsluitend bijgewerkt via Supabase SQL migrations.
+- **Alle schemawijzigingen** gebeuren via bestanden in **`supabase/migrations/`** (`.sql`). Maak daar nieuwe bestanden met een datum-prefix (bijv. `20250310120000_add_foo.sql`) en schrijf de benodigde SQL.
+- **Lokaal vóór deploy:** Voer **`supabase db push`** (of `supabase migration up`) lokaal uit tegen je Supabase-project, zodat de migraties op de database worden toegepast. Doe dit vóór je code deployt naar Vercel.
+- **Na schemawijziging:** Werk `prisma/schema.prisma` bij zodat het overeenkomt met de database (handmatig of via `prisma db pull`), en voer daarna **`npx prisma generate`** (of `npm run db:generate`) uit zodat de Prisma Client en types kloppen.
+
+**Samenvatting:** Schema = `supabase/migrations/*.sql` → lokaal `supabase db push` → eventueel `prisma schema` bijwerken + `prisma generate`. Geen Prisma Migrate en geen migrate-stap in de Vercel build of in GitHub Actions.
+
+### How to apply a database migration
+
+Volg deze stappen om een migratie uit `supabase/migrations/` op je (remote) Supabase-database toe te passen, en daarna de app te deployen:
+
+1. **Supabase CLI inloggen**
+   ```bash
+   supabase login
+   ```
+
+2. **Project koppelen** (eenmalig per project; `<PROJECT_REF>` vind je in Supabase → Project Settings → General → Reference ID)
+   ```bash
+   supabase link --project-ref <PROJECT_REF>
+   ```
+
+3. **Migraties naar de database pushen**
+   ```bash
+   supabase db push
+   ```
+
+4. **Prisma Client opnieuw genereren** (na schema-wijzigingen)
+   ```bash
+   npx prisma generate
+   ```
+
+5. **App deployen** (bijv. push naar `main` of trigger een deploy in Vercel)
+
+Gebruik **geen** `prisma migrate deploy`; migraties lopen alleen via de Supabase CLI.
+
+## Prisma (runtime only)
+
+De app gebruikt [Prisma](https://www.prisma.io/) als ORM voor runtime-queries tegen PostgreSQL. Prisma wordt alleen gebruikt voor de gegenereerde client en types; migraties lopen via Supabase (zie **Database Migrations Strategy**).
 
 **Eerste keer / na clone:**
 
 ```bash
 npm install
-# Voeg DATABASE_URL toe aan je bestaande .env.local (of kopieer .env.example naar .env en vul in)
+# Voeg DATABASE_URL toe aan .env of .env.local
 npx prisma generate
-npx prisma migrate dev --name init   # of een andere migratienaam
 ```
 
 **Handige commands:**
 
 | Command | Beschrijving |
 |---------|--------------|
-| `npm run db:generate` | Genereer Prisma Client (`prisma generate`) |
-| `npm run db:migrate` | Migraties uitvoeren in development (`prisma migrate dev`) |
-| `npm run db:migrate:deploy` | Migraties uitvoeren in productie (`prisma migrate deploy`) – handmatig; productie doet dit via GitHub Actions |
+| `npm run db:generate` | Genereer Prisma Client (`prisma generate`) – nodig na schema-wijzigingen |
 | `npm run db:studio` | Prisma Studio openen om data te bekijken/bewerken |
 
-**Migraties: lokaal vs productie**
+**Vercel build**
 
-- **Lokaal een migratie maken**  
-  Na wijzigingen in `prisma/schema.prisma`, met `DATABASE_URL` en `DIRECT_URL` in `.env`:
-  ```bash
-  npx prisma migrate dev --name beschrijvende_naam
-  ```
-  Dit maakt een migratiebestand en past die lokaal toe (via `DIRECT_URL`). Commit de map `prisma/migrations/` en push naar `main`.
-
-- **Productie: migraties toepassen**  
-  Bij elke **push naar `main`** draait de GitHub Actions workflow **Run database migrations** (`.github/workflows/migrate.yml`). Die voert `npx prisma migrate deploy` uit met de `DIRECT_URL` uit GitHub Secrets. Openstaande migraties worden dan op de Supabase-database toegepast; op Vercel draaien **geen** migraties tijdens de build.
-
-**Supabase pooling**  
-De Prisma-setup is compatibel met Supabase: runtime gebruikt de pooler-URL (`DATABASE_URL`, poort 6543); migraties gebruiken de directe URL (`DIRECT_URL`, poort 5432) via `directUrl` in `prisma/schema.prisma`.
+De build mag **geen** database-migraties uitvoeren. Gebruik als Build Command in Vercel de standaard: **`npm run build`** (of laat het leeg; dan gebruikt Vercel `npm run build`). In dit project is dat `prisma generate && next build` – alleen client genereren en Next.js bouwen. Voeg geen `prisma migrate deploy` of andere migrate-stap toe aan de build.
 
 ## Getting Started
 

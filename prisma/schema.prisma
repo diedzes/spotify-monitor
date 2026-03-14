@@ -6,9 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -131,7 +130,7 @@ model ReportResult {
   reportId       String
   generatedAt    DateTime @default(now())
   rowsJson       String   // JSON array of chart rows (origineel)
-  editedRowsJson String?  // handmatig bewerkte versie; rowsJson blijft ongewijzigd
+  editedRowsJson Json?    // handmatig bewerkte versie; rowsJson blijft ongewijzigd
   report         Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@map("report_results")
