@@ -108,7 +108,7 @@ export default function NewPlaylistPage() {
         return;
       }
       if (!res.ok || "error" in data) {
-        setError("error" in data ? data.error : "Kon playlists niet toevoegen.");
+        setError("error" in data && typeof data.error === "string" ? data.error : "Kon playlists niet toevoegen.");
         setBulkLoading(false);
         return;
       }
