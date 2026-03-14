@@ -49,8 +49,14 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 
 5. **GitHub Secrets (voor migraties in productie)**
    - GitHub → je repo → **Settings** → **Secrets and variables** → **Actions**.
-   - Voeg een secret toe: **Name:** `DIRECT_URL`, **Value:** de **directe** Supabase-URL (poort 5432, geen pooler).
-   - Bij elke push naar `main` draait de workflow **Run database migrations** (`.github/workflows/migrate.yml`) en voert `npx prisma migrate deploy` uit. Daarmee worden openstaande migraties op je Supabase-database toegepast.
+   - Voeg een secret toe: **Name:** `DIRECT_URL`, **Value:** zie hieronder.
+   - Bij elke push naar `main` draait de workflow **Run database migrations** (`.github/workflows/migrate.yml`) en voert `npx prisma migrate deploy` uit.
+
+   **Waarde voor `DIRECT_URL` in GitHub:**  
+   GitHub Actions heeft geen volledige IPv6-ondersteuning; de directe Supabase-host (`db.xxx.supabase.co:5432`) is vaak alleen via IPv6 bereikbaar, waardoor je **P1001: Can't reach database server** krijgt. Kies één van deze twee:
+
+   - **Optie A (aanbevolen, geen extra kosten):** Zet in GitHub Secrets **`DIRECT_URL`** = je **pooler**-URL (zelfde als `DATABASE_URL`: host `pooler.supabase.com`, poort **6543**, met `?pgbouncer=true`). De workflow maakt dan verbinding via de pooler (IPv4-compatible). Migraties werken hiermee; lokaal kun je gewoon de echte directe URL in `.env` blijven gebruiken.
+   - **Optie B:** Schakel in Supabase de **IPv4 add-on** in (Project Settings → Add-ons). Dan blijft de **directe** URL (poort 5432) ook vanaf GitHub bereikbaar; je kunt die dan als `DIRECT_URL` in GitHub Secrets zetten.
 
 **Tip:** Je kunt dezelfde Supabase-database voor lokaal én Vercel gebruiken, of lokaal een eigen PostgreSQL gebruiken en alleen op Vercel Supabase.
 
