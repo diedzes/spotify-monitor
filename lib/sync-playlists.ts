@@ -86,8 +86,12 @@ export async function syncTrackedPlaylist(
   const fields = playlistMetadataToTrackedFields(meta);
   const currentSnapshotId = meta.snapshot_id ?? null;
   const lastKnownSnapshotId = tracked.snapshotId ?? null;
+  const hasExistingSnapshot = tracked.snapshots.length > 0;
 
-  if (currentSnapshotId === lastKnownSnapshotId && lastKnownSnapshotId != null) {
+  // Alleen overslaan als de playlist al een snapshot heeft én de snapshot_id ongewijzigd is.
+  // Bij net toegevoegde playlists staat snapshotId al uit metadata maar is er nog geen snapshot in DB;
+  // dan moeten we wel de eerste snapshot + tracks aanmaken.
+  if (currentSnapshotId === lastKnownSnapshotId && lastKnownSnapshotId != null && hasExistingSnapshot) {
     await prisma.trackedPlaylist.update({
       where: { id: trackedPlaylistId },
       data: {
