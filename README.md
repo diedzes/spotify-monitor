@@ -10,6 +10,7 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 - **`AUTH_SECRET`**, **`NEXTAUTH_SECRET`** of **`BETTER_AUTH_SECRET`** – Geheim voor cookie/sessie-encryptie
 - **`NEXTAUTH_URL`** (optioneel) – Base URL van de app, bijv. `http://localhost:3000`. **Op Vercel:** zet dit op je productie-URL (bijv. `https://spotify-monitor-ten.vercel.app`) zodat de Spotify redirect URI niet per deployment wisselt.
 - **`SPOTIFY_REDIRECT_URI`** of **`AUTH_SPOTIFY_REDIRECT_URI`** (optioneel) – Volledige callback-URL voor Spotify (bijv. `https://spotify-monitor-ten.vercel.app/api/auth/spotify/callback`). Overschrijft de afgeleide URL; handig als inloggen op Vercel “plotseling” faalt.
+- **`CRON_SECRET`** (alleen op Vercel, voor wekelijkse sync) – Geheim waarmee de cron-job zich autoriseert. Zet dit in Vercel → Environment Variables; kies een lange willekeurige string. Zonder dit draait de geplande sync niet.
 
 **Spotify “Inloggen mislukt” op Vercel:** Voeg in het [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) bij jouw app → Settings → **Redirect URIs** exact de URL toe die de app toont (bijv. `https://jouw-project.vercel.app/api/auth/spotify/callback`). Zet op Vercel **NEXTAUTH_URL** of **SPOTIFY_REDIRECT_URI** op diezelfde basis-URL/callback zodat de waarde stabiel blijft.
 
@@ -161,6 +162,17 @@ npx prisma generate
 **Vercel build**
 
 De build mag **geen** database-migraties uitvoeren. Gebruik als Build Command in Vercel de standaard: **`npm run build`** (of laat het leeg; dan gebruikt Vercel `npm run build`). In dit project is dat `prisma generate && next build` – alleen client genereren en Next.js bouwen. Voeg geen `prisma migrate deploy` of andere migrate-stap toe aan de build.
+
+## Wekelijkse automatische sync
+
+De route **`GET /api/cron/sync-all`** synchroniseert alle tracked playlists van alle gebruikers die een geldige sessie (met refresh token) hebben. Je kunt dit op een vast moment in de week laten draaien.
+
+- **Beveiliging:** Zet op Vercel **`CRON_SECRET`** als Environment Variable (lange willekeurige string). De route accepteert alleen verzoeken met `Authorization: Bearer <CRON_SECRET>` of `?secret=<CRON_SECRET>`.
+- **Plannen:** Vercel’s eigen cron (uit `vercel.json`) roept de URL aan maar stuurt geen secret mee. Gebruik daarom een **externe cron-service** (bijv. [cron-job.org](https://cron-job.org) of [EasyCron](https://www.easycron.com)): maak een wekelijkse job die **GET** `https://jouw-app.vercel.app/api/cron/sync-all?secret=JOUW_CRON_SECRET` aanroept (zelfde waarde als in Vercel). Kies bijvoorbeeld maandag 04:00 (CET).
+- **Handmatig testen:**  
+  `curl "https://jouw-app.vercel.app/api/cron/sync-all?secret=JOUW_CRON_SECRET"`  
+  of met header:  
+  `curl -H "Authorization: Bearer JOUW_CRON_SECRET" https://jouw-app.vercel.app/api/cron/sync-all`
 
 ## Getting Started
 

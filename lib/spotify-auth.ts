@@ -234,3 +234,47 @@ export async function getSpotifySessionFromRequest(request: Request): Promise<Sp
   if (fromHeader) return getSessionFromSignedValue(fromHeader.trim());
   return null;
 }
+
+/** Voor cron/background: haal geldige sessie op uit een DB-sessierow (vernieuw token indien verlopen). */
+export async function getValidSessionFromRow(row: {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: Date;
+}): Promise<SpotifySession | null> {
+  const now = new Date();
+  const bufferMs = 5 * 60 * 1000;
+  if (row.expiresAt.getTime() > now.getTime() + bufferMs) {
+    return {
+      user: { id: row.userId, name: row.userName, email: row.userEmail },
+      access_token: row.accessToken,
+      refresh_token: row.refreshToken ?? undefined,
+      expires_at: Math.floor(row.expiresAt.getTime() / 1000),
+    };
+  }
+  if (!row.refreshToken) return null;
+  const { prisma } = await import("@/lib/db");
+  try {
+    const tokens = await refreshAccessToken(row.refreshToken);
+    const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000);
+    await prisma.session.update({
+      where: { id: row.id },
+      data: {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? row.refreshToken,
+        expiresAt,
+      },
+    });
+    return {
+      user: { id: row.userId, name: row.userName, email: row.userEmail },
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token ?? row.refreshToken,
+      expires_at: Math.floor(expiresAt.getTime() / 1000),
+    };
+  } catch {
+    return null;
+  }
+}
