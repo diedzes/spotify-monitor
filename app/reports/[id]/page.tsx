@@ -157,6 +157,77 @@ export default function ReportDetailPage() {
     }
   };
 
+  const handleAddGroupPlaylistsAsSources = async () => {
+    setSuccess(null);
+    setGenerateError(null);
+    setError(null);
+
+    if (!id) return;
+    if (!addGroupId) {
+      setError("Selecteer eerst een groep");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/groups/${addGroupId}`, {
+        credentials: "include",
+        headers: getSessionHeaders(),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        playlists?: Array<{ trackedPlaylistId: string | null }>;
+      };
+      if (!res.ok || !data.playlists) {
+        setError(data.error ?? "Kon groep niet laden");
+        return;
+      }
+
+      const existingPlaylistIds = new Set(
+        report.sources
+          .map((s) => s.trackedPlaylistId)
+          .filter((x): x is string => !!x)
+      );
+
+      const toAdd = data.playlists
+        .map((p) => p.trackedPlaylistId)
+        .filter((pid): pid is string => !!pid && !existingPlaylistIds.has(pid));
+
+      if (toAdd.length === 0) {
+        setError("Alle playlists uit deze groep staan al als bron in dit report.");
+        return;
+      }
+
+      for (const trackedPlaylistId of toAdd) {
+        const r = await fetch(`/api/reports/${id}/sources`, {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(),
+          body: JSON.stringify({
+            trackedPlaylistId,
+            weight: addWeight,
+            include: addInclude,
+          }),
+        });
+        const body = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!r.ok || !body.ok) {
+          throw new Error(body.error ?? "Kon bron niet toevoegen");
+        }
+      }
+
+      setSuccess(`Toegevoegd: ${toAdd.length} playlists uit deze groep als losse bron.`);
+      setAddPlaylistId("");
+      setAddGroupId("");
+      loadReport();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Kon playlists uit deze groep niet als bron toevoegen"
+      );
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const handleRemoveSource = async (sourceId: string) => {
     setSuccess(null);
     setError(null);
@@ -471,15 +542,29 @@ export default function ReportDetailPage() {
                 onChange={(e) => setAddInclude(e.target.checked)}
                 className="rounded border-zinc-300 dark:border-zinc-600"
               />
-              <label htmlFor="add-include" className="text-sm text-zinc-700 dark:text-zinc-300">Meenemen</label>
+              <label htmlFor="add-include" className="text-sm text-zinc-700 dark:text-zinc-300">
+                Meenemen
+              </label>
             </div>
-            <button
-              type="submit"
-              disabled={adding}
-              className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
-            >
-              {adding ? "Toevoegen…" : "Bron toevoegen"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="submit"
+                disabled={adding}
+                className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+              >
+                {adding ? "Toevoegen…" : "Bron toevoegen"}
+              </button>
+              {addSourceKind === "group" && (
+                <button
+                  type="button"
+                  disabled={adding}
+                  onClick={handleAddGroupPlaylistsAsSources}
+                  className="rounded-full border border-[#1DB954] px-4 py-2 text-sm font-medium text-[#1DB954] hover:bg-[#1DB954]/10 disabled:opacity-60"
+                >
+                  Alle playlists uit groep
+                </button>
+              )}
+            </div>
           </form>
         </section>
 
