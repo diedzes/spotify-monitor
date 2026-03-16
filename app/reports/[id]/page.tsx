@@ -82,6 +82,8 @@ export default function ReportDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [editingRows, setEditingRows] = useState<ChartRow[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [exportingPlaylist, setExportingPlaylist] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const loadReport = () => {
     setError(null);
@@ -257,6 +259,54 @@ export default function ReportDetailPage() {
     } finally {
       setSavingEdit(false);
     }
+  };
+
+  const handleExportPlaylist = async () => {
+    if (!report?.latestResult) {
+      setError("Geen resultaat om te exporteren. Genereer eerst een chart.");
+      return;
+    }
+    setExportingPlaylist(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/reports/${id}/export/playlist`, {
+        method: "POST",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; spotifyPlaylistUrl?: string };
+      if (!res.ok || !data.ok || !data.spotifyPlaylistUrl) {
+        setError(data.error ?? "Kon Spotify playlist niet aanmaken.");
+        return;
+      }
+      setSuccess("Spotify playlist aangemaakt.");
+      // Open in nieuw tabblad voor directe toegang
+      window.open(data.spotifyPlaylistUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setError("Kon Spotify playlist niet aanmaken.");
+    } finally {
+      setExportingPlaylist(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!report?.latestResult) {
+      setError("Geen resultaat om te exporteren. Genereer eerst een chart.");
+      return;
+    }
+    setExportingCsv(true);
+    setError(null);
+    setSuccess(null);
+    // Laat de browser zelf het bestand downloaden
+    const url = `/api/reports/${id}/export/csv`;
+    const win = window.open(url, "_blank");
+    if (win) {
+      win.opener = null;
+    }
+    // we kunnen niet weten wanneer de download klaar is; reset direct
+    setExportingCsv(false);
   };
 
   if (loading) {
@@ -525,13 +575,31 @@ export default function ReportDetailPage() {
 
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {!editMode ? (
-                <button
-                  type="button"
-                  onClick={() => startEditMode(displayRows)}
-                  className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                >
-                  Edit chart
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => startEditMode(displayRows)}
+                    className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                  >
+                    Edit chart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportPlaylist}
+                    disabled={exportingPlaylist || displayRows.length === 0}
+                    className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  >
+                    {exportingPlaylist ? "Exporteren…" : "Export to Spotify playlist"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    disabled={exportingCsv || displayRows.length === 0}
+                    className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  >
+                    {exportingCsv ? "Exporteren…" : "Download CSV"}
+                  </button>
+                </>
               ) : (
                 <>
                   <button
