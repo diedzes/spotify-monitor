@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -165,20 +166,26 @@ export default function PlaylistDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+        <AppHeader />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="min-h-screen bg-zinc-50 p-6 dark:bg-zinc-950">
-        <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-amber-800 dark:text-amber-200">{error}</p>
-          <Link href="/playlists" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-            ← Terug naar playlists
-          </Link>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+        <AppHeader />
+        <div className="p-6">
+          <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
+            <p className="text-amber-800 dark:text-amber-200">{error}</p>
+            <Link href="/playlists" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
+              ← Terug naar playlists
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -190,16 +197,7 @@ export default function PlaylistDetailPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <Link
-            href="/playlists"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Playlists
-          </Link>
-        </div>
-      </header>
+      <AppHeader />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-4">

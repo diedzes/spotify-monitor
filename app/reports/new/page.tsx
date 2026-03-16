@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -134,14 +134,17 @@ function NewReportPageContent() {
 
 export default function NewReportPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
-        </div>
-      }
-    >
-      <NewReportPageContent />
-    </Suspense>
+    <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+      <AppHeader />
+      <Suspense
+        fallback={
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          </div>
+        }
+      >
+        <NewReportPageContent />
+      </Suspense>
+    </div>
   );
 }

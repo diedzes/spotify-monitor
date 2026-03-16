@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -317,8 +318,11 @@ function PlaylistsPageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+        <AppHeader />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
       </div>
     );
   }
@@ -328,7 +332,9 @@ function PlaylistsPageContent() {
     const sessionNotInDb = authError.hint === "session_not_in_db";
     if (sessionNotInDb) clearStoredSessionId();
     return (
-      <div className="min-h-screen bg-zinc-50 p-6 font-sans dark:bg-zinc-950">
+      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+        <AppHeader />
+        <div className="p-6">
         <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
           <h1 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
             {sessionNotInDb ? "Sessie hoort bij andere omgeving" : "API gaf 401"}
@@ -360,22 +366,7 @@ function PlaylistsPageContent() {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
-            ← Dashboard
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">{user.name ?? user.email}</span>
-            <a
-              href="/api/auth/spotify/logout"
-              className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
-            >
-              Uitloggen
-            </a>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">

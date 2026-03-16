@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -126,24 +127,18 @@ export default function NewPlaylistPage() {
 
   if (!authChecked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+        <AppHeader />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <Link
-            href="/playlists"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Playlists
-          </Link>
-        </div>
-      </header>
+      <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-8">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           Playlist(s) toevoegen

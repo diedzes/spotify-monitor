@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSpotifySession, getSessionFromSignedValue, getSessionSignedIdFromCookie } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -31,27 +32,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <StoreSessionFromUrl />
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Home
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {session.user.name ?? session.user.email}
-            </span>
-            <a
-              href="/api/auth/spotify/logout"
-              className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-            >
-              Uitloggen
-            </a>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="mb-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           Dashboard

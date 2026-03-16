@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { AppHeader } from "@/components/AppHeader";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -61,16 +62,7 @@ export default function NewGroupPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto max-w-4xl px-4 py-4">
-          <Link
-            href="/groups"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Groepen
-          </Link>
-        </div>
-      </header>
+      <AppHeader />
       <main className="mx-auto max-w-md px-4 py-8">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           Nieuwe groep
