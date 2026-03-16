@@ -113,9 +113,11 @@ export async function POST(
       return NextResponse.json({ error: "Geen resultaat om te exporteren. Genereer eerst een chart." }, { status: 400 });
     }
 
-    const rowsJson = latestResult.editedRowsJson ?? latestResult.rowsJson;
+    const rawJson = latestResult.editedRowsJson ?? latestResult.rowsJson;
     let rows: ChartRow[];
     try {
+      const rowsJson =
+        typeof rawJson === "string" ? rawJson : JSON.stringify(rawJson);
       rows = JSON.parse(rowsJson) as ChartRow[];
     } catch {
       return NextResponse.json({ error: "Kon chart-data niet lezen." }, { status: 500 });
