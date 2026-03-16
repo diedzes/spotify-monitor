@@ -85,6 +85,7 @@ export default function ReportDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [exportingPlaylist, setExportingPlaylist] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [updatingSourceId, setUpdatingSourceId] = useState<string | null>(null);
 
   const loadReport = () => {
     setError(null);
@@ -225,6 +226,45 @@ export default function ReportDetailPage() {
       );
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleSourceWeightChange = (sourceId: string, weight: number) => {
+    setReport((prev) =>
+      prev
+        ? {
+            ...prev,
+            sources: prev.sources.map((s) =>
+              s.id === sourceId ? { ...s, weight } : s
+            ),
+          }
+        : prev,
+    );
+  };
+
+  const handleSourceWeightCommit = async (sourceId: string, weight: number) => {
+    setUpdatingSourceId(sourceId);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/reports/${id}/sources/${sourceId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({ weight }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Kon gewicht niet opslaan");
+        return;
+      }
+    } catch {
+      setError("Kon gewicht niet opslaan");
+    } finally {
+      setUpdatingSourceId(null);
     }
   };
 
@@ -458,17 +498,54 @@ export default function ReportDetailPage() {
               {report.sources.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50"
                 >
-                  <div>
-                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                      {s.type === "playlist" ? "Playlist" : "Groep"}
-                    </span>
-                    <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
-                    <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
-                      gewicht {s.weight}
-                      {!s.include && " · uitgeschakeld"}
-                    </span>
+                  <div className="flex-1">
+                    <div>
+                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                        {s.type === "playlist" ? "Playlist" : "Groep"}
+                      </span>
+                      <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                      <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
+                        {!s.include && " · uitgeschakeld"}
+                      </span>
+                    </div>
+                    {s.type === "playlist" && (
+                      <div className="mt-2 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={1}
+                          max={10}
+                          step={1}
+                          value={Math.round(s.weight || 1)}
+                          onChange={(e) =>
+                            handleSourceWeightChange(s.id, Number(e.target.value) || 1)
+                          }
+                          onMouseUp={(e) =>
+                            handleSourceWeightCommit(
+                              s.id,
+                              Number((e.currentTarget as HTMLInputElement).value) || 1,
+                            )
+                          }
+                          onTouchEnd={(e) =>
+                            handleSourceWeightCommit(
+                              s.id,
+                              Number((e.currentTarget as HTMLInputElement).value) || 1,
+                            )
+                          }
+                          disabled={updatingSourceId === s.id}
+                          className="h-1 w-40 cursor-pointer accent-[#1DB954]"
+                        />
+                        <span className="text-xs text-zinc-600 dark:text-zinc-300">
+                          Gewicht: {s.weight.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                    {s.type === "group" && (
+                      <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        Gewicht (groep): {s.weight.toFixed(1)}
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
