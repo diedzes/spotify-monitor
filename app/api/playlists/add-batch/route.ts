@@ -1,3 +1,4 @@
+import { syncTrackedPlaylist } from "@/lib/sync-playlists";
 import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
@@ -56,12 +57,13 @@ export async function POST(request: Request): Promise<NextResponse<AddBatchResul
     try {
       const metadata = await fetchPlaylistMetadata(session.access_token, playlistId);
       const fields = playlistMetadataToTrackedFields(metadata);
-      await prisma.trackedPlaylist.create({
+      const created = await prisma.trackedPlaylist.create({
         data: {
           userId: session.user.id,
           ...fields,
         },
       });
+      await syncTrackedPlaylist(created.id, session.access_token);
       results.added += 1;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

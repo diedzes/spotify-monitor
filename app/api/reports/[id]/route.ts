@@ -21,7 +21,6 @@ export async function GET(
           include: {
             trackedPlaylist: { select: { id: true, name: true } },
             playlistGroup: {
-              select: { id: true, name: true },
               include: {
                 groupPlaylists: {
                   include: { trackedPlaylist: { select: { name: true } } },
