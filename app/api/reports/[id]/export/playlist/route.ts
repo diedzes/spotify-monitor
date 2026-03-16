@@ -71,12 +71,21 @@ function rowsToTrackUris(rows: ChartRow[]): string[] {
   return rows
     .map((row) => {
       if (row.spotifyTrackId) {
-        // Als het al een volledige Spotify-URI is, gebruik die direct.
-        if (row.spotifyTrackId.includes(":")) {
-          return row.spotifyTrackId;
+        const id = row.spotifyTrackId.trim();
+        // Volledige Spotify track-URI
+        if (id.startsWith("spotify:track:")) {
+          return id;
         }
-        // Anders aannemen dat het de kale track-id is.
-        return `spotify:track:${row.spotifyTrackId}`;
+        // Volledige Spotify URL -> id eruit halen
+        if (id.includes("open.spotify.com/track/")) {
+          const m = id.match(/track\/([a-zA-Z0-9]+)/);
+          return m?.[1] ? `spotify:track:${m[1]}` : null;
+        }
+        // Kale base62-id
+        if (/^[A-Za-z0-9]+$/.test(id)) {
+          return `spotify:track:${id}`;
+        }
+        // Onbekend formaat: probeer spotifyUrl als fallback
       }
       const m = row.spotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
       return m?.[1] ? `spotify:track:${m[1]}` : null;
