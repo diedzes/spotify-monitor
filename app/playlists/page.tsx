@@ -358,6 +358,7 @@ function PlaylistsPageContent() {
             Naar startpagina
           </Link>
         </div>
+        </div>
       </div>
     );
   }
