@@ -71,6 +71,11 @@ function rowsToTrackUris(rows: ChartRow[]): string[] {
   return rows
     .map((row) => {
       if (row.spotifyTrackId) {
+        // Als het al een volledige Spotify-URI is, gebruik die direct.
+        if (row.spotifyTrackId.includes(":")) {
+          return row.spotifyTrackId;
+        }
+        // Anders aannemen dat het de kale track-id is.
         return `spotify:track:${row.spotifyTrackId}`;
       }
       const m = row.spotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
