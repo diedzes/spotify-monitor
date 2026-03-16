@@ -162,7 +162,7 @@ export default function ReportDetailPage() {
     setGenerateError(null);
     setError(null);
 
-    if (!id) return;
+    if (!id || !report) return;
     if (!addGroupId) {
       setError("Selecteer eerst een groep");
       return;
