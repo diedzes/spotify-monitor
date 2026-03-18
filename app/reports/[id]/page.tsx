@@ -542,8 +542,19 @@ export default function ReportDetailPage() {
                           Gewicht: {s.weight.toFixed(1)}
                         </span>
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          · {(s.followerCount ?? null) === null ? "—" : s.followerCount.toLocaleString("nl-NL")} volgers ·{" "}
-                          {(s.trackCount ?? null) === null ? "—" : s.trackCount.toLocaleString("nl-NL")} nummers
+                          {(() => {
+                            const followerCount = s.followerCount;
+                            const trackCount = s.trackCount;
+                            const followersText =
+                              followerCount != null ? followerCount.toLocaleString("nl-NL") : "—";
+                            const tracksText =
+                              trackCount != null ? trackCount.toLocaleString("nl-NL") : "—";
+                            return (
+                              <>
+                                · {followersText} volgers · {tracksText} nummers
+                              </>
+                            );
+                          })()}
                         </span>
                       </div>
                     )}
