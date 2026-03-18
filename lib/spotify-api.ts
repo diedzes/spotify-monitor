@@ -65,6 +65,7 @@ export interface SpotifyPlaylistMetadata {
   images: Array<{ url: string }>;
   snapshot_id: string;
   tracks: { total: number };
+  followers?: { total: number };
   public: boolean;
   collaborative: boolean;
 }
@@ -137,6 +138,7 @@ export function playlistMetadataToTrackedFields(meta: SpotifyPlaylistMetadata) {
     imageUrl: meta.images?.[0]?.url ?? null,
     snapshotId: meta.snapshot_id ?? null,
     trackCount: meta.tracks?.total ?? 0,
+    followerCount: meta.followers?.total ?? 0,
     isPublic: meta.public ?? true,
     isCollaborative: meta.collaborative ?? false,
   };

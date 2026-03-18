@@ -31,6 +31,8 @@ type SourceRow = {
   include: boolean;
   type: "playlist" | "group";
   name: string;
+  trackCount?: number | null;
+  followerCount?: number | null;
   expandedPlaylists?: string[];
 };
 
@@ -538,6 +540,10 @@ export default function ReportDetailPage() {
                         />
                         <span className="text-xs text-zinc-600 dark:text-zinc-300">
                           Gewicht: {s.weight.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          · {(s.followerCount ?? null) === null ? "—" : s.followerCount.toLocaleString("nl-NL")} volgers ·{" "}
+                          {(s.trackCount ?? null) === null ? "—" : s.trackCount.toLocaleString("nl-NL")} nummers
                         </span>
                       </div>
                     )}

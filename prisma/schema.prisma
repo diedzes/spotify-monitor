@@ -33,6 +33,7 @@ model TrackedPlaylist {
   imageUrl          String?
   snapshotId        String?
   trackCount        Int                @default(0)
+  followerCount     Int                @default(0)
   isPublic          Boolean            @default(true)
   isCollaborative   Boolean            @default(false)
   lastSyncedAt      DateTime?

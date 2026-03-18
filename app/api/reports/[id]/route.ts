@@ -19,7 +19,7 @@ export async function GET(
       include: {
         sources: {
           include: {
-            trackedPlaylist: { select: { id: true, name: true } },
+            trackedPlaylist: { select: { id: true, name: true, trackCount: true, followerCount: true } },
             playlistGroup: {
               include: {
                 groupPlaylists: {
@@ -52,6 +52,8 @@ export async function GET(
       include: s.include,
       type: s.trackedPlaylistId ? "playlist" : "group",
       name: s.trackedPlaylist?.name ?? s.playlistGroup?.name ?? "",
+      trackCount: s.trackedPlaylist?.trackCount ?? null,
+      followerCount: s.trackedPlaylist?.followerCount ?? null,
       expandedPlaylists:
         s.playlistGroup?.groupPlaylists?.map((gp) => gp.trackedPlaylist?.name ?? "").filter(Boolean) ?? [],
     })),
