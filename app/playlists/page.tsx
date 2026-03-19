@@ -262,7 +262,11 @@ function PlaylistsPageContent() {
           headers: getSessionHeaders(sidFromUrl),
           body: JSON.stringify({ name: newName }),
         });
-        const createData = (await createRes.json()) as { ok?: boolean; group?: { id: string }; error?: string };
+        const createData = (await createRes.json()) as {
+          ok?: boolean;
+          group?: { id: string; name: string };
+          error?: string;
+        };
         if (createRes.status === 401) return;
         if (!createRes.ok || !createData.group) {
           setBulkAddResult({
