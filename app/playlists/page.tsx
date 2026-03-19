@@ -138,6 +138,7 @@ function PlaylistsPageContent() {
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [bulkAddGroupId, setBulkAddGroupId] = useState("");
+  const [bulkAddNewGroupName, setBulkAddNewGroupName] = useState("");
   const [bulkAddLoading, setBulkAddLoading] = useState(false);
   const [bulkAddResult, setBulkAddResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
   const [bulkSyncLoading, setBulkSyncLoading] = useState(false);
@@ -249,15 +250,48 @@ function PlaylistsPageContent() {
   }, [sidFromUrl, refreshPlaylists]);
 
   const handleBulkAddToGroup = useCallback(async () => {
-    if (!bulkAddGroupId) return;
-    setBulkAddResult(null);
-    setBulkAddLoading(true);
+    const newName = bulkAddNewGroupName.trim();
+    let groupId = bulkAddGroupId;
+    if (newName) {
+      setBulkAddResult(null);
+      setBulkAddLoading(true);
+      try {
+        const createRes = await fetch("/api/groups", {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+          body: JSON.stringify({ name: newName }),
+        });
+        const createData = (await createRes.json()) as { ok?: boolean; group?: { id: string }; error?: string };
+        if (createRes.status === 401) return;
+        if (!createRes.ok || !createData.group) {
+          setBulkAddResult({
+            added: 0,
+            skipped: 0,
+            errors: [typeof createData.error === "string" ? createData.error : "Kon groep niet aanmaken"],
+          });
+          setBulkAddLoading(false);
+          return;
+        }
+        groupId = createData.group.id;
+        setGroups((prev) => [...prev, { id: createData.group!.id, name: createData.group!.name }]);
+      } catch {
+        setBulkAddResult({ added: 0, skipped: 0, errors: ["Kon groep niet aanmaken"] });
+        setBulkAddLoading(false);
+        return;
+      }
+    }
+    if (!groupId) return;
+    if (!newName) {
+      setBulkAddResult(null);
+      setBulkAddLoading(true);
+    }
     try {
       const res = await fetch("/api/playlists/bulk-add-to-group", {
         method: "POST",
         credentials: "include",
         headers: getSessionHeaders(sidFromUrl),
-        body: JSON.stringify({ groupId: bulkAddGroupId, trackedPlaylistIds: Array.from(selectedIds) }),
+        body: JSON.stringify({ groupId, trackedPlaylistIds: Array.from(selectedIds) }),
       });
       const data = (await res.json()) as { added?: number; skipped?: number; errors?: Array<{ error: string }>; error?: string };
       if (res.status === 401) return;
@@ -277,7 +311,7 @@ function PlaylistsPageContent() {
     } finally {
       setBulkAddLoading(false);
     }
-  }, [sidFromUrl, bulkAddGroupId, selectedIds, refreshPlaylists]);
+  }, [sidFromUrl, bulkAddGroupId, bulkAddNewGroupName, selectedIds, refreshPlaylists]);
 
   const handleBulkSyncSelected = useCallback(async () => {
     setBulkSyncResult(null);
@@ -308,6 +342,7 @@ function PlaylistsPageContent() {
   const openBulkAddModal = useCallback(() => {
     setBulkAddResult(null);
     setBulkAddGroupId("");
+    setBulkAddNewGroupName("");
     fetch("/api/groups", { credentials: "include", headers: getSessionHeaders(sidFromUrl) })
       .then((res) => res.json())
       .then((data: { groups?: Array<{ id: string; name: string }> }) => {
@@ -642,41 +677,56 @@ function PlaylistsPageContent() {
               Add selected to group
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Kies een groep. Playlists die er al in zitten worden overgeslagen.
+              Kies een bestaande groep of voer een naam in voor een nieuwe groep. Playlists die al in de groep zitten worden overgeslagen.
             </p>
-            {groups.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Je hebt nog geen groepen. Maak eerst een groep aan.</p>
-            ) : (
+            {groups.length > 0 && (
               <>
+                <label className="mt-4 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Bestaande groep</label>
                 <select
                   value={bulkAddGroupId}
-                  onChange={(e) => setBulkAddGroupId(e.target.value)}
-                  className="mt-4 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  onChange={(e) => {
+                    setBulkAddGroupId(e.target.value);
+                    if (e.target.value) setBulkAddNewGroupName("");
+                  }}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
                   <option value="">Kies een groep…</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </select>
-                {bulkAddResult && (
-                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
-                    <p className="text-zinc-900 dark:text-zinc-100">
-                      {bulkAddResult.added} toegevoegd, {bulkAddResult.skipped} al in groep
-                      {bulkAddResult.errors.length > 0 && `, ${bulkAddResult.errors.length} fout(en)`}
-                    </p>
-                    {bulkAddResult.errors.length > 0 && (
-                      <ul className="mt-1 list-inside text-zinc-600 dark:text-zinc-400">
-                        {bulkAddResult.errors.slice(0, 3).map((e, i) => <li key={i}>{e}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                )}
               </>
+            )}
+            <label className="mt-4 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              {groups.length > 0 ? "Of nieuwe groep" : "Nieuwe groep"}
+            </label>
+            <input
+              type="text"
+              value={bulkAddNewGroupName}
+              onChange={(e) => {
+                setBulkAddNewGroupName(e.target.value);
+                if (e.target.value.trim()) setBulkAddGroupId("");
+              }}
+              placeholder="Naam van de nieuwe groep"
+              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+            {bulkAddResult && (
+              <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
+                <p className="text-zinc-900 dark:text-zinc-100">
+                  {bulkAddResult.added} toegevoegd, {bulkAddResult.skipped} al in groep
+                  {bulkAddResult.errors.length > 0 && `, ${bulkAddResult.errors.length} fout(en)`}
+                </p>
+                {bulkAddResult.errors.length > 0 && (
+                  <ul className="mt-1 list-inside text-zinc-600 dark:text-zinc-400">
+                    {bulkAddResult.errors.slice(0, 3).map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                )}
+              </div>
             )}
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
-                disabled={bulkAddLoading || groups.length === 0 || !bulkAddGroupId}
+                disabled={bulkAddLoading || (!bulkAddGroupId && !bulkAddNewGroupName.trim())}
                 onClick={handleBulkAddToGroup}
                 className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
               >

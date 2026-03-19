@@ -70,7 +70,7 @@ export async function GET(
     const message = err instanceof Error ? err.message : "Databasefout";
     console.error("[GET /api/reports/[id]]", message);
     return NextResponse.json(
-      { error: "Kon report niet laden. Controleer of alle migraties in Supabase zijn uitgevoerd (o.a. kolom editedRowsJson)." },
+      { error: `Kon report niet laden: ${message}` },
       { status: 500 }
     );
   }
