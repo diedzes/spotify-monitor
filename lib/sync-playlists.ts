@@ -20,6 +20,7 @@ export interface TrackForSnapshot {
   title: string;
   artistsJson: string;
   album: string;
+  popularity: number | null;
 }
 
 /**
@@ -40,6 +41,10 @@ export async function getPlaylistTracksWithPagination(
       const track = item.track;
       if (!track) return; // null when track was removed from Spotify
       const position = offset + index;
+      const pop =
+        typeof track.popularity === "number" && Number.isFinite(track.popularity)
+          ? Math.trunc(track.popularity)
+          : null;
       all.push({
         position,
         spotifyTrackId: track.id ?? `local-${position}`,
@@ -48,6 +53,7 @@ export async function getPlaylistTracksWithPagination(
         title: track.name,
         artistsJson: JSON.stringify(track.artists?.map((a) => ({ id: a.id, name: a.name })) ?? []),
         album: track.album?.name ?? "",
+        popularity: pop,
       });
     });
     offset += page.items.length;
@@ -122,6 +128,7 @@ export async function syncTrackedPlaylist(
           title: t.title,
           artistsJson: t.artistsJson,
           album: t.album,
+          popularity: t.popularity,
           position: t.position,
         })),
       },

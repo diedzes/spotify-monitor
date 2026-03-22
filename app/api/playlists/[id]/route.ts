@@ -40,6 +40,7 @@ export async function GET(
     title: string;
     artistsJson: string;
     album: string;
+    popularity: number | null;
     spotifyUrl: string;
   }> = [];
 
@@ -53,6 +54,7 @@ export async function GET(
         title: true,
         artistsJson: true,
         album: true,
+        popularity: true,
         spotifyUrl: true,
       },
     });

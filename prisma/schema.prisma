@@ -93,6 +93,7 @@ model SnapshotTrack {
   title             String
   artistsJson       String           // JSON array of {name, id?}
   album             String
+  popularity        Int?             // Spotify track popularity 0–100, null if unknown/local
   position          Int              // 0-based index in playlist
   snapshot          PlaylistSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 

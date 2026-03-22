@@ -65,6 +65,7 @@ type PlaylistDetail = {
     title: string;
     artistsJson: string;
     album: string;
+    popularity: number | null;
     spotifyUrl: string;
   }>;
 };
@@ -347,6 +348,7 @@ export default function PlaylistDetailPage() {
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Album</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Popularity</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Link</th>
                       </tr>
                     </thead>
@@ -362,6 +364,9 @@ export default function PlaylistDetailPage() {
                           </td>
                           <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{t.title}</td>
                           <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.album}</td>
+                          <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400">
+                            {t.popularity != null ? t.popularity : "—"}
+                          </td>
                           <td className="px-4 py-3">
                             <a
                               href={t.spotifyUrl}

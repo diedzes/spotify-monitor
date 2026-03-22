@@ -97,6 +97,8 @@ export interface SpotifyPlaylistTrackItem {
     external_urls: { spotify: string };
     album: { name: string };
     artists: Array<{ id?: string; name: string }>;
+    /** Spotify 0–100; may be absent for some tracks */
+    popularity?: number;
   } | null;
 }
 
