@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import {
   fetchPlaylistMetadata,
   fetchPlaylistTracksPage,
+  fetchTracksPopularityByIds,
   playlistMetadataToTrackedFields,
   type SpotifyPlaylistTrackItem,
 } from "@/lib/spotify-api";
@@ -60,7 +61,14 @@ export async function getPlaylistTracksWithPagination(
     hasMore = page.next != null && page.items.length === PAGE_SIZE;
   }
 
-  return all;
+  // Playlist /tracks levert vaak geen `popularity` op het track-object; vul aan via GET /tracks.
+  const idsForPop = all.map((t) => t.spotifyTrackId);
+  const popMap =
+    idsForPop.length > 0 ? await fetchTracksPopularityByIds(accessToken, idsForPop) : new Map<string, number>();
+  return all.map((t) => ({
+    ...t,
+    popularity: popMap.get(t.spotifyTrackId) ?? t.popularity,
+  }));
 }
 
 export type SyncResult =

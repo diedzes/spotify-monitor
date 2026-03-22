@@ -128,6 +128,42 @@ export async function fetchPlaylistTracksPage(
   return res.json() as Promise<SpotifyPlaylistTracksResponse>;
 }
 
+/** Spotify track IDs zijn 22 base62-tekens (geen lokale placeholders). */
+export function isSpotifyTrackId(id: string): boolean {
+  return /^[a-zA-Z0-9]{22}$/.test(id) && !id.startsWith("local-");
+}
+
+/**
+ * Haal popularity (0–100) op voor track-IDs via GET /v1/tracks.
+ * De playlist-tracks response bevat vaak géén popularity; dit endpoint wel.
+ */
+export async function fetchTracksPopularityByIds(
+  accessToken: string,
+  trackIds: string[]
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const unique = [...new Set(trackIds.filter(isSpotifyTrackId))];
+  const chunkSize = 50;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const qs = chunk.map(encodeURIComponent).join(",");
+    const res = await spotifyFetch(`${SPOTIFY_API_BASE}/tracks?ids=${qs}`, { accessToken });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Spotify API tracks ${res.status}: ${text || res.statusText}`);
+    }
+    const body = (await res.json()) as {
+      tracks: Array<{ id: string; popularity: number } | null>;
+    };
+    for (const t of body.tracks) {
+      if (t && typeof t.popularity === "number" && Number.isFinite(t.popularity)) {
+        out.set(t.id, Math.trunc(t.popularity));
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Zet Spotify playlist response om naar velden voor ons TrackedPlaylist model.
  */
