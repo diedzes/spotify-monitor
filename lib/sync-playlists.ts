@@ -97,6 +97,33 @@ export async function syncTrackedPlaylist(
   // Bij net toegevoegde playlists staat snapshotId al uit metadata maar is er nog geen snapshot in DB;
   // dan moeten we wel de eerste snapshot + tracks aanmaken.
   if (currentSnapshotId === lastKnownSnapshotId && lastKnownSnapshotId != null && hasExistingSnapshot) {
+    // Backfill: vul ontbrekende durationMs in bestaande laatste snapshot aan.
+    const latestSnapshotId = tracked.snapshots[0]?.id;
+    if (latestSnapshotId) {
+      const missing = await prisma.snapshotTrack.findMany({
+        where: { snapshotId: latestSnapshotId, durationMs: null },
+        select: { id: true, spotifyTrackId: true },
+      });
+      if (missing.length > 0) {
+        try {
+          const tracksNow = await getPlaylistTracksWithPagination(accessToken, tracked.spotifyPlaylistId);
+          const durationByTrackId = new Map<string, number | null>();
+          for (const t of tracksNow) durationByTrackId.set(t.spotifyTrackId, t.durationMs);
+          for (const row of missing) {
+            const durationMs = durationByTrackId.get(row.spotifyTrackId);
+            if (durationMs != null) {
+              await prisma.snapshotTrack.update({
+                where: { id: row.id },
+                data: { durationMs },
+              });
+            }
+          }
+        } catch {
+          // Niet blokkeren: metadata-sync moet doorlopen ook als backfill faalt.
+        }
+      }
+    }
+
     await prisma.trackedPlaylist.update({
       where: { id: trackedPlaylistId },
       data: {
