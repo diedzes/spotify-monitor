@@ -58,6 +58,18 @@ type SchedulerRun = {
   status: "pending" | "success" | "failed";
 };
 
+type SchedulerRunRow = {
+  position: number;
+  spotifyTrackId: string | null;
+  title: string;
+  artists: string;
+  album: string;
+  spotifyUrl: string;
+  sourceName: string;
+  status: "scheduled" | "conflict";
+  conflictReason: string | null;
+};
+
 type SchedulerDetail = {
   scheduler: {
     id: string;
@@ -136,6 +148,8 @@ export default function SchedulerDetailPage() {
   const [artistSeparation, setArtistSeparation] = useState<string>("");
   const [titleSeparation, setTitleSeparation] = useState<string>("");
   const [savingRules, setSavingRules] = useState(false);
+  const [generatingRun, setGeneratingRun] = useState(false);
+  const [latestRunRows, setLatestRunRows] = useState<SchedulerRunRow[]>([]);
 
   const scheduler = data?.scheduler ?? null;
 
@@ -190,6 +204,20 @@ export default function SchedulerDetailPage() {
     setArtistSeparation(get("artist_separation")?.toString() ?? "");
     setTitleSeparation(get("title_separation")?.toString() ?? "");
   }, [data?.rules]);
+
+  useEffect(() => {
+    const latest = data?.runs?.[0];
+    if (!latest?.resultJson || latest.status !== "success") {
+      setLatestRunRows([]);
+      return;
+    }
+    try {
+      const rows = JSON.parse(latest.resultJson) as SchedulerRunRow[];
+      setLatestRunRows(Array.isArray(rows) ? rows : []);
+    } catch {
+      setLatestRunRows([]);
+    }
+  }, [data?.runs]);
 
   useEffect(() => {
     if (!scheduler || !data) return;
@@ -474,6 +502,32 @@ export default function SchedulerDetailPage() {
     }
   };
 
+  const handleGenerateRun = async () => {
+    setError(null);
+    setSuccess(null);
+    setGeneratingRun(true);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/generate`, {
+        method: "POST",
+        credentials: "include",
+        headers: getSessionHeaders(),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; rows?: SchedulerRunRow[] };
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? "Genereren mislukt");
+        return;
+      }
+      setSuccess("Schedule gegenereerd.");
+      setLatestRunRows(body.rows ?? []);
+      loadScheduler();
+      setTab("runs");
+    } catch {
+      setError("Genereren mislukt");
+    } finally {
+      setGeneratingRun(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -581,17 +635,27 @@ export default function SchedulerDetailPage() {
           </button>
         </section>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {(["sources", "clock", "rules", "runs"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${tab === k ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
-            >
-              {k[0].toUpperCase() + k.slice(1)}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {(["sources", "clock", "rules", "runs"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTab(k)}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${tab === k ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+              >
+                {k[0].toUpperCase() + k.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleGenerateRun}
+            disabled={generatingRun}
+            className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+          >
+            {generatingRun ? "Genereren…" : "Generate schedule"}
+          </button>
         </div>
 
         {tab === "sources" && (
@@ -938,7 +1002,48 @@ export default function SchedulerDetailPage() {
         {tab === "runs" && (
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
-            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Run engine nog niet gebouwd. Dit is een placeholder-tab.</p>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Laatste run-resultaat en historie.</p>
+            {latestRunRows.length > 0 ? (
+              <div className="mb-4 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+                      <th className="px-3 py-2">Positie</th>
+                      <th className="px-3 py-2">Track</th>
+                      <th className="px-3 py-2">Bron</th>
+                      <th className="px-3 py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestRunRows.map((r) => (
+                      <tr key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                        <td className="px-3 py-2">{r.position}</td>
+                        <td className="px-3 py-2">
+                          {r.status === "scheduled" ? (
+                            <a
+                              href={r.spotifyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#1DB954] hover:underline"
+                            >
+                              {r.title || r.spotifyTrackId}
+                            </a>
+                          ) : (
+                            <span className="text-zinc-500 dark:text-zinc-400">{r.conflictReason ?? "Conflict"}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">{r.sourceName || "—"}</td>
+                        <td className="px-3 py-2">
+                          <span className={r.status === "scheduled" ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}>
+                            {r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             {data.runs.length === 0 ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Nog geen runs.</p>
             ) : (
