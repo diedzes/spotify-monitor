@@ -78,6 +78,7 @@ export async function GET(
       id: run.id,
       createdAt: run.createdAt.toISOString(),
       resultJson: run.resultJson,
+      editedResultJson: run.editedResultJson,
       status: run.status,
     })),
   });

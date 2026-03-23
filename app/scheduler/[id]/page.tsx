@@ -55,11 +55,13 @@ type SchedulerRun = {
   id: string;
   createdAt: string;
   resultJson: string | null;
+  editedResultJson: string | null;
   status: "pending" | "success" | "failed";
 };
 
 type SchedulerRunRow = {
   position: number;
+  sourceKey: string | null;
   spotifyTrackId: string | null;
   title: string;
   artists: string;
@@ -68,6 +70,8 @@ type SchedulerRunRow = {
   sourceName: string;
   status: "scheduled" | "conflict";
   conflictReason: string | null;
+  locked: boolean;
+  replacedManually: boolean;
 };
 
 type SchedulerDetail = {
@@ -150,6 +154,23 @@ export default function SchedulerDetailPage() {
   const [savingRules, setSavingRules] = useState(false);
   const [generatingRun, setGeneratingRun] = useState(false);
   const [latestRunRows, setLatestRunRows] = useState<SchedulerRunRow[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string>("");
+  const [activePosition, setActivePosition] = useState<number | null>(null);
+  const [loadingEditor, setLoadingEditor] = useState(false);
+  const [suggestions, setSuggestions] = useState<
+    Array<{
+      track?: { spotifyTrackId: string; title: string; artists: string[]; album: string; spotifyUrl: string };
+      ruleImpact?: string;
+      spotifyTrackId?: string;
+      title?: string;
+      artists?: string;
+      album?: string;
+      spotifyUrl?: string;
+      sourceKey?: string;
+      sourceName?: string;
+    }>
+  >([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const scheduler = data?.scheduler ?? null;
 
@@ -206,18 +227,33 @@ export default function SchedulerDetailPage() {
   }, [data?.rules]);
 
   useEffect(() => {
-    const latest = data?.runs?.[0];
-    if (!latest?.resultJson || latest.status !== "success") {
+    if (!data?.runs?.length) {
+      setActiveRunId("");
+      return;
+    }
+    if (!activeRunId || !data.runs.some((r) => r.id === activeRunId)) {
+      setActiveRunId(data.runs[0].id);
+    }
+  }, [data?.runs, activeRunId]);
+
+  useEffect(() => {
+    const activeRun = data?.runs.find((r) => r.id === activeRunId) ?? data?.runs?.[0];
+    if (!activeRun || activeRun.status !== "success") {
       setLatestRunRows([]);
       return;
     }
     try {
-      const rows = JSON.parse(latest.resultJson) as SchedulerRunRow[];
+      const raw = activeRun.editedResultJson ?? activeRun.resultJson;
+      if (!raw) {
+        setLatestRunRows([]);
+        return;
+      }
+      const rows = JSON.parse(raw) as SchedulerRunRow[];
       setLatestRunRows(Array.isArray(rows) ? rows : []);
     } catch {
       setLatestRunRows([]);
     }
-  }, [data?.runs]);
+  }, [data?.runs, activeRunId]);
 
   useEffect(() => {
     if (!scheduler || !data) return;
@@ -512,13 +548,19 @@ export default function SchedulerDetailPage() {
         credentials: "include",
         headers: getSessionHeaders(),
       });
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; rows?: SchedulerRunRow[] };
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        rows?: SchedulerRunRow[];
+        run?: { id: string };
+      };
       if (!res.ok || !body.ok) {
         setError(body.error ?? "Genereren mislukt");
         return;
       }
       setSuccess("Schedule gegenereerd.");
       setLatestRunRows(body.rows ?? []);
+      if (body.run?.id) setActiveRunId(body.run.id);
       loadScheduler();
       setTab("runs");
     } catch {
@@ -526,6 +568,64 @@ export default function SchedulerDetailPage() {
     } finally {
       setGeneratingRun(false);
     }
+  };
+
+  const currentRun = data?.runs.find((r) => r.id === activeRunId) ?? data?.runs[0] ?? null;
+
+  const runAction = async (path: string, payload: Record<string, unknown>) => {
+    if (!currentRun) return null;
+    setLoadingEditor(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/runs/${currentRun.id}/${path}`, {
+        method: "POST",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        rows?: SchedulerRunRow[];
+        items?: Array<Record<string, unknown>>;
+      };
+      if (!res.ok || !body.ok) throw new Error(body.error ?? "Actie mislukt");
+      if (body.rows) setLatestRunRows(body.rows);
+      return body;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Actie mislukt");
+      return null;
+    } finally {
+      setLoadingEditor(false);
+    }
+  };
+
+  const fetchSuggestions = async () => {
+    if (!activePosition) return;
+    const body = await runAction("suggest", { position: activePosition, limit: 20 });
+    setSuggestions((body?.items ?? []) as typeof suggestions);
+  };
+
+  const searchAll = async () => {
+    if (!activePosition) return;
+    const body = await runAction("search", { position: activePosition, query: searchQuery, limit: 50 });
+    setSuggestions((body?.items ?? []) as typeof suggestions);
+  };
+
+  const replaceAtPosition = async (spotifyTrackId: string, sourceKey?: string) => {
+    if (!activePosition) return;
+    const body = await runAction("replace", { position: activePosition, spotifyTrackId, sourceKey: sourceKey ?? null });
+    if (body?.ok) setSuccess(`Positie ${activePosition} vervangen.`);
+  };
+
+  const toggleLock = async (position: number, locked: boolean) => {
+    const body = await runAction("lock", { position, locked });
+    if (body?.ok) setSuccess(`Positie ${position} ${locked ? "gelockt" : "unlocked"}.`);
+  };
+
+  const rescheduleFrom = async (fromPosition: number) => {
+    const body = await runAction("reschedule", { fromPosition });
+    if (body?.ok) setSuccess(`Reschedule vanaf positie ${fromPosition} voltooid.`);
   };
 
   if (loading) {
@@ -1002,7 +1102,29 @@ export default function SchedulerDetailPage() {
         {tab === "runs" && (
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
-            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Laatste run-resultaat en historie.</p>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Interactieve editor: lock, suggest, replace en reschedule per slot.
+            </p>
+            {data.runs.length > 0 && (
+              <div className="mb-3">
+                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Actieve run</label>
+                <select
+                  value={currentRun?.id ?? ""}
+                  onChange={(e) => {
+                    setActiveRunId(e.target.value);
+                    setActivePosition(null);
+                    setSuggestions([]);
+                  }}
+                  className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                >
+                  {data.runs.map((run) => (
+                    <option key={run.id} value={run.id}>
+                      {new Date(run.createdAt).toLocaleString("nl-NL")} - {run.status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {latestRunRows.length > 0 ? (
               <div className="mb-4 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                 <table className="w-full text-left text-sm">
@@ -1012,11 +1134,16 @@ export default function SchedulerDetailPage() {
                       <th className="px-3 py-2">Track</th>
                       <th className="px-3 py-2">Bron</th>
                       <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Lock</th>
+                      <th className="px-3 py-2">Acties</th>
                     </tr>
                   </thead>
                   <tbody>
                     {latestRunRows.map((r) => (
-                      <tr key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                      <tr
+                        key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`}
+                        className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${activePosition === r.position ? "bg-green-50 dark:bg-green-900/10" : ""}`}
+                      >
                         <td className="px-3 py-2">{r.position}</td>
                         <td className="px-3 py-2">
                           {r.status === "scheduled" ? (
@@ -1036,7 +1163,52 @@ export default function SchedulerDetailPage() {
                         <td className="px-3 py-2">
                           <span className={r.status === "scheduled" ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}>
                             {r.status}
+                            {r.replacedManually ? " (manual)" : ""}
                           </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <label className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={r.locked}
+                              onChange={(e) => toggleLock(r.position, e.target.checked)}
+                              disabled={loadingEditor}
+                            />
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">{r.locked ? "locked" : "open"}</span>
+                          </label>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePosition(r.position);
+                                setSuggestions([]);
+                              }}
+                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                            >
+                              Select
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setActivePosition(r.position);
+                                await fetchSuggestions();
+                              }}
+                              disabled={loadingEditor}
+                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                            >
+                              Suggest
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => rescheduleFrom(r.position)}
+                              disabled={loadingEditor}
+                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                            >
+                              Reschedule vanaf hier
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1044,6 +1216,76 @@ export default function SchedulerDetailPage() {
                 </table>
               </div>
             ) : null}
+            {activePosition != null && (
+              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
+                <p className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">Editor positie #{activePosition}</p>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchSuggestions}
+                    disabled={loadingEditor}
+                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                  >
+                    Suggest uit dezelfde bron
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rescheduleFrom(activePosition)}
+                    disabled={loadingEditor}
+                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                  >
+                    Reschedule per slot
+                  </button>
+                </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Zoek in alle songs..."
+                    className="w-full max-w-sm rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={searchAll}
+                    disabled={loadingEditor}
+                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                  >
+                    Search all songs
+                  </button>
+                </div>
+                {suggestions.length > 0 && (
+                  <div className="max-h-72 overflow-auto rounded border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {suggestions.map((s, i) => {
+                        const trackId = s.track?.spotifyTrackId ?? s.spotifyTrackId ?? "";
+                        const title = s.track?.title ?? s.title ?? "";
+                        const artists = s.track?.artists?.join(", ") ?? s.artists ?? "";
+                        const sourceName = s.sourceName ?? "zelfde bron";
+                        const ruleImpact = s.ruleImpact ?? "ok";
+                        const sourceKey = s.sourceKey;
+                        return (
+                          <li key={`${trackId}-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                            <div>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-100">{title}</p>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400">{artists} - {sourceName} - rule: {ruleImpact}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => replaceAtPosition(trackId, sourceKey)}
+                              disabled={!trackId || ruleImpact !== "ok" || loadingEditor}
+                              className="rounded border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-600"
+                            >
+                              Replace
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             {data.runs.length === 0 ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Nog geen runs.</p>
             ) : (
