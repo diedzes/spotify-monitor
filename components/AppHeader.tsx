@@ -8,6 +8,7 @@ const navItems = [
   { href: "/playlists", label: "Playlists" },
   { href: "/groups", label: "Groepen" },
   { href: "/reports", label: "Reports" },
+  { href: "/scheduler", label: "Scheduler" },
 ];
 
 export function AppHeader() {

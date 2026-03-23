@@ -42,6 +42,8 @@ model TrackedPlaylist {
   snapshots         PlaylistSnapshot[]
   groupPlaylists    GroupPlaylist[]
   reportSources     ReportSource[]
+  schedulerSources  SchedulerSource[]
+  schedulerClockSlots SchedulerClockSlot[]
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
@@ -56,6 +58,8 @@ model PlaylistGroup {
   updatedAt      DateTime        @updatedAt
   groupPlaylists GroupPlaylist[]
   reportSources  ReportSource[]
+  schedulerSources SchedulerSource[]
+  schedulerClockSlots SchedulerClockSlot[]
 
   @@unique([userId, name])
   @@map("playlist_groups")
@@ -71,6 +75,28 @@ model GroupPlaylist {
 
   @@unique([groupId, trackedPlaylistId])
   @@map("group_playlists")
+}
+
+enum SchedulerMode {
+  clock
+  ratio
+}
+
+enum SchedulerSelectionMode {
+  random
+  rank_preferred
+}
+
+enum SchedulerRuleType {
+  artist_maximum
+  artist_separation
+  title_separation
+}
+
+enum SchedulerRunStatus {
+  pending
+  success
+  failed
 }
 
 model PlaylistSnapshot {
@@ -111,6 +137,73 @@ model Report {
   results     ReportResult[]
 
   @@map("reports")
+}
+
+model Scheduler {
+  id               String               @id @default(cuid())
+  userId           String
+  name             String
+  description      String?
+  mode             SchedulerMode
+  targetTrackCount Int
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  sources          SchedulerSource[]
+  clockSlots       SchedulerClockSlot[]
+  rules            SchedulerRule[]
+  runs             SchedulerRun[]
+
+  @@map("schedulers")
+}
+
+model SchedulerSource {
+  id                String                 @id @default(cuid())
+  schedulerId       String
+  trackedPlaylistId String?
+  playlistGroupId   String?
+  include           Boolean                @default(true)
+  weight            Float?
+  selectionMode     SchedulerSelectionMode @default(rank_preferred)
+  rankBiasStrength  Int?
+  scheduler         Scheduler              @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+  trackedPlaylist   TrackedPlaylist?       @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+  playlistGroup     PlaylistGroup?         @relation(fields: [playlistGroupId], references: [id], onDelete: Cascade)
+
+  @@map("scheduler_sources")
+}
+
+model SchedulerClockSlot {
+  id                String           @id @default(cuid())
+  schedulerId       String
+  position          Int
+  trackedPlaylistId String?
+  playlistGroupId   String?
+  scheduler         Scheduler        @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+  trackedPlaylist   TrackedPlaylist? @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+  playlistGroup     PlaylistGroup?   @relation(fields: [playlistGroupId], references: [id], onDelete: Cascade)
+
+  @@map("scheduler_clock_slots")
+}
+
+model SchedulerRule {
+  id         String            @id @default(cuid())
+  schedulerId String
+  ruleType   SchedulerRuleType
+  valueInt   Int?
+  scheduler  Scheduler         @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+
+  @@map("scheduler_rules")
+}
+
+model SchedulerRun {
+  id          String            @id @default(cuid())
+  schedulerId String
+  createdAt   DateTime          @default(now())
+  resultJson  String?
+  status      SchedulerRunStatus
+  scheduler   Scheduler          @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+
+  @@map("scheduler_runs")
 }
 
 model ReportSource {
