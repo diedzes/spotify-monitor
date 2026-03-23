@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 import {
   fetchPlaylistMetadata,
   fetchPlaylistTracksPage,
-  fetchTracksPopularityByIds,
   playlistMetadataToTrackedFields,
   type SpotifyPlaylistTrackItem,
 } from "@/lib/spotify-api";
@@ -21,7 +20,7 @@ export interface TrackForSnapshot {
   title: string;
   artistsJson: string;
   album: string;
-  popularity: number | null;
+  durationMs: number | null;
 }
 
 /**
@@ -42,9 +41,9 @@ export async function getPlaylistTracksWithPagination(
       const track = item.track;
       if (!track) return; // null when track was removed from Spotify
       const position = offset + index;
-      const pop =
-        typeof track.popularity === "number" && Number.isFinite(track.popularity)
-          ? Math.trunc(track.popularity)
+      const durationMs =
+        typeof track.duration_ms === "number" && Number.isFinite(track.duration_ms)
+          ? Math.trunc(track.duration_ms)
           : null;
       all.push({
         position,
@@ -54,21 +53,13 @@ export async function getPlaylistTracksWithPagination(
         title: track.name,
         artistsJson: JSON.stringify(track.artists?.map((a) => ({ id: a.id, name: a.name })) ?? []),
         album: track.album?.name ?? "",
-        popularity: pop,
+        durationMs,
       });
     });
     offset += page.items.length;
     hasMore = page.next != null && page.items.length === PAGE_SIZE;
   }
-
-  // Playlist /tracks levert vaak geen `popularity` op het track-object; vul aan via GET /tracks.
-  const idsForPop = all.map((t) => t.spotifyTrackId);
-  const popMap =
-    idsForPop.length > 0 ? await fetchTracksPopularityByIds(accessToken, idsForPop) : new Map<string, number>();
-  return all.map((t) => ({
-    ...t,
-    popularity: popMap.get(t.spotifyTrackId) ?? t.popularity,
-  }));
+  return all;
 }
 
 export type SyncResult =
@@ -136,7 +127,7 @@ export async function syncTrackedPlaylist(
           title: t.title,
           artistsJson: t.artistsJson,
           album: t.album,
-          popularity: t.popularity,
+          durationMs: t.durationMs,
           position: t.position,
         })),
       },

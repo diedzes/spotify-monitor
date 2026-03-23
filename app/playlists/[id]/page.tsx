@@ -40,6 +40,14 @@ function parseArtists(artistsJson: string): string {
   }
 }
 
+function formatDuration(durationMs: number | null): string {
+  if (durationMs == null || durationMs < 0) return "—";
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 type PlaylistDetail = {
   playlist: {
     id: string;
@@ -65,7 +73,7 @@ type PlaylistDetail = {
     title: string;
     artistsJson: string;
     album: string;
-    popularity: number | null;
+    durationMs: number | null;
     spotifyUrl: string;
   }>;
 };
@@ -348,7 +356,7 @@ export default function PlaylistDetailPage() {
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Album</th>
-                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Popularity</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Duration</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Link</th>
                       </tr>
                     </thead>
@@ -365,7 +373,7 @@ export default function PlaylistDetailPage() {
                           <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{t.title}</td>
                           <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.album}</td>
                           <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400">
-                            {t.popularity != null ? t.popularity : "—"}
+                            {formatDuration(t.durationMs)}
                           </td>
                           <td className="px-4 py-3">
                             <a
