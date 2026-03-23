@@ -65,8 +65,9 @@ export async function GET(
       position: slot.position,
       trackedPlaylistId: slot.trackedPlaylistId,
       playlistGroupId: slot.playlistGroupId,
-      type: slot.trackedPlaylistId ? "playlist" : "group",
-      name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? "",
+      spotifyTrackId: slot.spotifyTrackId,
+      type: slot.trackedPlaylistId ? "playlist" : slot.playlistGroupId ? "group" : "track",
+      name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? slot.spotifyTrackId ?? "",
     })),
     rules: scheduler.rules.map((r) => ({
       id: r.id,

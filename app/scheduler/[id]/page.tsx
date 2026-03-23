@@ -40,7 +40,8 @@ type SchedulerClockSlot = {
   position: number;
   trackedPlaylistId: string | null;
   playlistGroupId: string | null;
-  type: "playlist" | "group";
+  spotifyTrackId: string | null;
+  type: "playlist" | "group" | "track";
   name: string;
 };
 
@@ -77,6 +78,30 @@ type Option = { id: string; name: string };
 
 type TabKey = "sources" | "clock" | "rules" | "runs";
 
+type ClockDraft = {
+  slotId: string | null;
+  kind: "none" | "playlist" | "group" | "track";
+  playlistId: string;
+  groupId: string;
+  trackInput: string;
+};
+
+function parseSpotifyTrackId(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  const idOnly = /^[a-zA-Z0-9]{22}$/;
+  if (idOnly.test(t)) return t;
+  const patterns = [
+    /(?:https?:\/\/)?open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/,
+    /spotify:track:([a-zA-Z0-9]{22})/,
+  ];
+  for (const p of patterns) {
+    const m = t.match(p);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
+
 export default function SchedulerDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -104,11 +129,8 @@ export default function SchedulerDetailPage() {
   const [addRankBiasStrength, setAddRankBiasStrength] = useState<number | null>(null);
   const [addingSource, setAddingSource] = useState(false);
 
-  const [addSlotKind, setAddSlotKind] = useState<"playlist" | "group">("playlist");
-  const [addSlotPlaylistId, setAddSlotPlaylistId] = useState("");
-  const [addSlotGroupId, setAddSlotGroupId] = useState("");
-  const [addSlotPosition, setAddSlotPosition] = useState(1);
-  const [addingSlot, setAddingSlot] = useState(false);
+  const [clockDrafts, setClockDrafts] = useState<Record<number, ClockDraft>>({});
+  const [savingClockPos, setSavingClockPos] = useState<number | null>(null);
 
   const [artistMaximum, setArtistMaximum] = useState<string>("");
   const [artistSeparation, setArtistSeparation] = useState<string>("");
@@ -168,6 +190,52 @@ export default function SchedulerDetailPage() {
     setArtistSeparation(get("artist_separation")?.toString() ?? "");
     setTitleSeparation(get("title_separation")?.toString() ?? "");
   }, [data?.rules]);
+
+  useEffect(() => {
+    if (!scheduler || !data) return;
+    const next: Record<number, ClockDraft> = {};
+    const byPos = new Map<number, SchedulerClockSlot>();
+    for (const slot of data.clockSlots) byPos.set(slot.position, slot);
+    for (let pos = 1; pos <= scheduler.targetTrackCount; pos += 1) {
+      const slot = byPos.get(pos);
+      if (!slot) {
+        next[pos] = {
+          slotId: null,
+          kind: "none",
+          playlistId: "",
+          groupId: "",
+          trackInput: "",
+        };
+        continue;
+      }
+      if (slot.trackedPlaylistId) {
+        next[pos] = {
+          slotId: slot.id,
+          kind: "playlist",
+          playlistId: slot.trackedPlaylistId,
+          groupId: "",
+          trackInput: "",
+        };
+      } else if (slot.playlistGroupId) {
+        next[pos] = {
+          slotId: slot.id,
+          kind: "group",
+          playlistId: "",
+          groupId: slot.playlistGroupId,
+          trackInput: "",
+        };
+      } else {
+        next[pos] = {
+          slotId: slot.id,
+          kind: "track",
+          playlistId: "",
+          groupId: "",
+          trackInput: slot.spotifyTrackId ?? "",
+        };
+      }
+    }
+    setClockDrafts(next);
+  }, [scheduler?.id, scheduler?.targetTrackCount, data?.clockSlots]);
 
   const canAddSource = useMemo(
     () => (addSourceKind === "playlist" ? !!addSourcePlaylistId : !!addSourceGroupId),
@@ -292,53 +360,72 @@ export default function SchedulerDetailPage() {
     loadScheduler();
   };
 
-  const handleAddSlot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const hasId = addSlotKind === "playlist" ? !!addSlotPlaylistId : !!addSlotGroupId;
-    if (!hasId) return;
-    setError(null);
-    setSuccess(null);
-    setAddingSlot(true);
-    try {
-      const res = await fetch(`/api/schedulers/${id}/clock-slots`, {
-        method: "POST",
-        credentials: "include",
-        headers: getSessionHeaders(),
-        body: JSON.stringify({
-          position: addSlotPosition,
-          trackedPlaylistId: addSlotKind === "playlist" ? addSlotPlaylistId : undefined,
-          playlistGroupId: addSlotKind === "group" ? addSlotGroupId : undefined,
-        }),
-      });
-      const body = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !body.ok) {
-        setError(body.error ?? "Slot toevoegen mislukt");
-        return;
-      }
-      setSuccess("Slot toegevoegd.");
-      setAddSlotPlaylistId("");
-      setAddSlotGroupId("");
-      loadScheduler();
-    } catch {
-      setError("Slot toevoegen mislukt");
-    } finally {
-      setAddingSlot(false);
-    }
+  const updateClockDraft = (position: number, patch: Partial<ClockDraft>) => {
+    setClockDrafts((prev) => ({
+      ...prev,
+      [position]: { ...prev[position], ...patch },
+    }));
   };
 
-  const handleDeleteSlot = async (slotId: string) => {
-    const res = await fetch(`/api/schedulers/${id}/clock-slots/${slotId}`, {
-      method: "DELETE",
-      credentials: "include",
-      headers: getSessionHeaders(),
-    });
-    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    if (!res.ok || !body.ok) {
-      setError(body.error ?? "Slot verwijderen mislukt");
-      return;
+  const saveClockPosition = async (position: number) => {
+    const draft = clockDrafts[position];
+    if (!draft) return;
+    setError(null);
+    setSuccess(null);
+    setSavingClockPos(position);
+    try {
+      if (draft.kind === "none") {
+        if (!draft.slotId) {
+          setSuccess(`Positie ${position} geleegd.`);
+          return;
+        }
+        const del = await fetch(`/api/schedulers/${id}/clock-slots/${draft.slotId}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: getSessionHeaders(),
+        });
+        const delBody = (await del.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!del.ok || !delBody.ok) throw new Error(delBody.error ?? "Slot verwijderen mislukt");
+        setSuccess(`Positie ${position} geleegd.`);
+        loadScheduler();
+        return;
+      }
+
+      const payload: Record<string, unknown> = { position };
+      if (draft.kind === "playlist") payload.trackedPlaylistId = draft.playlistId || "";
+      if (draft.kind === "group") payload.playlistGroupId = draft.groupId || "";
+      if (draft.kind === "track") {
+        const parsed = parseSpotifyTrackId(draft.trackInput);
+        if (!parsed) throw new Error("Ongeldige Spotify track-id of URL");
+        payload.spotifyTrackId = parsed;
+      }
+
+      if (draft.slotId) {
+        const res = await fetch(`/api/schedulers/${id}/clock-slots/${draft.slotId}`, {
+          method: "PUT",
+          credentials: "include",
+          headers: getSessionHeaders(),
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!res.ok || !body.ok) throw new Error(body.error ?? "Slot bijwerken mislukt");
+      } else {
+        const res = await fetch(`/api/schedulers/${id}/clock-slots`, {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(),
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!res.ok || !body.ok) throw new Error(body.error ?? "Slot opslaan mislukt");
+      }
+      setSuccess(`Positie ${position} opgeslagen.`);
+      loadScheduler();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Clock-positie opslaan mislukt");
+    } finally {
+      setSavingClockPos(null);
     }
-    setSuccess("Slot verwijderd.");
-    loadScheduler();
   };
 
   const handleSaveRules = async () => {
@@ -690,70 +777,110 @@ export default function SchedulerDetailPage() {
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Clock tab is alleen actief in clock mode.</p>
             ) : (
               <>
-                {data.clockSlots.length === 0 ? (
-                  <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Nog geen slots.</p>
-                ) : (
-                  <ul className="mb-4 space-y-2">
-                    {data.clockSlots.map((slot) => (
-                      <li key={slot.id} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/40">
-                        <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                          <span className="font-medium">#{slot.position}</span> · {slot.type} · {slot.name}
+                <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  Vaste clock met {scheduler.targetTrackCount} posities (afgeleid van Target track count). Per positie kies je playlist, groep of vaste Spotify track.
+                </p>
+                <div className="space-y-2">
+                  {Array.from({ length: scheduler.targetTrackCount }, (_, i) => i + 1).map((position) => {
+                    const d = clockDrafts[position] ?? {
+                      slotId: null,
+                      kind: "none",
+                      playlistId: "",
+                      groupId: "",
+                      trackInput: "",
+                    };
+                    return (
+                      <div
+                        key={position}
+                        className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40"
+                      >
+                        <div className="grid gap-2 md:grid-cols-[80px,140px,1fr,120px] md:items-end">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Positie</label>
+                            <div className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100">
+                              #{position}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Type</label>
+                            <select
+                              value={d.kind}
+                              onChange={(e) => {
+                                const next = e.target.value as ClockDraft["kind"];
+                                updateClockDraft(position, {
+                                  kind: next,
+                                  playlistId: next === "playlist" ? d.playlistId : "",
+                                  groupId: next === "group" ? d.groupId : "",
+                                  trackInput: next === "track" ? d.trackInput : "",
+                                });
+                              }}
+                              className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                            >
+                              <option value="none">Leeg</option>
+                              <option value="playlist">Playlist</option>
+                              <option value="group">Playlistgroep</option>
+                              <option value="track">Spotify track ID/URL</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Bron</label>
+                            {d.kind === "playlist" && (
+                              <select
+                                value={d.playlistId}
+                                onChange={(e) => updateClockDraft(position, { playlistId: e.target.value })}
+                                className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                              >
+                                <option value="">— Kies playlist —</option>
+                                {playlists.map((o) => (
+                                  <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            {d.kind === "group" && (
+                              <select
+                                value={d.groupId}
+                                onChange={(e) => updateClockDraft(position, { groupId: e.target.value })}
+                                className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                              >
+                                <option value="">— Kies groep —</option>
+                                {groups.map((o) => (
+                                  <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            {d.kind === "track" && (
+                              <input
+                                type="text"
+                                value={d.trackInput}
+                                onChange={(e) => updateClockDraft(position, { trackInput: e.target.value })}
+                                placeholder="track id, spotify:track:... of open.spotify.com/track/..."
+                                className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                              />
+                            )}
+                            {d.kind === "none" && (
+                              <div className="rounded border border-zinc-200 bg-zinc-100 px-2 py-1.5 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                                Geen bron
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => saveClockPosition(position)}
+                            disabled={
+                              savingClockPos === position ||
+                              (d.kind === "playlist" && !d.playlistId) ||
+                              (d.kind === "group" && !d.groupId) ||
+                              (d.kind === "track" && !d.trackInput.trim())
+                            }
+                            className="rounded-full bg-[#1DB954] px-3 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+                          >
+                            {savingClockPos === position ? "Opslaan…" : "Opslaan"}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSlot(slot.id)}
-                          className="text-sm text-red-600 hover:underline dark:text-red-400"
-                        >
-                          Verwijderen
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <form onSubmit={handleAddSlot} className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Position</label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={addSlotPosition}
-                      onChange={(e) => setAddSlotPosition(Number(e.target.value) || 1)}
-                      className="w-20 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Type</label>
-                    <select
-                      value={addSlotKind}
-                      onChange={(e) => setAddSlotKind(e.target.value as "playlist" | "group")}
-                      className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                    >
-                      <option value="playlist">Playlist</option>
-                      <option value="group">Groep</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">{addSlotKind === "playlist" ? "Playlist" : "Groep"}</label>
-                    <select
-                      value={addSlotKind === "playlist" ? addSlotPlaylistId : addSlotGroupId}
-                      onChange={(e) => (addSlotKind === "playlist" ? setAddSlotPlaylistId(e.target.value) : setAddSlotGroupId(e.target.value))}
-                      className="min-w-[220px] rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                    >
-                      <option value="">— Kies —</option>
-                      {(addSlotKind === "playlist" ? playlists : groups).map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={addingSlot || (addSlotKind === "playlist" ? !addSlotPlaylistId : !addSlotGroupId)}
-                    className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
-                  >
-                    {addingSlot ? "Toevoegen…" : "Slot toevoegen"}
-                  </button>
-                </form>
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             )}
           </section>

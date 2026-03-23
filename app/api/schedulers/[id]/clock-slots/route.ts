@@ -4,6 +4,22 @@ import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+function parseSpotifyTrackId(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  const idOnly = /^[a-zA-Z0-9]{22}$/;
+  if (idOnly.test(t)) return t;
+  const patterns = [
+    /(?:https?:\/\/)?open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/,
+    /spotify:track:([a-zA-Z0-9]{22})/,
+  ];
+  for (const p of patterns) {
+    const m = t.match(p);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -16,7 +32,7 @@ export async function POST(
   });
   if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
 
-  let body: { position?: number; trackedPlaylistId?: string; playlistGroupId?: string };
+  let body: { position?: number; trackedPlaylistId?: string; playlistGroupId?: string; spotifyTrackId?: string };
   try {
     body = await request.json();
   } catch {
@@ -32,8 +48,11 @@ export async function POST(
     typeof body.trackedPlaylistId === "string" ? body.trackedPlaylistId.trim() || null : null;
   const playlistGroupId =
     typeof body.playlistGroupId === "string" ? body.playlistGroupId.trim() || null : null;
-  if ((trackedPlaylistId && playlistGroupId) || (!trackedPlaylistId && !playlistGroupId)) {
-    return NextResponse.json({ error: "Geef playlist of groep op (exact 1)" }, { status: 400 });
+  const spotifyTrackId =
+    typeof body.spotifyTrackId === "string" ? parseSpotifyTrackId(body.spotifyTrackId) : null;
+  const chosen = [trackedPlaylistId, playlistGroupId, spotifyTrackId].filter(Boolean).length;
+  if (chosen !== 1) {
+    return NextResponse.json({ error: "Geef playlist, groep of Spotify track-id op (exact 1)" }, { status: 400 });
   }
 
   if (trackedPlaylistId) {
@@ -49,12 +68,19 @@ export async function POST(
     if (!g) return NextResponse.json({ error: "Groep niet gevonden of geen toegang" }, { status: 404 });
   }
 
-  const slot = await prisma.schedulerClockSlot.create({
-    data: {
+  const slot = await prisma.schedulerClockSlot.upsert({
+    where: { schedulerId_position: { schedulerId, position } },
+    create: {
       schedulerId,
       position,
       trackedPlaylistId: trackedPlaylistId ?? undefined,
       playlistGroupId: playlistGroupId ?? undefined,
+      spotifyTrackId: spotifyTrackId ?? undefined,
+    },
+    update: {
+      trackedPlaylistId: trackedPlaylistId ?? null,
+      playlistGroupId: playlistGroupId ?? null,
+      spotifyTrackId: spotifyTrackId ?? null,
     },
     include: {
       trackedPlaylist: { select: { id: true, name: true } },
@@ -68,8 +94,9 @@ export async function POST(
       position: slot.position,
       trackedPlaylistId: slot.trackedPlaylistId,
       playlistGroupId: slot.playlistGroupId,
-      type: slot.trackedPlaylistId ? "playlist" : "group",
-      name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? "",
+      spotifyTrackId: slot.spotifyTrackId,
+      type: slot.trackedPlaylistId ? "playlist" : slot.playlistGroupId ? "group" : "track",
+      name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? slot.spotifyTrackId ?? "",
     },
   });
 }

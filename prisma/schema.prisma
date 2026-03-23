@@ -178,10 +178,12 @@ model SchedulerClockSlot {
   position          Int
   trackedPlaylistId String?
   playlistGroupId   String?
+  spotifyTrackId    String?
   scheduler         Scheduler        @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
   trackedPlaylist   TrackedPlaylist? @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
   playlistGroup     PlaylistGroup?   @relation(fields: [playlistGroupId], references: [id], onDelete: Cascade)
 
+  @@unique([schedulerId, position])
   @@map("scheduler_clock_slots")
 }
 

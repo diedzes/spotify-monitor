@@ -4,6 +4,22 @@ import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+function parseSpotifyTrackId(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  const idOnly = /^[a-zA-Z0-9]{22}$/;
+  if (idOnly.test(t)) return t;
+  const patterns = [
+    /(?:https?:\/\/)?open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/,
+    /spotify:track:([a-zA-Z0-9]{22})/,
+  ];
+  for (const p of patterns) {
+    const m = t.match(p);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
+
 async function getOwnedSlot(userId: string, schedulerId: string, slotId: string) {
   const scheduler = await prisma.scheduler.findFirst({
     where: { id: schedulerId, userId },
@@ -22,7 +38,7 @@ export async function PUT(
   const slot = await getOwnedSlot(session.user.id, schedulerId, slotId);
   if (!slot) return NextResponse.json({ error: "Slot niet gevonden" }, { status: 404 });
 
-  let body: { position?: number; trackedPlaylistId?: string; playlistGroupId?: string };
+  let body: { position?: number; trackedPlaylistId?: string; playlistGroupId?: string; spotifyTrackId?: string };
   try {
     body = await request.json();
   } catch {
@@ -37,13 +53,19 @@ export async function PUT(
     typeof body.trackedPlaylistId === "string" ? body.trackedPlaylistId.trim() || null : undefined;
   const playlistGroupId =
     typeof body.playlistGroupId === "string" ? body.playlistGroupId.trim() || null : undefined;
+  const spotifyTrackId =
+    typeof body.spotifyTrackId === "string" ? parseSpotifyTrackId(body.spotifyTrackId) : undefined;
 
-  if (
-    trackedPlaylistId !== undefined &&
-    playlistGroupId !== undefined &&
-    ((trackedPlaylistId && playlistGroupId) || (!trackedPlaylistId && !playlistGroupId))
-  ) {
-    return NextResponse.json({ error: "Geef playlist of groep op (exact 1)" }, { status: 400 });
+  const anySourceProvided =
+    trackedPlaylistId !== undefined || playlistGroupId !== undefined || spotifyTrackId !== undefined;
+  if (anySourceProvided) {
+    const finalTracked = trackedPlaylistId !== undefined ? trackedPlaylistId : slot.trackedPlaylistId;
+    const finalGroup = playlistGroupId !== undefined ? playlistGroupId : slot.playlistGroupId;
+    const finalTrack = spotifyTrackId !== undefined ? spotifyTrackId : slot.spotifyTrackId;
+    const chosen = [finalTracked, finalGroup, finalTrack].filter(Boolean).length;
+    if (chosen !== 1) {
+      return NextResponse.json({ error: "Geef playlist, groep of Spotify track-id op (exact 1)" }, { status: 400 });
+    }
   }
 
   if (trackedPlaylistId) {
@@ -61,6 +83,7 @@ export async function PUT(
       ...(position !== undefined && { position }),
       ...(trackedPlaylistId !== undefined && { trackedPlaylistId }),
       ...(playlistGroupId !== undefined && { playlistGroupId }),
+      ...(spotifyTrackId !== undefined && { spotifyTrackId }),
     },
   });
 
@@ -71,6 +94,7 @@ export async function PUT(
       position: updated.position,
       trackedPlaylistId: updated.trackedPlaylistId,
       playlistGroupId: updated.playlistGroupId,
+      spotifyTrackId: updated.spotifyTrackId,
     },
   });
 }
