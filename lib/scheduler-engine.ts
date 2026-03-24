@@ -1,5 +1,17 @@
 import { prisma } from "@/lib/db";
 import { SchedulerRuleType, SchedulerSelectionMode } from "@prisma/client";
+import type { ScheduledRow } from "@/lib/scheduler-types";
+import {
+  humanizeConflictReason,
+  normalizeSchedulerRunRows,
+  parseRunResultJson,
+  serializeRunResult,
+  type RunQualitySummary,
+} from "@/lib/scheduler-run-result";
+
+export { normalizeSchedulerRunRows } from "@/lib/scheduler-run-result";
+
+export type { ScheduledRow } from "@/lib/scheduler-types";
 
 type CandidateTrack = {
   spotifyTrackId: string;
@@ -22,21 +34,6 @@ type RuleValues = {
   artistMaximum: number | null;
   artistSeparation: number | null;
   titleSeparation: number | null;
-};
-
-export type ScheduledRow = {
-  position: number;
-  sourceKey: string | null;
-  spotifyTrackId: string | null;
-  title: string;
-  artists: string;
-  album: string;
-  spotifyUrl: string;
-  sourceName: string;
-  status: "scheduled" | "conflict";
-  conflictReason: string | null;
-  locked: boolean;
-  replacedManually: boolean;
 };
 
 type GenerationContext = {
@@ -80,15 +77,43 @@ export function selectCandidateForSource(
   rankBiasStrength: number | null,
   rng: Rng
 ): CandidateTrack | null {
+  return selectCandidateForSourceWithReferenceBias(
+    candidates,
+    selectionMode,
+    rankBiasStrength,
+    rng,
+    new Set(),
+    1
+  );
+}
+
+const REFERENCE_WEIGHT_BOOST = 1.65;
+
+function selectCandidateForSourceWithReferenceBias(
+  candidates: CandidateTrack[],
+  selectionMode: SchedulerSelectionMode,
+  rankBiasStrength: number | null,
+  rng: Rng,
+  referenceIds: Set<string>,
+  refBoost: number
+): CandidateTrack | null {
   if (candidates.length === 0) return null;
   if (selectionMode === "random") {
-    const idx = Math.floor(rng() * candidates.length);
-    return candidates[idx] ?? null;
+    const weights = candidates.map((c) => (referenceIds.has(c.spotifyTrackId) ? refBoost : 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let t = rng() * total;
+    for (let i = 0; i < candidates.length; i += 1) {
+      t -= weights[i] ?? 0;
+      if (t <= 0) return candidates[i] ?? null;
+    }
+    return candidates[candidates.length - 1] ?? null;
   }
 
-  // rank_preferred: hogere ranking (lagere position) => meer kans
   const strength = rankBiasStrength && rankBiasStrength > 0 ? rankBiasStrength : 2;
-  const weights = candidates.map((c) => 1 / Math.pow(c.position + 1, Math.max(1, strength)));
+  const weights = candidates.map((c) => {
+    const base = 1 / Math.pow(c.position + 1, Math.max(1, strength));
+    return referenceIds.has(c.spotifyTrackId) ? base * refBoost : base;
+  });
   const total = weights.reduce((acc, w) => acc + w, 0);
   if (total <= 0) return candidates[0] ?? null;
   const target = rng() * total;
@@ -212,19 +237,183 @@ async function getSchedulerWithConfig(schedulerId: string) {
       },
       clockSlots: { orderBy: { position: "asc" } },
       rules: true,
+      reference: true,
+      overlapPreferences: true,
     },
   });
 }
 
+function parseReferenceTrackIds(rowsJson: string | null | undefined): Set<string> {
+  if (!rowsJson?.trim()) return new Set();
+  try {
+    const parsed = JSON.parse(rowsJson) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    const ids = new Set<string>();
+    for (const row of parsed) {
+      if (row && typeof row === "object" && "spotifyTrackId" in row && typeof (row as { spotifyTrackId: string }).spotifyTrackId === "string") {
+        ids.add((row as { spotifyTrackId: string }).spotifyTrackId);
+      }
+    }
+    return ids;
+  } catch {
+    return new Set();
+  }
+}
+
+function overlapPercentBySourceId(
+  scheduler: NonNullable<Awaited<ReturnType<typeof getSchedulerWithConfig>>>
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const p of scheduler.overlapPreferences) {
+    if (p.trackedPlaylistId) {
+      const src = scheduler.sources.find((s) => s.trackedPlaylistId === p.trackedPlaylistId);
+      if (src) map.set(src.id, Math.min(100, Math.max(0, p.overlapPercent)));
+    } else if (p.playlistGroupId) {
+      const src = scheduler.sources.find((s) => s.playlistGroupId === p.playlistGroupId);
+      if (src) map.set(src.id, Math.min(100, Math.max(0, p.overlapPercent)));
+    }
+  }
+  return map;
+}
+
+function computeSlotCountsPerSource(
+  scheduler: NonNullable<Awaited<ReturnType<typeof getSchedulerWithConfig>>>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  if (scheduler.mode === "clock") {
+    const byPosition = new Map<number, (typeof scheduler.clockSlots)[number]>();
+    for (const slot of scheduler.clockSlots) byPosition.set(slot.position, slot);
+    for (let pos = 1; pos <= scheduler.targetTrackCount; pos += 1) {
+      const slot = byPosition.get(pos);
+      if (!slot) continue;
+      if (slot.spotifyTrackId) {
+        const k = `track:${slot.spotifyTrackId}`;
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      } else {
+        const source = scheduler.sources.find(
+          (s) =>
+            (slot.trackedPlaylistId && s.trackedPlaylistId === slot.trackedPlaylistId) ||
+            (slot.playlistGroupId && s.playlistGroupId === slot.playlistGroupId)
+        );
+        if (source) counts.set(source.id, (counts.get(source.id) ?? 0) + 1);
+      }
+    }
+  } else {
+    const included = scheduler.sources
+      .filter((s) => s.include)
+      .map((s) => ({ key: s.id, weight: s.weight ?? 1 }));
+    const plan = buildRatioPositionPlan(included, scheduler.targetTrackCount);
+    for (const k of plan) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function buildOverlapState(
+  scheduler: NonNullable<Awaited<ReturnType<typeof getSchedulerWithConfig>>>,
+  pctBySource: Map<string, number>,
+  slotCounts: Map<string, number>,
+  seedRows?: ScheduledRow[]
+): Map<string, { target: number; current: number }> {
+  const bySource = new Map<string, { target: number; current: number }>();
+  for (const [key, slots] of slotCounts) {
+    if (key.startsWith("track:")) continue;
+    const pct = pctBySource.get(key) ?? 0;
+    const target = Math.round((pct / 100) * slots);
+    bySource.set(key, { target, current: 0 });
+  }
+  if (seedRows) {
+    for (const r of seedRows) {
+      if (r.status !== "scheduled" || !r.sourceKey || r.sourceKey.startsWith("track:")) continue;
+      const st = bySource.get(r.sourceKey);
+      if (st && r.overlapsReference) st.current += 1;
+    }
+  }
+  return bySource;
+}
+
+type OverlapPickContext = {
+  referenceIds: Set<string>;
+  bySource: Map<string, { target: number; current: number }>;
+};
+
 function normalizeRows(rows: ScheduledRow[]): ScheduledRow[] {
-  return rows
-    .map((r) => ({
-      ...r,
-      locked: !!r.locked,
-      replacedManually: !!r.replacedManually,
-      sourceKey: r.sourceKey ?? null,
-    }))
-    .sort((a, b) => a.position - b.position);
+  return normalizeSchedulerRunRows(rows);
+}
+
+export async function computeRunQuality(
+  schedulerId: string,
+  rows: ScheduledRow[]
+): Promise<RunQualitySummary> {
+  const scheduler = await getSchedulerWithConfig(schedulerId);
+  if (!scheduler) {
+    return {
+      fillPercent: 0,
+      scheduledCount: 0,
+      targetCount: 0,
+      conflictCount: 0,
+      overlapOverall: { targetPercent: null, achievedPercent: null, matchedTracks: 0, eligibleSlots: 0 },
+      overlapBySource: [],
+    };
+  }
+  const referenceIds = parseReferenceTrackIds(scheduler.reference?.rowsJson);
+  const pctBySource = overlapPercentBySourceId(scheduler);
+  const slotCounts = computeSlotCountsPerSource(scheduler);
+  const targetCount = scheduler.targetTrackCount;
+  const scheduled = rows.filter((r) => r.status === "scheduled");
+  const conflicts = rows.filter((r) => r.status === "conflict");
+  const fillPercent = targetCount > 0 ? (scheduled.length / targetCount) * 100 : 0;
+
+  const overlapBySource: RunQualitySummary["overlapBySource"] = [];
+  let weightedTarget = 0;
+  let weightedSlots = 0;
+  let matchedAll = 0;
+  let eligibleAll = 0;
+
+  for (const src of scheduler.sources) {
+    if (!src.include) continue;
+    const key = src.id;
+    const slots = slotCounts.get(key) ?? 0;
+    if (slots <= 0) continue;
+    const targetPct = pctBySource.get(key) ?? 0;
+    const rowsForSource = rows.filter(
+      (r) => r.sourceKey === key && r.status === "scheduled" && !r.sourceKey.startsWith("track:")
+    );
+    const eligible = rowsForSource.length;
+    const matched = rowsForSource.filter((r) => r.overlapsReference && referenceIds.has(r.spotifyTrackId ?? "")).length;
+    const achievedPercent = eligible > 0 ? (matched / eligible) * 100 : 0;
+    overlapBySource.push({
+      sourceKey: key,
+      sourceName: src.trackedPlaylist?.name ?? src.playlistGroup?.name ?? "Bron",
+      targetPercent: targetPct,
+      achievedPercent: Math.round(achievedPercent * 10) / 10,
+      matchedTracks: matched,
+      eligibleSlots: eligible,
+      onTarget: achievedPercent + 0.5 >= targetPct || targetPct === 0,
+    });
+    weightedTarget += targetPct * slots;
+    weightedSlots += slots;
+    matchedAll += matched;
+    eligibleAll += eligible;
+  }
+
+  const overlapOverallTarget =
+    weightedSlots > 0 ? Math.round((weightedTarget / weightedSlots) * 10) / 10 : null;
+  const overlapOverallAchieved =
+    eligibleAll > 0 ? Math.round((matchedAll / eligibleAll) * 1000) / 10 : null;
+
+  return {
+    fillPercent: Math.round(fillPercent * 10) / 10,
+    scheduledCount: scheduled.length,
+    targetCount,
+    conflictCount: conflicts.length,
+    overlapOverall: {
+      targetPercent: overlapOverallTarget,
+      achievedPercent: overlapOverallAchieved,
+      matchedTracks: matchedAll,
+      eligibleSlots: eligibleAll,
+    },
+    overlapBySource,
+  };
 }
 
 async function buildGenerationContext(schedulerId: string): Promise<GenerationContext> {
@@ -313,7 +502,8 @@ function pickForSource(
   scheduled: ScheduledRow[],
   usedTrackIds: Set<string>,
   rules: RuleValues,
-  rng: Rng
+  rng: Rng,
+  overlap: OverlapPickContext | null
 ): ScheduledRow {
   if (!sourcePool) {
     return {
@@ -327,43 +517,72 @@ function pickForSource(
       sourceName: "Onbekende bron",
       status: "conflict",
       conflictReason: "bron niet beschikbaar",
+      conflictDetail: humanizeConflictReason("bron niet beschikbaar"),
       locked: false,
       replacedManually: false,
+      overlapsReference: false,
     };
   }
 
-  const attempts = [...sourcePool.candidates];
-  let attemptsLeft = attempts.length;
-  while (attemptsLeft > 0) {
-    const candidate = selectCandidateForSource(
-      attempts,
-      sourcePool.selectionMode,
-      sourcePool.rankBiasStrength,
-      rng
-    );
-    if (!candidate) break;
-    attemptsLeft -= 1;
-    const idx = attempts.findIndex((c) => c.spotifyTrackId === candidate.spotifyTrackId);
-    if (idx >= 0) attempts.splice(idx, 1);
+  const refIds = overlap?.referenceIds ?? new Set<string>();
+  const st = overlap?.bySource.get(sourcePool.key);
+  const needOverlap = !!(st && refIds.size > 0 && st.current < st.target);
 
-    if (usedTrackIds.has(candidate.spotifyTrackId)) continue;
-    const check = validateTrackAgainstRules(candidate, scheduled, rules, position);
-    if (!check.ok) continue;
+  const tryPickFromPool = (poolList: CandidateTrack[]): CandidateTrack | null => {
+    const attempts = [...poolList];
+    let attemptsLeft = attempts.length;
+    while (attemptsLeft > 0) {
+      const candidate = selectCandidateForSourceWithReferenceBias(
+        attempts,
+        sourcePool.selectionMode,
+        sourcePool.rankBiasStrength,
+        rng,
+        refIds,
+        needOverlap ? 1 : REFERENCE_WEIGHT_BOOST
+      );
+      if (!candidate) break;
+      attemptsLeft -= 1;
+      const idx = attempts.findIndex((c) => c.spotifyTrackId === candidate.spotifyTrackId);
+      if (idx >= 0) attempts.splice(idx, 1);
+      if (usedTrackIds.has(candidate.spotifyTrackId)) continue;
+      const check = validateTrackAgainstRules(candidate, scheduled, rules, position);
+      if (!check.ok) continue;
+      return candidate;
+    }
+    return null;
+  };
 
-    usedTrackIds.add(candidate.spotifyTrackId);
+  const inRef = sourcePool.candidates.filter((c) => refIds.has(c.spotifyTrackId));
+  const notRef = sourcePool.candidates.filter((c) => !refIds.has(c.spotifyTrackId));
+
+  let picked: CandidateTrack | null = null;
+  if (needOverlap && inRef.length > 0) {
+    picked = tryPickFromPool(inRef);
+  }
+  if (!picked) {
+    const primary = needOverlap && inRef.length > 0 ? [...notRef, ...inRef] : sourcePool.candidates;
+    picked = tryPickFromPool(primary);
+  }
+
+  if (picked) {
+    const overlapsReference = refIds.has(picked.spotifyTrackId);
+    if (st && overlapsReference) st.current += 1;
+    usedTrackIds.add(picked.spotifyTrackId);
     return {
       position,
       sourceKey: sourcePool.key,
-      spotifyTrackId: candidate.spotifyTrackId,
-      title: candidate.title,
-      artists: candidate.artists.join(", "),
-      album: candidate.album,
-      spotifyUrl: candidate.spotifyUrl,
+      spotifyTrackId: picked.spotifyTrackId,
+      title: picked.title,
+      artists: picked.artists.join(", "),
+      album: picked.album,
+      spotifyUrl: picked.spotifyUrl,
       sourceName: sourcePool.sourceName,
       status: "scheduled",
       conflictReason: null,
+      conflictDetail: null,
       locked: false,
       replacedManually: false,
+      overlapsReference,
     };
   }
 
@@ -378,14 +597,21 @@ function pickForSource(
     sourceName: sourcePool.sourceName,
     status: "conflict",
     conflictReason: "geen geldige kandidaat (rules of duplicates)",
+    conflictDetail: humanizeConflictReason("geen geldige kandidaat (rules of duplicates)"),
     locked: false,
     replacedManually: false,
+    overlapsReference: false,
   };
 }
 
 export async function generateSchedulerRun(schedulerId: string) {
   const { scheduler, rules, sourcePools, globalTrackLookup } = await buildGenerationContext(schedulerId);
 
+  const referenceIds = parseReferenceTrackIds(scheduler.reference?.rowsJson);
+  const pctBySource = overlapPercentBySourceId(scheduler);
+  const slotCounts = computeSlotCountsPerSource(scheduler);
+  const overlapBySource = buildOverlapState(scheduler, pctBySource, slotCounts);
+  const overlapCtx: OverlapPickContext = { referenceIds, bySource: overlapBySource };
 
   const run = await prisma.schedulerRun.create({
     data: {
@@ -419,8 +645,10 @@ export async function generateSchedulerRun(schedulerId: string) {
             sourceName: "",
             status: "conflict",
             conflictReason: "geen clock-slot geconfigureerd",
+            conflictDetail: humanizeConflictReason("geen clock-slot geconfigureerd"),
             locked: false,
             replacedManually: false,
+            overlapsReference: false,
           });
           continue;
         }
@@ -439,8 +667,10 @@ export async function generateSchedulerRun(schedulerId: string) {
               sourceName: "Vast nummer",
               status: "conflict",
               conflictReason: "vast nummer niet gevonden in snapshots",
+              conflictDetail: humanizeConflictReason("vast nummer niet gevonden in snapshots"),
               locked: false,
               replacedManually: false,
+              overlapsReference: false,
             });
             continue;
           }
@@ -456,8 +686,10 @@ export async function generateSchedulerRun(schedulerId: string) {
               sourceName: "Vast nummer",
               status: "conflict",
               conflictReason: "nummer al gebruikt",
+              conflictDetail: humanizeConflictReason("nummer al gebruikt"),
               locked: false,
               replacedManually: false,
+              overlapsReference: false,
             });
             continue;
           }
@@ -474,12 +706,15 @@ export async function generateSchedulerRun(schedulerId: string) {
               sourceName: "Vast nummer",
               status: "conflict",
               conflictReason: check.reason,
+              conflictDetail: humanizeConflictReason(check.reason),
               locked: false,
               replacedManually: false,
+              overlapsReference: false,
             });
             continue;
           }
           usedTrackIds.add(t.spotifyTrackId);
+          const overlapsReference = referenceIds.has(t.spotifyTrackId);
           scheduled.push({
             position,
             sourceKey: `track:${slot.spotifyTrackId}`,
@@ -491,8 +726,10 @@ export async function generateSchedulerRun(schedulerId: string) {
             sourceName: "Vast nummer",
             status: "scheduled",
             conflictReason: null,
+            conflictDetail: null,
             locked: true,
             replacedManually: false,
+            overlapsReference,
           });
           continue;
         }
@@ -503,7 +740,7 @@ export async function generateSchedulerRun(schedulerId: string) {
             (slot.playlistGroupId && s.playlistGroupId === slot.playlistGroupId)
         );
         const pool = source ? sourcePools.get(source.id) ?? null : null;
-        scheduled.push(pickForSource(pool, position, scheduled, usedTrackIds, rules, rng));
+        scheduled.push(pickForSource(pool, position, scheduled, usedTrackIds, rules, rng, overlapCtx));
       }
     } else {
       const included = scheduler.sources
@@ -514,11 +751,13 @@ export async function generateSchedulerRun(schedulerId: string) {
         const position = i + 1;
         const sourceId = plan[i] ?? null;
         const pool = sourceId ? sourcePools.get(sourceId) ?? null : null;
-        scheduled.push(pickForSource(pool, position, scheduled, usedTrackIds, rules, rng));
+        scheduled.push(pickForSource(pool, position, scheduled, usedTrackIds, rules, rng, overlapCtx));
       }
     }
 
-    const resultJson = JSON.stringify(normalizeRows(scheduled));
+    const normalized = normalizeRows(scheduled);
+    const quality = await computeRunQuality(schedulerId, normalized);
+    const resultJson = serializeRunResult(normalized, quality);
     const finalRun = await prisma.schedulerRun.update({
       where: { id: run.id },
       data: { status: "success", resultJson, editedResultJson: null },
@@ -530,7 +769,8 @@ export async function generateSchedulerRun(schedulerId: string) {
         createdAt: finalRun.createdAt,
         status: finalRun.status,
       },
-      rows: scheduled,
+      rows: normalized,
+      quality,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Onbekende fout";
@@ -549,14 +789,17 @@ async function getRunRowsOrThrow(schedulerId: string, runId: string) {
   if (!run) throw new Error("Run niet gevonden");
   const raw = run.editedResultJson ?? run.resultJson;
   if (!raw) throw new Error("Run heeft geen resultaat");
-  const rows = normalizeRows(JSON.parse(raw) as ScheduledRow[]);
-  return { run, rows };
+  const { rows } = parseRunResultJson(raw);
+  return { run, rows: normalizeRows(rows) };
 }
 
-function persistRunEdits(runId: string, rows: ScheduledRow[]) {
+async function persistRunEdits(runId: string, schedulerId: string, rows: ScheduledRow[]) {
+  const normalized = normalizeRows(rows);
+  const quality = await computeRunQuality(schedulerId, normalized);
+  const payload = serializeRunResult(normalized, quality);
   return prisma.schedulerRun.update({
     where: { id: runId },
-    data: { editedResultJson: JSON.stringify(normalizeRows(rows)) },
+    data: { editedResultJson: payload },
   });
 }
 
@@ -663,6 +906,8 @@ export async function replaceTrackInRun(
 
   const sourceName =
     (sourceKey && sourcePools.get(sourceKey)?.sourceName) || rows[rowIdx].sourceName || "Handmatige keuze";
+  const schedulerRow = await getSchedulerWithConfig(schedulerId);
+  const refIds = parseReferenceTrackIds(schedulerRow?.reference?.rowsJson);
   rows[rowIdx] = {
     ...rows[rowIdx],
     sourceKey: sourceKey ?? rows[rowIdx].sourceKey,
@@ -674,9 +919,11 @@ export async function replaceTrackInRun(
     sourceName,
     status: "scheduled",
     conflictReason: null,
+    conflictDetail: null,
     replacedManually: true,
+    overlapsReference: refIds.has(candidate.spotifyTrackId),
   };
-  await persistRunEdits(runId, rows);
+  await persistRunEdits(runId, schedulerId, rows);
   return normalizeRows(rows);
 }
 
@@ -690,7 +937,7 @@ export async function setLockForSlot(
   const idx = rows.findIndex((r) => r.position === position);
   if (idx < 0) throw new Error("Positie niet gevonden");
   rows[idx] = { ...rows[idx], locked };
-  await persistRunEdits(runId, rows);
+  await persistRunEdits(runId, schedulerId, rows);
   return normalizeRows(rows);
 }
 
@@ -700,7 +947,14 @@ export async function rescheduleFromPosition(
   fromPosition: number
 ) {
   const { rows } = await getRunRowsOrThrow(schedulerId, runId);
-  const { rules, sourcePools } = await buildGenerationContext(schedulerId);
+  const { scheduler, rules, sourcePools } = await buildGenerationContext(schedulerId);
+  const referenceIds = parseReferenceTrackIds(scheduler.reference?.rowsJson);
+  const pctBySource = overlapPercentBySourceId(scheduler);
+  const slotCounts = computeSlotCountsPerSource(scheduler);
+  const seed = rows.filter((r) => r.position < fromPosition);
+  const overlapBySource = buildOverlapState(scheduler, pctBySource, slotCounts, seed);
+  const overlapCtx: OverlapPickContext = { referenceIds, bySource: overlapBySource };
+
   const rng = makeDeterministicRng(`reschedule:${runId}:${fromPosition}`);
 
   const next = normalizeRows(rows).map((r) => ({ ...r }));
@@ -717,7 +971,7 @@ export async function rescheduleFromPosition(
       continue;
     }
     const pool = row.sourceKey ? sourcePools.get(row.sourceKey) ?? null : null;
-    const picked = pickForSource(pool, row.position, next, used, rules, rng);
+    const picked = pickForSource(pool, row.position, next, used, rules, rng, overlapCtx);
     next[row.position - 1] = {
       ...picked,
       locked: row.locked,
@@ -725,7 +979,7 @@ export async function rescheduleFromPosition(
     };
   }
 
-  await persistRunEdits(runId, next);
+  await persistRunEdits(runId, schedulerId, next);
   return normalizeRows(next);
 }
 

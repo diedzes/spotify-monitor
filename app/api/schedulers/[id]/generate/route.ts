@@ -29,6 +29,7 @@ export async function POST(
         createdAt: result.run.createdAt.toISOString(),
       },
       rows: result.rows,
+      quality: result.quality,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Genereren mislukt";

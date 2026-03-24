@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
-import { rescheduleFromPosition } from "@/lib/scheduler-engine";
+import { computeRunQuality, rescheduleFromPosition } from "@/lib/scheduler-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,8 @@ export async function POST(
   }
   try {
     const rows = await rescheduleFromPosition(id, runId, body.fromPosition!);
-    return NextResponse.json({ ok: true, rows });
+    const quality = await computeRunQuality(id, rows);
+    return NextResponse.json({ ok: true, rows, quality });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Reschedule mislukt";
     return NextResponse.json({ error: message }, { status: 400 });

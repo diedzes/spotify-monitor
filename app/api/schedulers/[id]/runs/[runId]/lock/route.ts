@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
-import { setLockForSlot } from "@/lib/scheduler-engine";
+import { computeRunQuality, setLockForSlot } from "@/lib/scheduler-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,8 @@ export async function POST(
   }
   try {
     const rows = await setLockForSlot(id, runId, body.position!, body.locked);
-    return NextResponse.json({ ok: true, rows });
+    const quality = await computeRunQuality(id, rows);
+    return NextResponse.json({ ok: true, rows, quality });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Lock aanpassen mislukt";
     return NextResponse.json({ error: message }, { status: 400 });

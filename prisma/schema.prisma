@@ -44,6 +44,7 @@ model TrackedPlaylist {
   reportSources     ReportSource[]
   schedulerSources  SchedulerSource[]
   schedulerClockSlots SchedulerClockSlot[]
+  schedulerOverlapPreferences SchedulerOverlapPreference[]
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
@@ -60,6 +61,7 @@ model PlaylistGroup {
   reportSources  ReportSource[]
   schedulerSources SchedulerSource[]
   schedulerClockSlots SchedulerClockSlot[]
+  schedulerOverlapPreferences SchedulerOverlapPreference[]
 
   @@unique([userId, name])
   @@map("playlist_groups")
@@ -152,8 +154,36 @@ model Scheduler {
   clockSlots       SchedulerClockSlot[]
   rules            SchedulerRule[]
   runs             SchedulerRun[]
+  reference        SchedulerReference?
+  overlapPreferences SchedulerOverlapPreference[]
 
   @@map("schedulers")
+}
+
+model SchedulerReference {
+  id          String    @id @default(cuid())
+  schedulerId String    @unique
+  rowsJson    String    // JSON array of reference tracks (spotifyTrackId, title, …)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  scheduler   Scheduler @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+
+  @@map("scheduler_references")
+}
+
+model SchedulerOverlapPreference {
+  id                 String           @id @default(cuid())
+  schedulerId        String
+  trackedPlaylistId  String?
+  playlistGroupId    String?
+  overlapPercent     Int              @default(0)
+  scheduler          Scheduler        @relation(fields: [schedulerId], references: [id], onDelete: Cascade)
+  trackedPlaylist    TrackedPlaylist? @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+  playlistGroup      PlaylistGroup?   @relation(fields: [playlistGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([schedulerId, trackedPlaylistId])
+  @@unique([schedulerId, playlistGroupId])
+  @@map("scheduler_overlap_preferences")
 }
 
 model SchedulerSource {

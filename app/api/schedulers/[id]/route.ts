@@ -24,6 +24,14 @@ async function getOwnedScheduler(id: string, userId: string) {
       },
       rules: { orderBy: { ruleType: "asc" as const } },
       runs: { orderBy: { createdAt: "desc" as const }, take: 20 },
+      reference: true,
+      overlapPreferences: {
+        include: {
+          trackedPlaylist: { select: { id: true, name: true } },
+          playlistGroup: { select: { id: true, name: true } },
+        },
+        orderBy: { id: "asc" as const },
+      },
     },
   });
 }
@@ -80,6 +88,27 @@ export async function GET(
       resultJson: run.resultJson,
       editedResultJson: run.editedResultJson,
       status: run.status,
+    })),
+    reference: scheduler.reference
+      ? {
+          id: scheduler.reference.id,
+          updatedAt: scheduler.reference.updatedAt.toISOString(),
+          trackCount: (() => {
+            try {
+              const a = JSON.parse(scheduler.reference.rowsJson) as unknown;
+              return Array.isArray(a) ? a.length : 0;
+            } catch {
+              return 0;
+            }
+          })(),
+        }
+      : null,
+    overlapPreferences: scheduler.overlapPreferences.map((p) => ({
+      id: p.id,
+      trackedPlaylistId: p.trackedPlaylistId,
+      playlistGroupId: p.playlistGroupId,
+      overlapPercent: p.overlapPercent,
+      name: p.trackedPlaylist?.name ?? p.playlistGroup?.name ?? "",
     })),
   });
 }

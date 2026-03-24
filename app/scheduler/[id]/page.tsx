@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { normalizeSchedulerRunRows, parseRunResultJson, type RunQualitySummary } from "@/lib/scheduler-run-result";
+import type { ScheduledRow } from "@/lib/scheduler-types";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -70,8 +72,24 @@ type SchedulerRunRow = {
   sourceName: string;
   status: "scheduled" | "conflict";
   conflictReason: string | null;
+  conflictDetail?: string | null;
   locked: boolean;
   replacedManually: boolean;
+  overlapsReference?: boolean;
+};
+
+type SchedulerReferenceInfo = {
+  id: string;
+  updatedAt: string;
+  trackCount: number;
+};
+
+type OverlapPreferenceRow = {
+  id: string;
+  trackedPlaylistId: string | null;
+  playlistGroupId: string | null;
+  overlapPercent: number;
+  name: string;
 };
 
 type SchedulerDetail = {
@@ -88,11 +106,13 @@ type SchedulerDetail = {
   clockSlots: SchedulerClockSlot[];
   rules: SchedulerRule[];
   runs: SchedulerRun[];
+  reference: SchedulerReferenceInfo | null;
+  overlapPreferences: OverlapPreferenceRow[];
 };
 
 type Option = { id: string; name: string };
 
-type TabKey = "sources" | "clock" | "rules" | "runs";
+type TabKey = "sources" | "clock" | "rules" | "reference" | "overlap" | "runs";
 
 type ClockDraft = {
   slotId: string | null;
@@ -171,6 +191,12 @@ export default function SchedulerDetailPage() {
     }>
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [latestQuality, setLatestQuality] = useState<RunQualitySummary | null>(null);
+  const [refPlaylistId, setRefPlaylistId] = useState("");
+  const [refUrl, setRefUrl] = useState("");
+  const [savingReference, setSavingReference] = useState(false);
+  const [overlapBySourceId, setOverlapBySourceId] = useState<Record<string, number>>({});
+  const [savingOverlap, setSavingOverlap] = useState(false);
 
   const scheduler = data?.scheduler ?? null;
 
@@ -240,20 +266,36 @@ export default function SchedulerDetailPage() {
     const activeRun = data?.runs.find((r) => r.id === activeRunId) ?? data?.runs?.[0];
     if (!activeRun || activeRun.status !== "success") {
       setLatestRunRows([]);
+      setLatestQuality(null);
       return;
     }
     try {
       const raw = activeRun.editedResultJson ?? activeRun.resultJson;
       if (!raw) {
         setLatestRunRows([]);
+        setLatestQuality(null);
         return;
       }
-      const rows = JSON.parse(raw) as SchedulerRunRow[];
-      setLatestRunRows(Array.isArray(rows) ? rows : []);
+      const { rows, quality } = parseRunResultJson(raw);
+      setLatestRunRows(normalizeSchedulerRunRows(rows as ScheduledRow[]));
+      setLatestQuality(quality);
     } catch {
       setLatestRunRows([]);
+      setLatestQuality(null);
     }
   }, [data?.runs, activeRunId]);
+
+  useEffect(() => {
+    if (!data?.sources) return;
+    const next: Record<string, number> = {};
+    for (const s of data.sources) {
+      const pref = s.trackedPlaylistId
+        ? data.overlapPreferences.find((p) => p.trackedPlaylistId === s.trackedPlaylistId)
+        : data.overlapPreferences.find((p) => p.playlistGroupId === s.playlistGroupId);
+      next[s.id] = pref?.overlapPercent ?? 0;
+    }
+    setOverlapBySourceId(next);
+  }, [data?.sources, data?.overlapPreferences]);
 
   useEffect(() => {
     if (!scheduler || !data) return;
@@ -538,6 +580,88 @@ export default function SchedulerDetailPage() {
     }
   };
 
+  const handleSaveReference = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setSavingReference(true);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/reference`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({
+          trackedPlaylistId: refPlaylistId.trim() || undefined,
+          playlistUrl: refUrl.trim() || undefined,
+        }),
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string; reference?: { trackCount: number } };
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? "Reference opslaan mislukt");
+        return;
+      }
+      setSuccess(`Reference playlist opgeslagen (${body.reference?.trackCount ?? 0} tracks).`);
+      setRefUrl("");
+      loadScheduler();
+    } catch {
+      setError("Reference opslaan mislukt");
+    } finally {
+      setSavingReference(false);
+    }
+  };
+
+  const handleClearReference = async () => {
+    if (!window.confirm("Reference playlist verwijderen?")) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/reference`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: getSessionHeaders(),
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? "Verwijderen mislukt");
+        return;
+      }
+      setSuccess("Reference verwijderd.");
+      loadScheduler();
+    } catch {
+      setError("Verwijderen mislukt");
+    }
+  };
+
+  const handleSaveOverlap = async () => {
+    if (!data?.sources.length) return;
+    setError(null);
+    setSuccess(null);
+    setSavingOverlap(true);
+    try {
+      const items = data.sources.map((s) => ({
+        trackedPlaylistId: s.trackedPlaylistId,
+        playlistGroupId: s.playlistGroupId,
+        overlapPercent: Math.min(100, Math.max(0, Math.round(overlapBySourceId[s.id] ?? 0))),
+      }));
+      const res = await fetch(`/api/schedulers/${id}/overlap-preferences`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({ items }),
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? "Overlap opslaan mislukt");
+        return;
+      }
+      setSuccess("Overlap-voorkeuren opgeslagen.");
+      loadScheduler();
+    } catch {
+      setError("Overlap opslaan mislukt");
+    } finally {
+      setSavingOverlap(false);
+    }
+  };
+
   const handleGenerateRun = async () => {
     setError(null);
     setSuccess(null);
@@ -553,13 +677,15 @@ export default function SchedulerDetailPage() {
         error?: string;
         rows?: SchedulerRunRow[];
         run?: { id: string };
+        quality?: RunQualitySummary;
       };
       if (!res.ok || !body.ok) {
         setError(body.error ?? "Genereren mislukt");
         return;
       }
       setSuccess("Schedule gegenereerd.");
-      setLatestRunRows(body.rows ?? []);
+      setLatestRunRows(body.rows ? normalizeSchedulerRunRows(body.rows as ScheduledRow[]) : []);
+      setLatestQuality(body.quality ?? null);
       if (body.run?.id) setActiveRunId(body.run.id);
       loadScheduler();
       setTab("runs");
@@ -587,10 +713,12 @@ export default function SchedulerDetailPage() {
         ok?: boolean;
         error?: string;
         rows?: SchedulerRunRow[];
+        quality?: RunQualitySummary;
         items?: Array<Record<string, unknown>>;
       };
       if (!res.ok || !body.ok) throw new Error(body.error ?? "Actie mislukt");
-      if (body.rows) setLatestRunRows(body.rows);
+      if (body.rows) setLatestRunRows(normalizeSchedulerRunRows(body.rows as ScheduledRow[]));
+      if (body.quality) setLatestQuality(body.quality);
       return body;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Actie mislukt");
@@ -735,14 +863,14 @@ export default function SchedulerDetailPage() {
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            {(["sources", "clock", "rules", "runs"] as const).map((k) => (
+            {(["sources", "clock", "rules", "reference", "overlap", "runs"] as const).map((k) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
                 className={`rounded px-3 py-1.5 text-sm font-medium ${tab === k ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
               >
-                {k[0].toUpperCase() + k.slice(1)}
+                {k === "reference" ? "Reference" : k === "overlap" ? "Overlap" : k[0].toUpperCase() + k.slice(1)}
               </button>
             ))}
           </div>
@@ -1097,6 +1225,123 @@ export default function SchedulerDetailPage() {
           </section>
         )}
 
+        {tab === "reference" && (
+          <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">Reference playlist</h2>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              De engine geeft voorkeur aan nummers die ook in deze reference staan. Importeer vanuit een tracked playlist (snapshot) of plak een Spotify playlist-URL die al in je account staat.
+            </p>
+            {data.reference ? (
+              <p className="mb-3 text-sm text-zinc-700 dark:text-zinc-300">
+                Ingesteld: <strong>{data.reference.trackCount}</strong> tracks (bijgewerkt{" "}
+                {new Date(data.reference.updatedAt).toLocaleString("nl-NL")})
+              </p>
+            ) : (
+              <p className="mb-3 text-sm text-amber-800 dark:text-amber-200">Nog geen reference ingesteld.</p>
+            )}
+            <form onSubmit={handleSaveReference} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Tracked playlist</label>
+                <select
+                  value={refPlaylistId}
+                  onChange={(e) => {
+                    setRefPlaylistId(e.target.value);
+                    setRefUrl("");
+                  }}
+                  className="w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                >
+                  <option value="">— Kies —</option>
+                  {playlists.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  Of playlist-URL (moet al als tracked playlist bestaan)
+                </label>
+                <input
+                  type="text"
+                  value={refUrl}
+                  onChange={(e) => {
+                    setRefUrl(e.target.value);
+                    setRefPlaylistId("");
+                  }}
+                  placeholder="https://open.spotify.com/playlist/..."
+                  className="w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={savingReference || (!refPlaylistId && !refUrl.trim())}
+                  className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+                >
+                  {savingReference ? "Importeren…" : "Import reference"}
+                </button>
+                {data.reference ? (
+                  <button
+                    type="button"
+                    onClick={handleClearReference}
+                    className="rounded-full border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600"
+                  >
+                    Verwijder reference
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </section>
+        )}
+
+        {tab === "overlap" && (
+          <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">Overlap per bron</h2>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Streefpercentage: hoeveel van de gekozen slots per bron (ongeveer) ook in de reference playlist moet voorkomen. 0 = geen overlap-doel.
+            </p>
+            {data.sources.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Voeg eerst bronnen toe.</p>
+            ) : (
+              <ul className="mb-4 space-y-3">
+                {data.sources.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
+                    <div className="min-w-[220px] flex-1 text-sm">
+                      <span className="text-zinc-500 dark:text-zinc-400">{s.type}</span>
+                      <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <span className="text-zinc-600 dark:text-zinc-400">Overlap</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={overlapBySourceId[s.id] ?? 0}
+                        onChange={(e) =>
+                          setOverlapBySourceId((prev) => ({ ...prev, [s.id]: Number(e.target.value) }))
+                        }
+                        className="w-40"
+                      />
+                      <span className="w-20 tabular-nums text-zinc-800 dark:text-zinc-200">
+                        {overlapBySourceId[s.id] ?? 0}%
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              disabled={savingOverlap || data.sources.length === 0}
+              onClick={handleSaveOverlap}
+              className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+            >
+              {savingOverlap ? "Opslaan…" : "Overlap opslaan"}
+            </button>
+          </section>
+        )}
+
         {tab === "runs" && (
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
@@ -1123,6 +1368,39 @@ export default function SchedulerDetailPage() {
                 </select>
               </div>
             )}
+            {latestQuality && (
+              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">Kwaliteit</p>
+                <ul className="mt-2 grid gap-1 text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
+                  <li>
+                    Gevuld: {latestQuality.scheduledCount}/{latestQuality.targetCount} (
+                    {latestQuality.fillPercent.toFixed(1)}%)
+                  </li>
+                  <li>Conflicts: {latestQuality.conflictCount}</li>
+                  <li>
+                    Overlap (gewogen doel):{" "}
+                    {latestQuality.overlapOverall.targetPercent != null
+                      ? `${latestQuality.overlapOverall.targetPercent}%`
+                      : "—"}{" "}
+                    → gehaald:{" "}
+                    {latestQuality.overlapOverall.achievedPercent != null
+                      ? `${latestQuality.overlapOverall.achievedPercent}%`
+                      : "—"}{" "}
+                    ({latestQuality.overlapOverall.matchedTracks}/{latestQuality.overlapOverall.eligibleSlots} slots)
+                  </li>
+                </ul>
+                {latestQuality.overlapBySource.length > 0 && (
+                  <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+                    {latestQuality.overlapBySource.map((o) => (
+                      <span key={o.sourceKey} className="mr-3 inline-block">
+                        {o.sourceName}: doel {o.targetPercent}% → {o.achievedPercent.toFixed(1)}%
+                        {o.onTarget ? " ✓" : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {latestRunRows.length > 0 ? (
               <div className="mb-4 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                 <table className="w-full text-left text-sm">
@@ -1131,6 +1409,7 @@ export default function SchedulerDetailPage() {
                       <th className="px-3 py-2">Positie</th>
                       <th className="px-3 py-2">Track</th>
                       <th className="px-3 py-2">Bron</th>
+                      <th className="px-3 py-2">Overlap</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Lock</th>
                       <th className="px-3 py-2">Acties</th>
@@ -1140,7 +1419,7 @@ export default function SchedulerDetailPage() {
                     {latestRunRows.map((r) => (
                       <tr
                         key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`}
-                        className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${activePosition === r.position ? "bg-green-50 dark:bg-green-900/10" : ""}`}
+                        className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${activePosition === r.position ? "bg-green-50 dark:bg-green-900/10" : ""} ${r.overlapsReference && r.status === "scheduled" ? "bg-amber-50/80 dark:bg-amber-950/20" : ""}`}
                       >
                         <td className="px-3 py-2">{r.position}</td>
                         <td className="px-3 py-2">
@@ -1154,10 +1433,23 @@ export default function SchedulerDetailPage() {
                               {r.title || r.spotifyTrackId}
                             </a>
                           ) : (
-                            <span className="text-zinc-500 dark:text-zinc-400">{r.conflictReason ?? "Conflict"}</span>
+                            <span className="text-zinc-500 dark:text-zinc-400">
+                              {r.conflictDetail ?? r.conflictReason ?? "Conflict"}
+                            </span>
                           )}
                         </td>
                         <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">{r.sourceName || "—"}</td>
+                        <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                          {r.status === "scheduled" ? (
+                            r.overlapsReference ? (
+                              <span>Reference match</span>
+                            ) : (
+                              <span>—</span>
+                            )
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           <span className={r.status === "scheduled" ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}>
                             {r.status}

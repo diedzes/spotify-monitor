@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
-import { replaceTrackInRun } from "@/lib/scheduler-engine";
+import { computeRunQuality, replaceTrackInRun } from "@/lib/scheduler-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,8 @@ export async function POST(
       spotifyTrackId: body.spotifyTrackId.trim(),
       sourceKey: body.sourceKey ?? undefined,
     });
-    return NextResponse.json({ ok: true, rows });
+    const quality = await computeRunQuality(id, rows);
+    return NextResponse.json({ ok: true, rows, quality });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Vervangen mislukt";
     return NextResponse.json({ error: message }, { status: 400 });
