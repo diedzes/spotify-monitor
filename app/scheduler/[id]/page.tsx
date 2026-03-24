@@ -600,15 +600,13 @@ export default function SchedulerDetailPage() {
     }
   };
 
-  const fetchSuggestions = async () => {
-    if (!activePosition) return;
-    const body = await runAction("suggest", { position: activePosition, limit: 20 });
+  const fetchSuggestions = async (position: number) => {
+    const body = await runAction("suggest", { position, limit: 20 });
     setSuggestions((body?.items ?? []) as typeof suggestions);
   };
 
-  const searchAll = async () => {
-    if (!activePosition) return;
-    const body = await runAction("search", { position: activePosition, query: searchQuery, limit: 50 });
+  const searchAll = async (position: number) => {
+    const body = await runAction("search", { position, query: searchQuery, limit: 50 });
     setSuggestions((body?.items ?? []) as typeof suggestions);
   };
 
@@ -1193,10 +1191,10 @@ export default function SchedulerDetailPage() {
                               type="button"
                               onClick={async () => {
                                 setActivePosition(r.position);
-                                await fetchSuggestions();
+                                await fetchSuggestions(r.position);
                               }}
                               disabled={loadingEditor}
-                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                              className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
                             >
                               Suggest
                             </button>
@@ -1204,7 +1202,7 @@ export default function SchedulerDetailPage() {
                               type="button"
                               onClick={() => rescheduleFrom(r.position)}
                               disabled={loadingEditor}
-                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                              className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
                             >
                               Reschedule vanaf hier
                             </button>
@@ -1222,9 +1220,9 @@ export default function SchedulerDetailPage() {
                 <div className="mb-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={fetchSuggestions}
+                    onClick={() => fetchSuggestions(activePosition)}
                     disabled={loadingEditor}
-                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
                   >
                     Suggest uit dezelfde bron
                   </button>
@@ -1247,9 +1245,9 @@ export default function SchedulerDetailPage() {
                   />
                   <button
                     type="button"
-                    onClick={searchAll}
+                    onClick={() => searchAll(activePosition)}
                     disabled={loadingEditor}
-                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
                   >
                     Search all songs
                   </button>
