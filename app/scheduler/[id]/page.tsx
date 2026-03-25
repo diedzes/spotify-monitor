@@ -1692,7 +1692,12 @@ export default function SchedulerDetailPage() {
                             const sourceName = s.sourceName ?? "Bron";
                             const ruleImpact = s.ruleImpact ?? "ok";
                             const sourceKey = s.sourceKey;
-                            const sugHue = sourceHueFromId((sourceKey ?? trackId) || "x");
+                            const activeRow =
+                              activePosition != null
+                                ? latestRunRows.find((row) => row.position === activePosition)
+                                : undefined;
+                            const colorKey = sourceKey ?? activeRow?.sourceKey ?? "default";
+                            const sugHue = sourceHueFromId(colorKey);
                             const ok = ruleImpact === "ok";
                             return (
                               <li

@@ -820,12 +820,22 @@ export async function suggestAlternativesForSlot(
   const used = new Set(
     rows.filter((r) => r.status === "scheduled" && r.position !== position).map((r) => r.spotifyTrackId ?? "")
   );
-  const results: Array<{ track: CandidateTrack; ruleImpact: string }> = [];
+  const results: Array<{
+    track: CandidateTrack;
+    ruleImpact: string;
+    sourceKey: string;
+    sourceName: string;
+  }> = [];
   for (const c of pool.candidates) {
     if (used.has(c.spotifyTrackId)) continue;
     const check = validateTrackAgainstRules(c, rows, rules, position, position);
     if (!check.ok) continue;
-    results.push({ track: c, ruleImpact: "ok" });
+    results.push({
+      track: c,
+      ruleImpact: "ok",
+      sourceKey: pool.key,
+      sourceName: pool.sourceName,
+    });
     if (results.length >= limit) break;
   }
   return results;
