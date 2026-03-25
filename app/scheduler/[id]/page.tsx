@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { SubNavBar } from "@/components/SubNavBar";
+import { sourceHueFromId } from "@/lib/source-color";
 import { normalizeSchedulerRunRows, parseRunResultJson, type RunQualitySummary } from "@/lib/scheduler-run-result";
 import type { ScheduledRow } from "@/lib/scheduler-types";
 
@@ -347,6 +349,18 @@ export default function SchedulerDetailPage() {
     () => (addSourceKind === "playlist" ? !!addSourcePlaylistId : !!addSourceGroupId),
     [addSourceKind, addSourcePlaylistId, addSourceGroupId]
   );
+
+  const tabLabel = useMemo(() => {
+    const labels: Record<TabKey, string> = {
+      sources: "Sources",
+      clock: "Clock",
+      rules: "Rules",
+      reference: "Reference",
+      overlap: "Overlap",
+      runs: "Runs",
+    };
+    return labels[tab];
+  }, [tab]);
 
   const handleSaveHeader = async () => {
     if (!scheduler) return;
@@ -786,7 +800,8 @@ export default function SchedulerDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <AppHeader />
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <SubNavBar parentLabel="Scheduler" parentHref="/scheduler" currentTitle={scheduler.name} extraCrumb={tabLabel} />
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{scheduler.name}</h1>
           <button
@@ -861,14 +876,14 @@ export default function SchedulerDetailPage() {
           </button>
         </section>
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="sticky top-14 z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50/95 px-4 py-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {(["sources", "clock", "rules", "reference", "overlap", "runs"] as const).map((k) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
-                className={`rounded px-3 py-1.5 text-sm font-medium ${tab === k ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === k ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/80 dark:hover:bg-zinc-700/80"}`}
               >
                 {k === "reference" ? "Reference" : k === "overlap" ? "Overlap" : k[0].toUpperCase() + k.slice(1)}
               </button>
@@ -878,7 +893,7 @@ export default function SchedulerDetailPage() {
             type="button"
             onClick={handleGenerateRun}
             disabled={generatingRun}
-            className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
+            className="shrink-0 rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
           >
             {generatingRun ? "Genereren…" : "Generate schedule"}
           </button>
@@ -894,9 +909,15 @@ export default function SchedulerDetailPage() {
                 {data.sources.map((s) => (
                   <li key={s.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="text-sm">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-zinc-800"
+                          style={{ backgroundColor: `hsl(${sourceHueFromId(s.id)} 58% 48%)` }}
+                          title="Bronkleur"
+                          aria-hidden
+                        />
                         <span className="text-zinc-500 dark:text-zinc-400">{s.type}</span>
-                        <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
                       </div>
                       <button
                         type="button"
@@ -1307,9 +1328,14 @@ export default function SchedulerDetailPage() {
               <ul className="mb-4 space-y-3">
                 {data.sources.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
-                    <div className="min-w-[220px] flex-1 text-sm">
+                    <div className="flex min-w-[220px] flex-1 items-center gap-2 text-sm">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: `hsl(${sourceHueFromId(s.id)} 58% 48%)` }}
+                        aria-hidden
+                      />
                       <span className="text-zinc-500 dark:text-zinc-400">{s.type}</span>
-                      <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
                     </div>
                     <label className="flex items-center gap-2 text-sm">
                       <span className="text-zinc-600 dark:text-zinc-400">Overlap</span>
@@ -1344,250 +1370,371 @@ export default function SchedulerDetailPage() {
 
         {tab === "runs" && (
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
-            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-              Interactieve editor: lock, suggest, replace en reschedule per slot.
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
+            <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+              Kies een positie en gebruik het suggestiepaneel rechts (of onderaan op mobiel) voor alternatieven — geen scrollen naar onder nodig.
             </p>
-            {data.runs.length > 0 && (
-              <div className="mb-3">
-                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Actieve run</label>
-                <select
-                  value={currentRun?.id ?? ""}
-                  onChange={(e) => {
-                    setActiveRunId(e.target.value);
-                    setActivePosition(null);
-                    setSuggestions([]);
-                  }}
-                  className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  {data.runs.map((run) => (
-                    <option key={run.id} value={run.id}>
-                      {new Date(run.createdAt).toLocaleString("nl-NL")} - {run.status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {latestQuality && (
-              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/40">
-                <p className="font-medium text-zinc-900 dark:text-zinc-100">Kwaliteit</p>
-                <ul className="mt-2 grid gap-1 text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
-                  <li>
-                    Gevuld: {latestQuality.scheduledCount}/{latestQuality.targetCount} (
-                    {latestQuality.fillPercent.toFixed(1)}%)
-                  </li>
-                  <li>Conflicts: {latestQuality.conflictCount}</li>
-                  <li>
-                    Overlap (gewogen doel):{" "}
-                    {latestQuality.overlapOverall.targetPercent != null
-                      ? `${latestQuality.overlapOverall.targetPercent}%`
-                      : "—"}{" "}
-                    → gehaald:{" "}
-                    {latestQuality.overlapOverall.achievedPercent != null
-                      ? `${latestQuality.overlapOverall.achievedPercent}%`
-                      : "—"}{" "}
-                    ({latestQuality.overlapOverall.matchedTracks}/{latestQuality.overlapOverall.eligibleSlots} slots)
-                  </li>
-                </ul>
-                {latestQuality.overlapBySource.length > 0 && (
-                  <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-                    {latestQuality.overlapBySource.map((o) => (
-                      <span key={o.sourceKey} className="mr-3 inline-block">
-                        {o.sourceName}: doel {o.targetPercent}% → {o.achievedPercent.toFixed(1)}%
-                        {o.onTarget ? " ✓" : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {latestRunRows.length > 0 ? (
-              <div className="mb-4 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
-                      <th className="px-3 py-2">Positie</th>
-                      <th className="px-3 py-2">Track</th>
-                      <th className="px-3 py-2">Bron</th>
-                      <th className="px-3 py-2">Overlap</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Lock</th>
-                      <th className="px-3 py-2">Acties</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {latestRunRows.map((r) => (
-                      <tr
-                        key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`}
-                        className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${activePosition === r.position ? "bg-green-50 dark:bg-green-900/10" : ""} ${r.overlapsReference && r.status === "scheduled" ? "bg-amber-50/80 dark:bg-amber-950/20" : ""}`}
-                      >
-                        <td className="px-3 py-2">{r.position}</td>
-                        <td className="px-3 py-2">
-                          {r.status === "scheduled" ? (
-                            <a
-                              href={r.spotifyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#1DB954] hover:underline"
-                            >
-                              {r.title || r.spotifyTrackId}
-                            </a>
-                          ) : (
-                            <span className="text-zinc-500 dark:text-zinc-400">
-                              {r.conflictDetail ?? r.conflictReason ?? "Conflict"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">{r.sourceName || "—"}</td>
-                        <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
-                          {r.status === "scheduled" ? (
-                            r.overlapsReference ? (
-                              <span>Reference match</span>
-                            ) : (
-                              <span>—</span>
-                            )
-                          ) : (
-                            <span>—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={r.status === "scheduled" ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}>
-                            {r.status}
-                            {r.replacedManually ? " (manual)" : ""}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              checked={r.locked}
-                              onChange={(e) => toggleLock(r.position, e.target.checked)}
-                              disabled={loadingEditor}
-                            />
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400">{r.locked ? "locked" : "open"}</span>
-                          </label>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActivePosition(r.position);
-                                setSuggestions([]);
-                              }}
-                              className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                            >
-                              Select
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setActivePosition(r.position);
-                                await fetchSuggestions(r.position);
-                              }}
-                              disabled={loadingEditor}
-                              className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                            >
-                              Suggest
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => rescheduleFrom(r.position)}
-                              disabled={loadingEditor}
-                              className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                            >
-                              Reschedule vanaf hier
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
+
             {activePosition != null && (
-              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
-                <p className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">Editor positie #{activePosition}</p>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fetchSuggestions(activePosition)}
-                    disabled={loadingEditor}
-                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                  >
-                    Suggest uit dezelfde bron
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => rescheduleFrom(activePosition)}
-                    disabled={loadingEditor}
-                    className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                  >
-                    Reschedule per slot
-                  </button>
-                </div>
-                <div className="mb-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Zoek in alle songs..."
-                    className="w-full max-w-sm rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => searchAll(activePosition)}
-                    disabled={loadingEditor}
-                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
-                  >
-                    Search all songs
-                  </button>
-                </div>
-                {suggestions.length > 0 && (
-                  <div className="max-h-72 overflow-auto rounded border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
-                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                      {suggestions.map((s, i) => {
-                        const trackId = s.track?.spotifyTrackId ?? s.spotifyTrackId ?? "";
-                        const title = s.track?.title ?? s.title ?? "";
-                        const artists = s.track?.artists?.join(", ") ?? s.artists ?? "";
-                        const sourceName = s.sourceName ?? "zelfde bron";
-                        const ruleImpact = s.ruleImpact ?? "ok";
-                        const sourceKey = s.sourceKey;
-                        return (
-                          <li key={`${trackId}-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                            <div>
-                              <p className="font-medium text-zinc-900 dark:text-zinc-100">{title}</p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400">{artists} - {sourceName} - rule: {ruleImpact}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => replaceAtPosition(trackId, sourceKey)}
-                              disabled={!trackId || ruleImpact !== "ok" || loadingEditor}
-                              className="rounded border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-600"
-                            >
-                              Replace
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+              <button
+                type="button"
+                aria-label="Sluit suggestiepaneel"
+                className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+                onClick={() => {
+                  setActivePosition(null);
+                  setSuggestions([]);
+                }}
+              />
+            )}
+
+            <div className="relative z-10 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4">
+              <div className="min-w-0 space-y-4">
+                {data.runs.length > 0 && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Actieve run</label>
+                    <select
+                      value={currentRun?.id ?? ""}
+                      onChange={(e) => {
+                        setActiveRunId(e.target.value);
+                        setActivePosition(null);
+                        setSuggestions([]);
+                      }}
+                      className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      {data.runs.map((run) => (
+                        <option key={run.id} value={run.id}>
+                          {new Date(run.createdAt).toLocaleString("nl-NL")} - {run.status}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
+
+                {latestQuality && (
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">Kwaliteit</p>
+                    <ul className="mt-2 grid gap-1 text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
+                      <li>
+                        Gevuld: {latestQuality.scheduledCount}/{latestQuality.targetCount} (
+                        {latestQuality.fillPercent.toFixed(1)}%)
+                      </li>
+                      <li>Conflicts: {latestQuality.conflictCount}</li>
+                      <li className="sm:col-span-2">
+                        Overlap (gewogen doel):{" "}
+                        {latestQuality.overlapOverall.targetPercent != null
+                          ? `${latestQuality.overlapOverall.targetPercent}%`
+                          : "—"}{" "}
+                        → gehaald:{" "}
+                        {latestQuality.overlapOverall.achievedPercent != null
+                          ? `${latestQuality.overlapOverall.achievedPercent}%`
+                          : "—"}{" "}
+                        ({latestQuality.overlapOverall.matchedTracks}/{latestQuality.overlapOverall.eligibleSlots} slots)
+                      </li>
+                    </ul>
+                    {latestQuality.overlapBySource.length > 0 && (
+                      <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        {latestQuality.overlapBySource.map((o) => (
+                          <span key={o.sourceKey} className="mr-3 inline-block">
+                            {o.sourceName}: doel {o.targetPercent}% → {o.achievedPercent.toFixed(1)}%
+                            {o.onTarget ? " ✓" : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {latestRunRows.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+                          <th className="px-2 py-2">#</th>
+                          <th className="px-2 py-2">Song</th>
+                          <th className="px-2 py-2">Bron</th>
+                          <th className="hidden sm:table-cell px-2 py-2">Overlap</th>
+                          <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2">Lock</th>
+                          <th className="px-2 py-2">Acties</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {latestRunRows.map((r) => {
+                          const hue = sourceHueFromId(r.sourceKey ?? "default");
+                          const activeRow = activePosition === r.position;
+                          return (
+                            <tr
+                              key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`}
+                              className={`border-b border-zinc-100 transition-shadow last:border-0 dark:border-zinc-800 ${activeRow ? "bg-green-50 ring-2 ring-inset ring-[#1DB954]/50 dark:bg-green-950/30" : ""} ${r.overlapsReference && r.status === "scheduled" ? "bg-amber-50/60 dark:bg-amber-950/15" : ""}`}
+                              style={
+                                r.sourceKey
+                                  ? { borderLeft: `4px solid hsl(${hue} 52% 46%)` }
+                                  : undefined
+                              }
+                            >
+                              <td className="whitespace-nowrap px-2 py-2 align-top text-zinc-500">{r.position}</td>
+                              <td className="max-w-[220px] px-2 py-2 align-top sm:max-w-xs">
+                                {r.status === "scheduled" ? (
+                                  <a
+                                    href={r.spotifyUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block text-[#1DB954] hover:underline"
+                                  >
+                                    <span className="block font-medium leading-snug text-zinc-900 dark:text-zinc-100">
+                                      {r.title || "—"}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs leading-snug text-zinc-500 dark:text-zinc-400">
+                                      {r.artists || "—"}
+                                    </span>
+                                  </a>
+                                ) : (
+                                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                                    {r.conflictDetail ?? r.conflictReason ?? "Conflict"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 align-top">
+                                <span className="inline-flex max-w-[160px] items-center gap-1.5 sm:max-w-[200px]">
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ backgroundColor: `hsl(${hue} 58% 48%)` }}
+                                    aria-hidden
+                                  />
+                                  <span className="truncate text-zinc-700 dark:text-zinc-300">{r.sourceName || "—"}</span>
+                                </span>
+                              </td>
+                              <td className="hidden px-2 py-2 align-top text-xs text-zinc-600 dark:text-zinc-400 sm:table-cell">
+                                {r.status === "scheduled" ? (
+                                  r.overlapsReference ? (
+                                    <span className="text-amber-800 dark:text-amber-200">Ref</span>
+                                  ) : (
+                                    <span>—</span>
+                                  )
+                                ) : (
+                                  <span>—</span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-2 py-2 align-top">
+                                <span
+                                  className={
+                                    r.status === "scheduled"
+                                      ? "text-green-700 dark:text-green-300"
+                                      : "text-amber-700 dark:text-amber-300"
+                                  }
+                                >
+                                  {r.status}
+                                  {r.replacedManually ? " · m" : ""}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 align-top">
+                                <label className="flex cursor-pointer items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={r.locked}
+                                    onChange={(e) => toggleLock(r.position, e.target.checked)}
+                                    disabled={loadingEditor}
+                                  />
+                                  <span className="text-xs text-zinc-500 dark:text-zinc-400">{r.locked ? "aan" : "uit"}</span>
+                                </label>
+                              </td>
+                              <td className="px-2 py-2 align-top">
+                                <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActivePosition(r.position);
+                                      setSuggestions([]);
+                                    }}
+                                    className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                                  >
+                                    Select
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setActivePosition(r.position);
+                                      await fetchSuggestions(r.position);
+                                    }}
+                                    disabled={loadingEditor}
+                                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                                  >
+                                    Suggest
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => rescheduleFrom(r.position)}
+                                    disabled={loadingEditor}
+                                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
+                                  >
+                                    Reschedule
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : data.runs.length > 0 && currentRun?.status === "success" ? (
+                  <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                    Geen rijen om te tonen. Genereer opnieuw of kies een andere run.
+                  </p>
+                ) : null}
+
+                {data.runs.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                    Nog geen runs. Klik op <strong>Generate schedule</strong> om te starten.
+                  </p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {data.runs.map((run) => (
+                      <li
+                        key={run.id}
+                        className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/40"
+                      >
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">{run.status}</span>
+                        <span className="ml-2 text-zinc-500 dark:text-zinc-400">
+                          {new Date(run.createdAt).toLocaleString("nl-NL")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-            {data.runs.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Nog geen runs.</p>
-            ) : (
-              <ul className="space-y-2">
-                {data.runs.map((run) => (
-                  <li key={run.id} className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800/40">
-                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{run.status}</span>
-                    <span className="ml-2 text-zinc-500 dark:text-zinc-400">{new Date(run.createdAt).toLocaleString("nl-NL")}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+
+              {/* Suggestiepaneel: desktop naast de tabel; mobiel vast onderaan na selectie */}
+              <aside
+                className={`mt-4 flex max-h-[min(520px,70vh)] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/60 lg:sticky lg:top-24 lg:mt-0 lg:max-h-[calc(100vh-8rem)] max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-50 max-lg:max-h-[min(52vh,420px)] max-lg:rounded-b-none max-lg:rounded-t-xl max-lg:border-x-0 max-lg:border-b-0 max-lg:border-t-2 max-lg:border-t-zinc-300 max-lg:shadow-[0_-12px_40px_rgba(0,0,0,0.15)] ${activePosition == null ? "max-lg:hidden" : "max-lg:flex"}`}
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Suggesties
+                    </p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      {activePosition != null ? `Positie #${activePosition}` : "Geen slot"}
+                    </p>
+                  </div>
+                  {activePosition != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivePosition(null);
+                        setSuggestions([]);
+                      }}
+                      className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    >
+                      Sluiten
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+                  {activePosition == null ? (
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      Selecteer een rij met <strong>Select</strong> of <strong>Suggest</strong> om alternatieven te zien.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fetchSuggestions(activePosition)}
+                          disabled={loadingEditor}
+                          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                        >
+                          {loadingEditor ? "Laden…" : "Vernieuw suggesties"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rescheduleFrom(activePosition)}
+                          disabled={loadingEditor}
+                          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-600"
+                        >
+                          Reschedule vanaf hier
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void searchAll(activePosition);
+                          }}
+                          placeholder="Zoek alle bronnen…"
+                          className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => searchAll(activePosition)}
+                          disabled={loadingEditor}
+                          className="shrink-0 rounded-lg bg-[#1DB954] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
+                        >
+                          Zoek
+                        </button>
+                      </div>
+
+                      {suggestions.length === 0 && !loadingEditor && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Nog geen resultaten. Kies <strong>Vernieuw suggesties</strong> of gebruik zoeken.
+                        </p>
+                      )}
+
+                      {suggestions.length > 0 && (
+                        <ul className="space-y-2">
+                          {suggestions.map((s, i) => {
+                            const trackId = s.track?.spotifyTrackId ?? s.spotifyTrackId ?? "";
+                            const title = s.track?.title ?? s.title ?? "";
+                            const artists = s.track?.artists?.join(", ") ?? s.artists ?? "";
+                            const sourceName = s.sourceName ?? "Bron";
+                            const ruleImpact = s.ruleImpact ?? "ok";
+                            const sourceKey = s.sourceKey;
+                            const sugHue = sourceHueFromId((sourceKey ?? trackId) || "x");
+                            const ok = ruleImpact === "ok";
+                            return (
+                              <li
+                                key={`${trackId}-${i}`}
+                                className="flex gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-600 dark:bg-zinc-950/50"
+                                style={{ borderLeftWidth: 4, borderLeftColor: `hsl(${sugHue} 52% 46%)` }}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium leading-snug text-zinc-900 dark:text-zinc-100">{title}</p>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{artists}</p>
+                                  <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                                    <span className="inline-flex items-center gap-1">
+                                      <span
+                                        className="h-1.5 w-1.5 rounded-full"
+                                        style={{ backgroundColor: `hsl(${sugHue} 58% 48%)` }}
+                                      />
+                                      {sourceName}
+                                    </span>
+                                    {" · "}
+                                    <span className={ok ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-300"}>
+                                      {ok ? "regels OK" : ruleImpact}
+                                    </span>
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => replaceAtPosition(trackId, sourceKey)}
+                                  disabled={!trackId || !ok || loadingEditor}
+                                  className="shrink-0 self-center rounded-lg border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                                >
+                                  Kies
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              </aside>
+            </div>
           </section>
         )}
       </main>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { SubNavBar } from "@/components/SubNavBar";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -469,7 +470,8 @@ export default function ReportDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <AppHeader />
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <SubNavBar parentLabel="Reports" parentHref="/reports" currentTitle={report.report.name} />
         <h1 className="mb-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           {report.report.name}
         </h1>
