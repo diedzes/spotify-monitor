@@ -178,6 +178,8 @@ export default function SchedulerDetailPage() {
   const [latestRunRows, setLatestRunRows] = useState<SchedulerRunRow[]>([]);
   const [activeRunId, setActiveRunId] = useState<string>("");
   const [activePosition, setActivePosition] = useState<number | null>(null);
+  const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [loadingEditor, setLoadingEditor] = useState(false);
   const [suggestions, setSuggestions] = useState<
     Array<{
@@ -766,6 +768,15 @@ export default function SchedulerDetailPage() {
   const rescheduleFrom = async (fromPosition: number) => {
     const body = await runAction("reschedule", { fromPosition });
     if (body?.ok) setSuccess(`Reschedule vanaf positie ${fromPosition} voltooid.`);
+  };
+
+  const movePosition = async (fromPosition: number, toPosition: number) => {
+    if (fromPosition === toPosition || loadingEditor) return;
+    const body = await runAction("move", { fromPosition, toPosition });
+    if (body?.ok) {
+      setSuccess(`Positie ${fromPosition} verplaatst naar ${toPosition}.`);
+      if (activePosition === fromPosition) setActivePosition(toPosition);
+    }
   };
 
   if (loading) {
@@ -1374,6 +1385,9 @@ export default function SchedulerDetailPage() {
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
               Kies een positie en gebruik het suggestiepaneel rechts (of onderaan op mobiel) voor alternatieven — geen scrollen naar onder nodig.
             </p>
+            <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+              Reorder: gebruik ↑/↓ per rij of sleep een rij naar een andere positie.
+            </p>
 
             {activePosition != null && (
               <button
@@ -1462,10 +1476,34 @@ export default function SchedulerDetailPage() {
                         {latestRunRows.map((r) => {
                           const hue = sourceHueFromId(r.sourceKey ?? "default");
                           const activeRow = activePosition === r.position;
+                          const dropTarget = dragOverPosition === r.position && draggedPosition !== r.position;
                           return (
                             <tr
                               key={`${r.position}-${r.spotifyTrackId ?? "conflict"}`}
-                              className={`border-b border-zinc-100 transition-shadow last:border-0 dark:border-zinc-800 ${activeRow ? "bg-green-50 ring-2 ring-inset ring-[#1DB954]/50 dark:bg-green-950/30" : ""} ${r.overlapsReference && r.status === "scheduled" ? "bg-amber-50/60 dark:bg-amber-950/15" : ""}`}
+                              draggable={!loadingEditor}
+                              onDragStart={(e) => {
+                                setDraggedPosition(r.position);
+                                setDragOverPosition(null);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", String(r.position));
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (draggedPosition != null && draggedPosition !== r.position) setDragOverPosition(r.position);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const dataPos = Number.parseInt(e.dataTransfer.getData("text/plain"), 10);
+                                const from = Number.isInteger(dataPos) ? dataPos : draggedPosition;
+                                if (from != null) void movePosition(from, r.position);
+                                setDraggedPosition(null);
+                                setDragOverPosition(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedPosition(null);
+                                setDragOverPosition(null);
+                              }}
+                              className={`border-b border-zinc-100 transition-shadow last:border-0 dark:border-zinc-800 ${activeRow ? "bg-green-50 ring-2 ring-inset ring-[#1DB954]/50 dark:bg-green-950/30" : ""} ${dropTarget ? "ring-2 ring-inset ring-blue-500/50" : ""} ${r.overlapsReference && r.status === "scheduled" ? "bg-amber-50/60 dark:bg-amber-950/15" : ""} ${draggedPosition === r.position ? "opacity-70" : ""}`}
                               style={
                                 r.sourceKey
                                   ? { borderLeft: `4px solid hsl(${hue} 52% 46%)` }
@@ -1568,6 +1606,24 @@ export default function SchedulerDetailPage() {
                                     className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600"
                                   >
                                     Reschedule
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void movePosition(r.position, r.position - 1)}
+                                    disabled={loadingEditor || r.position <= 1}
+                                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600 disabled:opacity-40"
+                                    title="Verplaats omhoog"
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void movePosition(r.position, r.position + 1)}
+                                    disabled={loadingEditor || r.position >= latestRunRows.length}
+                                    className="cursor-pointer rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-600 disabled:opacity-40"
+                                    title="Verplaats omlaag"
+                                  >
+                                    ↓
                                   </button>
                                 </div>
                               </td>

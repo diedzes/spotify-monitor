@@ -993,3 +993,30 @@ export async function rescheduleFromPosition(
   return normalizeRows(next);
 }
 
+export async function moveSlotInRun(
+  schedulerId: string,
+  runId: string,
+  fromPosition: number,
+  toPosition: number
+) {
+  const { rows } = await getRunRowsOrThrow(schedulerId, runId);
+  const normalized = normalizeRows(rows);
+  const maxPos = normalized.length;
+  if (fromPosition < 1 || fromPosition > maxPos) throw new Error("fromPosition buiten bereik");
+  if (toPosition < 1 || toPosition > maxPos) throw new Error("toPosition buiten bereik");
+  if (fromPosition === toPosition) return normalized;
+
+  const moving = normalized[fromPosition - 1];
+  if (!moving) throw new Error("Positie niet gevonden");
+
+  const without = normalized.filter((r) => r.position !== fromPosition);
+  without.splice(toPosition - 1, 0, moving);
+  const reordered = without.map((r, idx) => ({
+    ...r,
+    position: idx + 1,
+  }));
+
+  await persistRunEdits(runId, schedulerId, reordered);
+  return normalizeRows(reordered);
+}
+
