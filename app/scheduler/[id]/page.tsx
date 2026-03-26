@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { SubNavBar } from "@/components/SubNavBar";
@@ -181,6 +181,7 @@ export default function SchedulerDetailPage() {
   const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [loadingEditor, setLoadingEditor] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [suggestions, setSuggestions] = useState<
     Array<{
       track?: { spotifyTrackId: string; title: string; artists: string[]; album: string; spotifyUrl: string };
@@ -201,6 +202,8 @@ export default function SchedulerDetailPage() {
   const [savingReference, setSavingReference] = useState(false);
   const [overlapBySourceId, setOverlapBySourceId] = useState<Record<string, number>>({});
   const [savingOverlap, setSavingOverlap] = useState(false);
+  const pendingOrderRef = useRef<SchedulerRunRow[] | null>(null);
+  const orderSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduler = data?.scheduler ?? null;
 
@@ -265,6 +268,12 @@ export default function SchedulerDetailPage() {
       setActiveRunId(data.runs[0].id);
     }
   }, [data?.runs, activeRunId]);
+
+  useEffect(() => {
+    return () => {
+      if (orderSaveTimerRef.current) clearTimeout(orderSaveTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const activeRun = data?.runs.find((r) => r.id === activeRunId) ?? data?.runs?.[0];
@@ -785,14 +794,24 @@ export default function SchedulerDetailPage() {
     const activeWasMoved = activePosition === fromPosition;
     setLatestRunRows(withPositions);
     if (activeWasMoved) setActivePosition(toPosition);
+    pendingOrderRef.current = withPositions;
 
-    const body = await runAction("move", { fromPosition, toPosition });
-    if (body?.ok) {
-      setSuccess(`Positie ${fromPosition} verplaatst naar ${toPosition}.`);
-      return;
-    }
-    setLatestRunRows(prev);
-    if (activeWasMoved) setActivePosition(fromPosition);
+    if (orderSaveTimerRef.current) clearTimeout(orderSaveTimerRef.current);
+    orderSaveTimerRef.current = setTimeout(async () => {
+      const pendingRows = pendingOrderRef.current;
+      if (!pendingRows) return;
+      setSavingOrder(true);
+      const body = await runAction("reorder", { rows: pendingRows });
+      setSavingOrder(false);
+      if (body?.ok) {
+        setSuccess("Volgorde opgeslagen.");
+        pendingOrderRef.current = null;
+        return;
+      }
+      setLatestRunRows(prev);
+      if (activeWasMoved) setActivePosition(fromPosition);
+      pendingOrderRef.current = null;
+    }, 280);
   };
 
   if (loading) {
@@ -1421,7 +1440,9 @@ export default function SchedulerDetailPage() {
               <div className="min-w-0 space-y-4">
                 {data.runs.length > 0 && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Actieve run</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Actieve run {savingOrder ? "· volgorde opslaan…" : ""}
+                    </label>
                     <select
                       value={currentRun?.id ?? ""}
                       onChange={(e) => {

@@ -1031,3 +1031,32 @@ export async function moveSlotInRun(
   return normalizeRows(normalizedReordered);
 }
 
+export async function reorderRunRows(
+  schedulerId: string,
+  runId: string,
+  rowsInput: ScheduledRow[]
+) {
+  const { rows, quality } = await getRunRowsOrThrow(schedulerId, runId);
+  const normalized = normalizeRows(rows);
+  const size = normalized.length;
+  if (!Array.isArray(rowsInput) || rowsInput.length !== size) throw new Error("Ongeldige reorder payload");
+
+  const normalizedInput = normalizeRows(rowsInput).map((r, idx) => ({
+    ...r,
+    position: idx + 1,
+  }));
+  const normalizedReordered = normalizeRows(normalizedInput);
+
+  if (quality) {
+    const payload = serializeRunResult(normalizedReordered, quality);
+    await prisma.schedulerRun.update({
+      where: { id: runId },
+      data: { editedResultJson: payload },
+    });
+    return normalizedReordered;
+  }
+
+  await persistRunEdits(runId, schedulerId, normalizedReordered);
+  return normalizeRows(normalizedReordered);
+}
+
