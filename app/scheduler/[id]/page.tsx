@@ -182,6 +182,8 @@ export default function SchedulerDetailPage() {
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [loadingEditor, setLoadingEditor] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPlaylist, setExportingPlaylist] = useState(false);
   const [suggestions, setSuggestions] = useState<
     Array<{
       track?: { spotifyTrackId: string; title: string; artists: string[]; album: string; spotifyUrl: string };
@@ -777,6 +779,67 @@ export default function SchedulerDetailPage() {
   const rescheduleFrom = async (fromPosition: number) => {
     const body = await runAction("reschedule", { fromPosition });
     if (body?.ok) setSuccess(`Reschedule vanaf positie ${fromPosition} voltooid.`);
+  };
+
+  const exportRunCsv = async () => {
+    if (!currentRun) return;
+    setError(null);
+    setExportingCsv(true);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/runs/${currentRun.id}/export/csv`, {
+        method: "GET",
+        credentials: "include",
+        headers: getSessionHeaders(),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "CSV export mislukt");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const m = cd.match(/filename="([^"]+)"/);
+      a.href = url;
+      a.download = m?.[1] ?? `scheduler-run-${currentRun.id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setSuccess("CSV export gestart.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "CSV export mislukt");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const exportRunToSpotify = async () => {
+    if (!currentRun) return;
+    setError(null);
+    setExportingPlaylist(true);
+    try {
+      const res = await fetch(`/api/schedulers/${id}/runs/${currentRun.id}/export/playlist`, {
+        method: "POST",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({}),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        spotifyPlaylistUrl?: string;
+      };
+      if (!res.ok || !body.ok || !body.spotifyPlaylistUrl) {
+        throw new Error(body.error ?? "Spotify export mislukt");
+      }
+      setSuccess("Spotify-playlist aangemaakt.");
+      window.open(body.spotifyPlaylistUrl, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Spotify export mislukt");
+    } finally {
+      setExportingPlaylist(false);
+    }
   };
 
   const movePosition = async (fromPosition: number, toPosition: number) => {
@@ -1458,6 +1521,24 @@ export default function SchedulerDetailPage() {
                         </option>
                       ))}
                     </select>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void exportRunCsv()}
+                        disabled={!currentRun || currentRun.status !== "success" || exportingCsv || exportingPlaylist}
+                        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                      >
+                        {exportingCsv ? "CSV..." : "Export CSV"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void exportRunToSpotify()}
+                        disabled={!currentRun || currentRun.status !== "success" || exportingPlaylist || exportingCsv}
+                        className="rounded-lg bg-[#1DB954] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1ed760] disabled:opacity-40"
+                      >
+                        {exportingPlaylist ? "Export..." : "Export naar Spotify"}
+                      </button>
+                    </div>
                   </div>
                 )}
 
