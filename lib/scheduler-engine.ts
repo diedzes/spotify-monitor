@@ -789,8 +789,8 @@ async function getRunRowsOrThrow(schedulerId: string, runId: string) {
   if (!run) throw new Error("Run niet gevonden");
   const raw = run.editedResultJson ?? run.resultJson;
   if (!raw) throw new Error("Run heeft geen resultaat");
-  const { rows } = parseRunResultJson(raw);
-  return { run, rows: normalizeRows(rows) };
+  const { rows, quality } = parseRunResultJson(raw);
+  return { run, rows: normalizeRows(rows), quality };
 }
 
 async function persistRunEdits(runId: string, schedulerId: string, rows: ScheduledRow[]) {
@@ -999,7 +999,7 @@ export async function moveSlotInRun(
   fromPosition: number,
   toPosition: number
 ) {
-  const { rows } = await getRunRowsOrThrow(schedulerId, runId);
+  const { rows, quality } = await getRunRowsOrThrow(schedulerId, runId);
   const normalized = normalizeRows(rows);
   const maxPos = normalized.length;
   if (fromPosition < 1 || fromPosition > maxPos) throw new Error("fromPosition buiten bereik");
@@ -1015,8 +1015,19 @@ export async function moveSlotInRun(
     ...r,
     position: idx + 1,
   }));
+  const normalizedReordered = normalizeRows(reordered);
 
-  await persistRunEdits(runId, schedulerId, reordered);
-  return normalizeRows(reordered);
+  // Reordering wijzigt geen trackinhoud; hergebruik bestaande quality om move-respons sneller te maken.
+  if (quality) {
+    const payload = serializeRunResult(normalizedReordered, quality);
+    await prisma.schedulerRun.update({
+      where: { id: runId },
+      data: { editedResultJson: payload },
+    });
+    return normalizedReordered;
+  }
+
+  await persistRunEdits(runId, schedulerId, normalizedReordered);
+  return normalizeRows(normalizedReordered);
 }
 

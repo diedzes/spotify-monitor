@@ -772,11 +772,27 @@ export default function SchedulerDetailPage() {
 
   const movePosition = async (fromPosition: number, toPosition: number) => {
     if (fromPosition === toPosition || loadingEditor) return;
+    const prev = latestRunRows;
+    const fromIdx = prev.findIndex((r) => r.position === fromPosition);
+    const toIdx = prev.findIndex((r) => r.position === toPosition);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const optimistic = prev.map((r) => ({ ...r }));
+    const [moving] = optimistic.splice(fromIdx, 1);
+    if (!moving) return;
+    optimistic.splice(toIdx, 0, moving);
+    const withPositions = optimistic.map((r, idx) => ({ ...r, position: idx + 1 }));
+    const activeWasMoved = activePosition === fromPosition;
+    setLatestRunRows(withPositions);
+    if (activeWasMoved) setActivePosition(toPosition);
+
     const body = await runAction("move", { fromPosition, toPosition });
     if (body?.ok) {
       setSuccess(`Positie ${fromPosition} verplaatst naar ${toPosition}.`);
-      if (activePosition === fromPosition) setActivePosition(toPosition);
+      return;
     }
+    setLatestRunRows(prev);
+    if (activeWasMoved) setActivePosition(fromPosition);
   };
 
   if (loading) {
