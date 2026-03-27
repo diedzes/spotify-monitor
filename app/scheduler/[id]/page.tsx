@@ -101,6 +101,7 @@ type SchedulerDetail = {
     description: string | null;
     mode: "clock" | "ratio";
     targetTrackCount: number;
+    ratioEvenDistribution: boolean;
     createdAt: string;
     updatedAt: string;
   };
@@ -156,6 +157,7 @@ export default function SchedulerDetailPage() {
   const [editingDescription, setEditingDescription] = useState("");
   const [editingMode, setEditingMode] = useState<"clock" | "ratio">("clock");
   const [editingTargetTrackCount, setEditingTargetTrackCount] = useState(30);
+  const [editingRatioEvenDistribution, setEditingRatioEvenDistribution] = useState(true);
   const [savingHeader, setSavingHeader] = useState(false);
 
   const [addSourceKind, setAddSourceKind] = useState<"playlist" | "group">("playlist");
@@ -251,6 +253,7 @@ export default function SchedulerDetailPage() {
     setEditingDescription(scheduler.description ?? "");
     setEditingMode(scheduler.mode);
     setEditingTargetTrackCount(scheduler.targetTrackCount);
+    setEditingRatioEvenDistribution(scheduler.ratioEvenDistribution);
   }, [scheduler?.id]);
 
   useEffect(() => {
@@ -399,6 +402,7 @@ export default function SchedulerDetailPage() {
           description: editingDescription.trim() || null,
           mode: editingMode,
           targetTrackCount: editingTargetTrackCount,
+          ratioEvenDistribution: editingRatioEvenDistribution,
         }),
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
@@ -974,6 +978,24 @@ export default function SchedulerDetailPage() {
                 className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
+            {editingMode === "ratio" && (
+              <div className="md:col-span-2">
+                <label className="inline-flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={editingRatioEvenDistribution}
+                    onChange={(e) => setEditingRatioEvenDistribution(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Gelijkmatig verspreiden over de hele playlist
+                    <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                      Houdt gewichten aan, maar verdeelt elke bron zo gelijk mogelijk over alle posities.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
           <button
             type="button"

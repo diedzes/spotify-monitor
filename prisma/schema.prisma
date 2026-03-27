@@ -148,6 +148,7 @@ model Scheduler {
   description      String?
   mode             SchedulerMode
   targetTrackCount Int
+  ratioEvenDistribution Boolean         @default(true)
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   sources          SchedulerSource[]

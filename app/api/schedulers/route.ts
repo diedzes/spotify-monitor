@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     description?: string;
     mode?: SchedulerMode;
     targetTrackCount?: number;
+    ratioEvenDistribution?: boolean;
   };
   try {
     body = await request.json();
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "targetTrackCount moet een positief geheel getal zijn" }, { status: 400 });
   }
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
+  const ratioEvenDistribution = typeof body.ratioEvenDistribution === "boolean" ? body.ratioEvenDistribution : true;
 
   const scheduler = await prisma.scheduler.create({
     data: {
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
       description,
       mode,
       targetTrackCount,
+      ratioEvenDistribution,
       updatedAt: new Date(),
     },
   });
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
       description: scheduler.description,
       mode: scheduler.mode,
       targetTrackCount: scheduler.targetTrackCount,
+      ratioEvenDistribution: scheduler.ratioEvenDistribution,
       createdAt: scheduler.createdAt.toISOString(),
       updatedAt: scheduler.updatedAt.toISOString(),
     },

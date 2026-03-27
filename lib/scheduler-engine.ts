@@ -178,7 +178,8 @@ export function validateTrackAgainstRules(
 
 function buildRatioPositionPlan(
   sources: Array<{ key: string; weight: number }>,
-  targetTrackCount: number
+  targetTrackCount: number,
+  evenDistribution: boolean
 ): string[] {
   if (sources.length === 0 || targetTrackCount <= 0) return [];
   const totalWeight = sources.reduce((sum, s) => sum + Math.max(0, s.weight), 0);
@@ -196,6 +197,39 @@ function buildRatioPositionPlan(
         b.count += 1;
         allocated += 1;
       });
+  }
+
+  if (evenDistribution) {
+    const targetByKey = new Map<string, number>(base.map((b) => [b.key, b.count]));
+    const assignedByKey = new Map<string, number>(base.map((b) => [b.key, 0]));
+    const plan: string[] = [];
+
+    for (let pos = 1; pos <= targetTrackCount; pos += 1) {
+      let bestKey: string | null = null;
+      let bestDeficit = Number.NEGATIVE_INFINITY;
+      let bestRemaining = Number.NEGATIVE_INFINITY;
+      for (const b of base) {
+        const target = targetByKey.get(b.key) ?? 0;
+        const assigned = assignedByKey.get(b.key) ?? 0;
+        const remaining = target - assigned;
+        if (remaining <= 0) continue;
+        const desiredByNow = (pos * target) / targetTrackCount;
+        const deficit = desiredByNow - assigned;
+        if (
+          deficit > bestDeficit ||
+          (deficit === bestDeficit && remaining > bestRemaining) ||
+          (deficit === bestDeficit && remaining === bestRemaining && bestKey !== null && b.key < bestKey)
+        ) {
+          bestKey = b.key;
+          bestDeficit = deficit;
+          bestRemaining = remaining;
+        }
+      }
+      if (!bestKey) break;
+      plan.push(bestKey);
+      assignedByKey.set(bestKey, (assignedByKey.get(bestKey) ?? 0) + 1);
+    }
+    return plan;
   }
 
   const plan: string[] = [];
@@ -302,7 +336,7 @@ function computeSlotCountsPerSource(
     const included = scheduler.sources
       .filter((s) => s.include)
       .map((s) => ({ key: s.id, weight: s.weight ?? 1 }));
-    const plan = buildRatioPositionPlan(included, scheduler.targetTrackCount);
+    const plan = buildRatioPositionPlan(included, scheduler.targetTrackCount, scheduler.ratioEvenDistribution);
     for (const k of plan) counts.set(k, (counts.get(k) ?? 0) + 1);
   }
   return counts;
@@ -746,7 +780,7 @@ export async function generateSchedulerRun(schedulerId: string) {
       const included = scheduler.sources
         .filter((s) => s.include)
         .map((s) => ({ key: s.id, weight: s.weight ?? 1 }));
-      const plan = buildRatioPositionPlan(included, scheduler.targetTrackCount);
+      const plan = buildRatioPositionPlan(included, scheduler.targetTrackCount, scheduler.ratioEvenDistribution);
       for (let i = 0; i < scheduler.targetTrackCount; i += 1) {
         const position = i + 1;
         const sourceId = plan[i] ?? null;

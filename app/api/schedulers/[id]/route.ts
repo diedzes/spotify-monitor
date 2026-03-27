@@ -54,6 +54,7 @@ export async function GET(
       description: scheduler.description,
       mode: scheduler.mode,
       targetTrackCount: scheduler.targetTrackCount,
+      ratioEvenDistribution: scheduler.ratioEvenDistribution,
       createdAt: scheduler.createdAt.toISOString(),
       updatedAt: scheduler.updatedAt.toISOString(),
     },
@@ -123,7 +124,13 @@ export async function PUT(
   const exists = await prisma.scheduler.findFirst({ where: { id, userId: session.user.id } });
   if (!exists) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
 
-  let body: { name?: string; description?: string; mode?: "clock" | "ratio"; targetTrackCount?: number };
+  let body: {
+    name?: string;
+    description?: string;
+    mode?: "clock" | "ratio";
+    targetTrackCount?: number;
+    ratioEvenDistribution?: boolean;
+  };
   try {
     body = await request.json();
   } catch {
@@ -141,6 +148,8 @@ export async function PUT(
       : body.targetTrackCount === undefined
         ? undefined
         : null;
+  const ratioEvenDistribution =
+    typeof body.ratioEvenDistribution === "boolean" ? body.ratioEvenDistribution : undefined;
 
   if (targetTrackCount === null) {
     return NextResponse.json({ error: "targetTrackCount moet een positief geheel getal zijn" }, { status: 400 });
@@ -154,6 +163,7 @@ export async function PUT(
       ...(description !== undefined && { description }),
       ...(mode !== undefined && { mode }),
       ...(targetTrackCount !== undefined && { targetTrackCount }),
+      ...(ratioEvenDistribution !== undefined && { ratioEvenDistribution }),
       updatedAt: new Date(),
     },
   });
@@ -166,6 +176,7 @@ export async function PUT(
       description: updated.description,
       mode: updated.mode,
       targetTrackCount: updated.targetTrackCount,
+      ratioEvenDistribution: updated.ratioEvenDistribution,
       updatedAt: updated.updatedAt.toISOString(),
     },
   });

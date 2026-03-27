@@ -32,6 +32,7 @@ function NewSchedulerPageContent() {
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<"clock" | "ratio">("clock");
   const [targetTrackCount, setTargetTrackCount] = useState(30);
+  const [ratioEvenDistribution, setRatioEvenDistribution] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +59,7 @@ function NewSchedulerPageContent() {
           description: description.trim() || undefined,
           mode,
           targetTrackCount,
+          ratioEvenDistribution,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; scheduler?: { id: string }; error?: string };
@@ -135,6 +137,22 @@ function NewSchedulerPageContent() {
               className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
+          {mode === "ratio" && (
+            <label className="inline-flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input
+                type="checkbox"
+                checked={ratioEvenDistribution}
+                onChange={(e) => setRatioEvenDistribution(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Gelijkmatig verspreiden over de hele playlist
+                <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                  Houdt gewichten aan, maar spreidt nummers uit dezelfde bron zoveel mogelijk over alle posities.
+                </span>
+              </span>
+            </label>
+          )}
           <div className="flex gap-3">
             <button
               type="submit"
