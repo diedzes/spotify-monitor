@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { GROUP_COLOR_PRESETS } from "@/lib/group-color";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -27,6 +28,7 @@ export default function NewGroupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [color, setColor] = useState("#6366f1");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +46,11 @@ export default function NewGroupPage() {
         method: "POST",
         credentials: "include",
         headers: getSessionHeaders(),
-        body: JSON.stringify({ name: trimmed, description: description.trim() || undefined }),
+        body: JSON.stringify({
+          name: trimmed,
+          description: description.trim() || undefined,
+          color,
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; group?: { id: string } };
       if (!res.ok || !data.ok) {
@@ -99,6 +105,33 @@ export default function NewGroupPage() {
               className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               placeholder="Optioneel"
             />
+          </div>
+          <div>
+            <span className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Kleur</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-10 w-14 cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600"
+                aria-label="Groepskleur"
+              />
+              <div className="flex flex-wrap gap-2">
+                {GROUP_COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    title={preset}
+                    onClick={() => setColor(preset)}
+                    className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950 ${
+                      color.toLowerCase() === preset.toLowerCase() ? "ring-[#1DB954]" : "ring-transparent"
+                    }`}
+                    style={{ backgroundColor: preset }}
+                  />
+                ))}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Deze kleur zie je bij playlists, reports en scheduler.</p>
           </div>
           <div className="flex gap-3 pt-2">
             <button

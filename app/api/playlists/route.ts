@@ -19,13 +19,13 @@ export async function GET(request: Request) {
             trackedPlaylistId: { in: playlistIds },
             group: { userId: session.user.id },
           },
-          include: { group: { select: { id: true, name: true } } },
+          include: { group: { select: { id: true, name: true, color: true } } },
         })
       : [];
-    const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string }>>();
+    const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string; color: string }>>();
     for (const link of groupLinks) {
       const list = groupsByPlaylistId.get(link.trackedPlaylistId) ?? [];
-      list.push({ id: link.group.id, name: link.group.name });
+      list.push({ id: link.group.id, name: link.group.name, color: link.group.color });
       groupsByPlaylistId.set(link.trackedPlaylistId, list);
     }
     return NextResponse.json({

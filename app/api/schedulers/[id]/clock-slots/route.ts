@@ -84,7 +84,7 @@ export async function POST(
     },
     include: {
       trackedPlaylist: { select: { id: true, name: true } },
-      playlistGroup: { select: { id: true, name: true } },
+      playlistGroup: { select: { id: true, name: true, color: true } },
     },
   });
   return NextResponse.json({
@@ -97,6 +97,7 @@ export async function POST(
       spotifyTrackId: slot.spotifyTrackId,
       type: slot.trackedPlaylistId ? "playlist" : slot.playlistGroupId ? "group" : "track",
       name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? slot.spotifyTrackId ?? "",
+      groupColor: slot.playlistGroup?.color ?? null,
     },
   });
 }

@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { GroupChip } from "@/components/GroupChip";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -34,7 +35,7 @@ type PlaylistRow = {
   spotifyPlaylistId: string;
   isPublic: boolean;
   isMainPlaylist: boolean;
-  groups: Array<{ id: string; name: string }>;
+  groups: Array<{ id: string; name: string; color: string }>;
 };
 
 function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
@@ -162,7 +163,7 @@ function PlaylistsPageContent() {
   const [syncAllLoading, setSyncAllLoading] = useState(false);
   const [syncAllResult, setSyncAllResult] = useState<{ synced: number; failed: number; errors: Array<{ playlistId: string; error: string }> } | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
-  const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [bulkAddGroupId, setBulkAddGroupId] = useState("");
   const [bulkAddNewGroupName, setBulkAddNewGroupName] = useState("");
   const [bulkAddLoading, setBulkAddLoading] = useState(false);
@@ -184,6 +185,10 @@ function PlaylistsPageContent() {
             data.playlists.map((p) => ({
               ...p,
               isMainPlaylist: !!p.isMainPlaylist,
+              groups: (p.groups ?? []).map((g) => ({
+                ...g,
+                color: (g as { color?: string }).color ?? "#71717a",
+              })),
             }))
           );
       });
@@ -234,9 +239,11 @@ function PlaylistsPageContent() {
 
   const uniqueOwners = useMemo(() => [...new Set(playlists.map((p) => p.ownerName))].sort(), [playlists]);
   const uniqueGroups = useMemo(() => {
-    const map = new Map<string, string>();
-    playlists.forEach((p) => p.groups.forEach((g) => map.set(g.id, g.name)));
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    const map = new Map<string, { id: string; name: string; color: string }>();
+    playlists.forEach((p) =>
+      p.groups.forEach((g) => map.set(g.id, { id: g.id, name: g.name, color: g.color }))
+    );
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [playlists]);
 
   const selectAll = useCallback(() => {
@@ -320,7 +327,7 @@ function PlaylistsPageContent() {
         });
         const createData = (await createRes.json()) as {
           ok?: boolean;
-          group?: { id: string; name: string };
+          group?: { id: string; name: string; color: string };
           error?: string;
         };
         if (createRes.status === 401) return;
@@ -334,7 +341,14 @@ function PlaylistsPageContent() {
           return;
         }
         groupId = createData.group.id;
-        setGroups((prev) => [...prev, { id: createData.group!.id, name: createData.group!.name }]);
+        setGroups((prev) => [
+          ...prev,
+          {
+            id: createData.group!.id,
+            name: createData.group!.name,
+            color: createData.group!.color ?? "#71717a",
+          },
+        ]);
       } catch {
         setBulkAddResult({ added: 0, skipped: 0, errors: ["Kon groep niet aanmaken"] });
         setBulkAddLoading(false);
@@ -513,8 +527,14 @@ function PlaylistsPageContent() {
     setBulkAddNewGroupName("");
     fetch("/api/groups", { credentials: "include", headers: getSessionHeaders(sidFromUrl) })
       .then((res) => res.json())
-      .then((data: { groups?: Array<{ id: string; name: string }> }) => {
-        setGroups(data.groups ?? []);
+      .then((data: { groups?: Array<{ id: string; name: string; color?: string }> }) => {
+        setGroups(
+          (data.groups ?? []).map((g) => ({
+            id: g.id,
+            name: g.name,
+            color: g.color ?? "#71717a",
+          }))
+        );
         setBulkAddOpen(true);
       });
   }, [sidFromUrl]);
@@ -642,7 +662,9 @@ function PlaylistsPageContent() {
           >
             <option value="">Alle groepen</option>
             {uniqueGroups.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
             ))}
           </select>
           <select
@@ -762,13 +784,13 @@ function PlaylistsPageContent() {
                     />
                   ) : null}
                 </th>
-                <th className="px-3 py-3 font-medium text-zinc-900 dark:text-zinc-100">Main</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Naam</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Owner</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groepen</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Laatste sync</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Acties</th>
+                <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Main</th>
               </tr>
             </thead>
             <tbody>
@@ -792,23 +814,6 @@ function PlaylistsPageContent() {
                         className="h-4 w-4 rounded border-zinc-300 text-[#1DB954] focus:ring-[#1DB954]"
                       />
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <label className="flex cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={p.isMainPlaylist}
-                          disabled={mainToggleLoading === p.id}
-                          onChange={(e) => void toggleMainPlaylist(p.id, e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
-                          title="Main playlist (bron voor Hitlist)"
-                        />
-                        {p.isMainPlaylist && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-                            Main
-                          </span>
-                        )}
-                      </label>
-                    </td>
                     <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">
                       <Link href={`/playlists/${p.id}`} className="hover:underline">
                         {p.name}
@@ -821,13 +826,12 @@ function PlaylistsPageContent() {
                           <span className="text-zinc-400 dark:text-zinc-500">—</span>
                         ) : (
                           p.groups.map((g) => (
-                            <Link
+                            <GroupChip
                               key={g.id}
+                              name={g.name}
+                              color={g.color}
                               href={`/groups/${g.id}`}
-                              className="rounded bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
-                            >
-                              {g.name}
-                            </Link>
+                            />
                           ))
                         )}
                         <Link
@@ -891,6 +895,23 @@ function PlaylistsPageContent() {
                           Open in Spotify
                         </a>
                       </span>
+                    </td>
+                    <td className="px-3 py-3 align-top text-right">
+                      <label className="inline-flex cursor-pointer items-center justify-end gap-2">
+                        <input
+                          type="checkbox"
+                          checked={p.isMainPlaylist}
+                          disabled={mainToggleLoading === p.id}
+                          onChange={(e) => void toggleMainPlaylist(p.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+                          title="Main playlist (bron voor Hitlist)"
+                        />
+                        {p.isMainPlaylist && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                            Main
+                          </span>
+                        )}
+                      </label>
                     </td>
                   </tr>
                 ))

@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { normalizeGroupColor } from "@/lib/group-color";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -28,6 +29,7 @@ type GroupRow = {
   id: string;
   name: string;
   description: string | null;
+  color: string;
   createdAt: string;
   playlistCount: number;
 };
@@ -47,7 +49,13 @@ function GroupsPageContent() {
           return;
         }
         return res.json().then((data) => {
-          if (data.groups) setGroups(data.groups);
+          if (data.groups)
+            setGroups(
+              (data.groups as GroupRow[]).map((g) => ({
+                ...g,
+                color: g.color ?? "#71717a",
+              }))
+            );
         });
       })
       .catch(() => setLoading(false))
@@ -114,10 +122,11 @@ function GroupsPageContent() {
               <li key={g.id}>
                 <Link
                   href={`/groups/${g.id}`}
-                  className="block rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                  className="block rounded-xl border border-zinc-200 bg-white p-4 pl-3 transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                  style={{ borderLeftWidth: 4, borderLeftColor: normalizeGroupColor(g.color) }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <h2 className="font-medium text-zinc-900 dark:text-zinc-100">{g.name}</h2>
                       {g.description && (
                         <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1">

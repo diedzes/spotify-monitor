@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { normalizeGroupColor } from "@/lib/group-color";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 const FETCH_TIMEOUT_MS = 15000;
@@ -35,6 +36,7 @@ type GroupOption = {
   name: string;
   description: string | null;
   playlistCount: number;
+  color: string;
 };
 
 export default function AddPlaylistToGroupPage() {
@@ -78,7 +80,13 @@ export default function AddPlaylistToGroupPage() {
           setPlaylistName(playlistRes.playlist.name);
           setPlaylistGroupIds(new Set((playlistRes.playlist.groups ?? []).map((g: { id: string }) => g.id)));
         }
-        if (groupsRes?.groups) setGroups(groupsRes.groups);
+        if (groupsRes?.groups)
+          setGroups(
+            (groupsRes.groups as GroupOption[]).map((g) => ({
+              ...g,
+              color: g.color ?? "#71717a",
+            }))
+          );
       })
       .catch((err) => {
         if (err?.name === "AbortError") {
@@ -181,7 +189,8 @@ export default function AddPlaylistToGroupPage() {
             {availableGroups.map((g) => (
               <li
                 key={g.id}
-                className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white py-3 pl-3 pr-4 dark:border-zinc-800 dark:bg-zinc-900"
+                style={{ borderLeftWidth: 4, borderLeftColor: normalizeGroupColor(g.color) }}
               >
                 <div>
                   <p className="font-medium text-zinc-900 dark:text-zinc-100">{g.name}</p>

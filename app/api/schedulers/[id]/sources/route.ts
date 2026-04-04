@@ -76,7 +76,7 @@ export async function POST(
     },
     include: {
       trackedPlaylist: { select: { id: true, name: true } },
-      playlistGroup: { select: { id: true, name: true } },
+      playlistGroup: { select: { id: true, name: true, color: true } },
     },
   });
 
@@ -92,6 +92,7 @@ export async function POST(
       rankBiasStrength: source.rankBiasStrength,
       type: source.trackedPlaylistId ? "playlist" : "group",
       name: source.trackedPlaylist?.name ?? source.playlistGroup?.name ?? "",
+      groupColor: source.playlistGroup?.color ?? null,
     },
   });
 }

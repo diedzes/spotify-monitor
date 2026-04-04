@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { GROUP_COLOR_PRESETS, normalizeGroupColor } from "@/lib/group-color";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -40,7 +41,14 @@ type PlaylistInGroup = {
 };
 
 type GroupDetail = {
-  group: { id: string; name: string; description: string | null; createdAt: string; updatedAt: string };
+  group: {
+    id: string;
+    name: string;
+    description: string | null;
+    color: string;
+    createdAt: string;
+    updatedAt: string;
+  };
   playlists: PlaylistInGroup[];
 };
 
@@ -53,6 +61,9 @@ export default function GroupDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [groupColor, setGroupColor] = useState("#71717a");
+  const [colorSaving, setColorSaving] = useState(false);
+  const [colorError, setColorError] = useState<string | null>(null);
 
   const load = () => {
     setError(null);
@@ -60,7 +71,11 @@ export default function GroupDetailPage() {
       .then((res) => {
         if (res.status === 401) router.replace("/groups");
         else if (res.status === 404) setError("Groep niet gevonden");
-        else return res.json().then(setData);
+        else
+          return res.json().then((d: GroupDetail) => {
+            setData(d);
+            if (d.group?.color) setGroupColor(normalizeGroupColor(d.group.color));
+          });
       })
       .catch(() => setError("Kon groep niet laden"))
       .finally(() => setLoading(false));
@@ -70,6 +85,30 @@ export default function GroupDetailPage() {
     if (!id) return;
     load();
   }, [id]);
+
+  const saveGroupColor = async () => {
+    setColorError(null);
+    setColorSaving(true);
+    try {
+      const res = await fetch(`/api/groups/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: getSessionHeaders(),
+        body: JSON.stringify({ color: groupColor }),
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        setColorError(body.error ?? "Kleur opslaan mislukt.");
+        return;
+      }
+      setSuccess("Kleur opgeslagen.");
+      load();
+    } catch {
+      setColorError("Kleur opslaan mislukt.");
+    } finally {
+      setColorSaving(false);
+    }
+  };
 
   const handleRemove = async (trackedPlaylistId: string) => {
     setSuccess(null);
@@ -128,7 +167,10 @@ export default function GroupDetailPage() {
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <AppHeader />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-6">
+        <div
+          className="mb-6 rounded-r-xl border border-zinc-200 border-l-4 bg-white py-4 pl-5 pr-4 dark:border-zinc-800 dark:bg-zinc-900"
+          style={{ borderLeftColor: normalizeGroupColor(group.color) }}
+        >
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             {group.name}
           </h1>
@@ -136,6 +178,47 @@ export default function GroupDetailPage() {
             <p className="mt-1 text-zinc-600 dark:text-zinc-400">{group.description}</p>
           )}
         </div>
+
+        <section className="mb-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">Groepskleur</h2>
+          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Zichtbaar op playlists-overzicht, in reports en scheduler.
+          </p>
+          {colorError && (
+            <p className="mb-2 text-sm text-red-600 dark:text-red-400">{colorError}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="color"
+              value={groupColor}
+              onChange={(e) => setGroupColor(e.target.value)}
+              className="h-10 w-14 cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600"
+              aria-label="Groepskleur"
+            />
+            <div className="flex flex-wrap gap-2">
+              {GROUP_COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  title={preset}
+                  onClick={() => setGroupColor(preset)}
+                  className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950 ${
+                    groupColor.toLowerCase() === preset.toLowerCase() ? "ring-[#1DB954]" : "ring-transparent"
+                  }`}
+                  style={{ backgroundColor: preset }}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={colorSaving || normalizeGroupColor(groupColor) === normalizeGroupColor(group.color)}
+              onClick={() => void saveGroupColor()}
+              className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
+            >
+              {colorSaving ? "Opslaan…" : "Kleur opslaan"}
+            </button>
+          </div>
+        </section>
 
         {success && (
           <p className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200">

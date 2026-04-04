@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       id: g.id,
       name: g.name,
       description: g.description,
+      color: g.color,
       createdAt: g.createdAt.toISOString(),
       playlistCount: g._count.groupPlaylists,
     })),
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
   }
-  let body: { name?: string; description?: string };
+  let body: { name?: string; description?: string; color?: string };
   try {
     body = await request.json();
   } catch {
@@ -34,14 +35,16 @@ export async function POST(request: Request) {
   }
   const name = typeof body.name === "string" ? body.name : "";
   const description = typeof body.description === "string" ? body.description : undefined;
+  const color = typeof body.color === "string" ? body.color : undefined;
   try {
-    const group = await createPlaylistGroup(session.user.id, name, description);
+    const group = await createPlaylistGroup(session.user.id, name, description, color);
     return NextResponse.json({
       ok: true,
       group: {
         id: group.id,
         name: group.name,
         description: group.description,
+        color: group.color,
         createdAt: group.createdAt.toISOString(),
       },
     });

@@ -82,6 +82,7 @@ model PlaylistGroup {
   userId         String
   name           String
   description    String?
+  color          String          @default("#71717a")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   groupPlaylists GroupPlaylist[]

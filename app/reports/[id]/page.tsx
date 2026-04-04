@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { SubNavBar } from "@/components/SubNavBar";
+import { GroupChip } from "@/components/GroupChip";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -35,6 +36,7 @@ type SourceRow = {
   trackCount?: number | null;
   followerCount?: number | null;
   expandedPlaylists?: string[];
+  groupColor?: string | null;
 };
 
 type ChartRow = {
@@ -60,7 +62,7 @@ type ReportDetail = {
 };
 
 type PlaylistOption = { id: string; name: string };
-type GroupOption = { id: string; name: string; playlistCount: number };
+type GroupOption = { id: string; name: string; playlistCount: number; color: string };
 
 export default function ReportDetailPage() {
   const params = useParams();
@@ -119,7 +121,15 @@ export default function ReportDetailPage() {
     fetch("/api/groups", { credentials: "include", headers: getSessionHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.groups) setGroups(data.groups.map((g: { id: string; name: string; playlistCount: number }) => ({ id: g.id, name: g.name, playlistCount: g.playlistCount })));
+        if (data?.groups)
+          setGroups(
+            data.groups.map((g: { id: string; name: string; playlistCount: number; color?: string }) => ({
+              id: g.id,
+              name: g.name,
+              playlistCount: g.playlistCount,
+              color: g.color ?? "#71717a",
+            }))
+          );
       })
       .catch(() => {});
   }, []);
@@ -509,7 +519,17 @@ export default function ReportDetailPage() {
                       <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                         {s.type === "playlist" ? "Playlist" : "Groep"}
                       </span>
-                      <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                      {s.type === "group" && s.playlistGroupId ? (
+                        <span className="ml-2 inline-flex align-middle">
+                          <GroupChip
+                            name={s.name}
+                            color={s.groupColor}
+                            href={`/groups/${s.playlistGroupId}`}
+                          />
+                        </span>
+                      ) : (
+                        <span className="ml-2 font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                      )}
                       <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
                         {!s.include && " · uitgeschakeld"}
                       </span>
@@ -721,10 +741,18 @@ export default function ReportDetailPage() {
                 </p>
                 <ul className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
                   {groupSources.map((s) => (
-                    <li key={s.id}>
-                      <span className="font-medium">{s.name}</span>
+                    <li key={s.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {s.playlistGroupId ? (
+                        <GroupChip
+                          name={s.name}
+                          color={s.groupColor}
+                          href={`/groups/${s.playlistGroupId}`}
+                        />
+                      ) : (
+                        <span className="font-medium">{s.name}</span>
+                      )}
                       {s.expandedPlaylists?.length ? (
-                        <span>: {s.expandedPlaylists.join(", ")}</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">: {s.expandedPlaylists.join(", ")}</span>
                       ) : null}
                     </li>
                   ))}

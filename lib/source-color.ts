@@ -1,3 +1,5 @@
+import { normalizeGroupColor } from "@/lib/group-color";
+
 /**
  * Stabiele, toegankelijke accentkleur per bron-id (scheduler source of vergelijkbaar).
  * Zelfde id → zelfde hue over de hele app.
@@ -25,4 +27,14 @@ export function sourceColorCss(id: string): {
     textLight: `hsl(${h} 50% 22%)`,
     textDark: `hsl(${h} 45% 92%)`,
   };
+}
+
+/** Playlistgroep: echte groepskleur; anders stabiele hue per bron-id. */
+export function sourceSwatchBackground(
+  type: "playlist" | "group",
+  sourceId: string,
+  groupColor: string | null | undefined
+): string {
+  if (type === "group" && groupColor) return normalizeGroupColor(groupColor);
+  return `hsl(${sourceHueFromId(sourceId)} 58% 48%)`;
 }

@@ -11,14 +11,14 @@ async function getOwnedScheduler(id: string, userId: string) {
       sources: {
         include: {
           trackedPlaylist: { select: { id: true, name: true } },
-          playlistGroup: { select: { id: true, name: true } },
+          playlistGroup: { select: { id: true, name: true, color: true } },
         },
         orderBy: { id: "asc" as const },
       },
       clockSlots: {
         include: {
           trackedPlaylist: { select: { id: true, name: true } },
-          playlistGroup: { select: { id: true, name: true } },
+          playlistGroup: { select: { id: true, name: true, color: true } },
         },
         orderBy: { position: "asc" as const },
       },
@@ -28,7 +28,7 @@ async function getOwnedScheduler(id: string, userId: string) {
       overlapPreferences: {
         include: {
           trackedPlaylist: { select: { id: true, name: true } },
-          playlistGroup: { select: { id: true, name: true } },
+          playlistGroup: { select: { id: true, name: true, color: true } },
         },
         orderBy: { id: "asc" as const },
       },
@@ -68,6 +68,7 @@ export async function GET(
       rankBiasStrength: s.rankBiasStrength,
       type: s.trackedPlaylistId ? "playlist" : "group",
       name: s.trackedPlaylist?.name ?? s.playlistGroup?.name ?? "",
+      groupColor: s.playlistGroup?.color ?? null,
     })),
     clockSlots: scheduler.clockSlots.map((slot) => ({
       id: slot.id,
@@ -77,6 +78,7 @@ export async function GET(
       spotifyTrackId: slot.spotifyTrackId,
       type: slot.trackedPlaylistId ? "playlist" : slot.playlistGroupId ? "group" : "track",
       name: slot.trackedPlaylist?.name ?? slot.playlistGroup?.name ?? slot.spotifyTrackId ?? "",
+      groupColor: slot.playlistGroup?.color ?? null,
     })),
     rules: scheduler.rules.map((r) => ({
       id: r.id,
@@ -110,6 +112,7 @@ export async function GET(
       playlistGroupId: p.playlistGroupId,
       overlapPercent: p.overlapPercent,
       name: p.trackedPlaylist?.name ?? p.playlistGroup?.name ?? "",
+      groupColor: p.playlistGroup?.color ?? null,
     })),
   });
 }

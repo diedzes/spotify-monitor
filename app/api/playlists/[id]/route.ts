@@ -25,7 +25,7 @@ export async function GET(
       },
       groupPlaylists: {
         where: { group: { userId: session.user.id } },
-        include: { group: { select: { id: true, name: true } } },
+        include: { group: { select: { id: true, name: true, color: true } } },
       },
     },
   });
@@ -74,7 +74,11 @@ export async function GET(
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
       isMainPlaylist: playlist.isMainPlaylist,
-      groups: playlist.groupPlaylists.map((gp) => ({ id: gp.group.id, name: gp.group.name })),
+      groups: playlist.groupPlaylists.map((gp) => ({
+        id: gp.group.id,
+        name: gp.group.name,
+        color: gp.group.color,
+      })),
     },
     snapshots: playlist.snapshots.map((s) => ({
       id: s.id,

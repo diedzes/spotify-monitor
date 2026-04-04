@@ -3,11 +3,13 @@
  */
 
 import { prisma } from "@/lib/db";
+import { normalizeGroupColor } from "@/lib/group-color";
 
 export async function createPlaylistGroup(
   userId: string,
   name: string,
-  description?: string | null
+  description?: string | null,
+  color?: string | null
 ) {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Naam is verplicht");
@@ -16,7 +18,40 @@ export async function createPlaylistGroup(
       userId,
       name: trimmed,
       description: description?.trim() || null,
+      ...(color != null && String(color).trim() !== ""
+        ? { color: normalizeGroupColor(color) }
+        : {}),
     },
+  });
+}
+
+export async function updatePlaylistGroupForUser(
+  userId: string,
+  groupId: string,
+  patch: { name?: string; description?: string | null; color?: string }
+) {
+  const existing = await prisma.playlistGroup.findFirst({
+    where: { id: groupId, userId },
+  });
+  if (!existing) throw new Error("Groep niet gevonden");
+
+  const data: { name?: string; description?: string | null; color?: string } = {};
+  if (patch.name !== undefined) {
+    const t = patch.name.trim();
+    if (!t) throw new Error("Naam mag niet leeg zijn");
+    data.name = t;
+  }
+  if (patch.description !== undefined) {
+    data.description = patch.description === null ? null : patch.description.trim() || null;
+  }
+  if (patch.color !== undefined) {
+    data.color = normalizeGroupColor(patch.color);
+  }
+  if (Object.keys(data).length === 0) return existing;
+
+  return prisma.playlistGroup.update({
+    where: { id: groupId },
+    data,
   });
 }
 

@@ -52,6 +52,7 @@ export async function GET(
       include: s.include,
       type: s.trackedPlaylistId ? "playlist" : "group",
       name: s.trackedPlaylist?.name ?? s.playlistGroup?.name ?? "",
+      groupColor: s.playlistGroup?.color ?? null,
       trackCount: s.trackedPlaylist?.trackCount ?? null,
       followerCount: s.trackedPlaylist?.followerCount ?? null,
       expandedPlaylists:

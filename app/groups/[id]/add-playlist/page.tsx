@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { normalizeGroupColor } from "@/lib/group-color";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -30,7 +31,7 @@ type PlaylistOption = {
   groups: Array<{ id: string; name: string }>;
 };
 
-type GroupInfo = { id: string; name: string };
+type GroupInfo = { id: string; name: string; color: string };
 
 export default function AddPlaylistToGroupPage() {
   const params = useParams();
@@ -49,7 +50,12 @@ export default function AddPlaylistToGroupPage() {
       fetch("/api/playlists", { credentials: "include", headers }).then((r) => r.json()),
     ])
       .then(([groupRes, playlistsRes]) => {
-        if (groupRes.group) setGroup({ id: groupRes.group.id, name: groupRes.group.name });
+        if (groupRes.group)
+          setGroup({
+            id: groupRes.group.id,
+            name: groupRes.group.name,
+            color: groupRes.group.color ?? "#71717a",
+          });
         if (playlistsRes.playlists) {
           const inGroup = new Set(
             (groupRes.playlists as Array<{ trackedPlaylistId: string }>)?.map((p) => p.trackedPlaylistId) ?? []
@@ -106,7 +112,14 @@ export default function AddPlaylistToGroupPage() {
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+        <h1
+          className="mb-6 rounded-r-xl border border-zinc-200 border-l-4 py-3 pl-4 pr-3 text-2xl font-semibold tracking-tight text-zinc-900 dark:border-zinc-800 dark:text-zinc-100"
+          style={
+            group
+              ? { borderLeftColor: normalizeGroupColor(group.color) }
+              : undefined
+          }
+        >
           Playlist toevoegen aan {group?.name ?? "groep"}
         </h1>
         {error && (

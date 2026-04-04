@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { SubNavBar } from "@/components/SubNavBar";
-import { sourceHueFromId } from "@/lib/source-color";
+import { normalizeGroupColor } from "@/lib/group-color";
+import { sourceHueFromId, sourceSwatchBackground } from "@/lib/source-color";
 import { normalizeSchedulerRunRows, parseRunResultJson, type RunQualitySummary } from "@/lib/scheduler-run-result";
 import type { ScheduledRow } from "@/lib/scheduler-types";
 
@@ -37,6 +38,7 @@ type SchedulerSource = {
   rankBiasStrength: number | null;
   type: "playlist" | "group";
   name: string;
+  groupColor: string | null;
 };
 
 type SchedulerClockSlot = {
@@ -47,6 +49,7 @@ type SchedulerClockSlot = {
   spotifyTrackId: string | null;
   type: "playlist" | "group" | "track";
   name: string;
+  groupColor: string | null;
 };
 
 type SchedulerRule = {
@@ -92,6 +95,7 @@ type OverlapPreferenceRow = {
   playlistGroupId: string | null;
   overlapPercent: number;
   name: string;
+  groupColor: string | null;
 };
 
 type SchedulerDetail = {
@@ -113,7 +117,7 @@ type SchedulerDetail = {
   overlapPreferences: OverlapPreferenceRow[];
 };
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; color: string };
 
 type TabKey = "sources" | "clock" | "rules" | "reference" | "overlap" | "runs";
 
@@ -243,7 +247,15 @@ export default function SchedulerDetailPage() {
       .catch(() => {});
     fetch("/api/groups", { credentials: "include", headers: getSessionHeaders() })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setGroups((d?.groups ?? []).map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))))
+      .then((d) =>
+        setGroups(
+          (d?.groups ?? []).map((g: { id: string; name: string; color?: string }) => ({
+            id: g.id,
+            name: g.name,
+            color: g.color ?? "#71717a",
+          }))
+        )
+      )
       .catch(() => {});
   }, [id]);
 
@@ -1043,7 +1055,7 @@ export default function SchedulerDetailPage() {
                       <div className="flex items-center gap-2 text-sm">
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-zinc-800"
-                          style={{ backgroundColor: `hsl(${sourceHueFromId(s.id)} 58% 48%)` }}
+                          style={{ backgroundColor: sourceSwatchBackground(s.type, s.id, s.groupColor) }}
                           title="Bronkleur"
                           aria-hidden
                         />
@@ -1279,16 +1291,29 @@ export default function SchedulerDetailPage() {
                               </select>
                             )}
                             {d.kind === "group" && (
-                              <select
-                                value={d.groupId}
-                                onChange={(e) => updateClockDraft(position, { groupId: e.target.value })}
-                                className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                              >
-                                <option value="">— Kies groep —</option>
-                                {groups.map((o) => (
-                                  <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                              </select>
+                              <div className="flex w-full items-center gap-2">
+                                <select
+                                  value={d.groupId}
+                                  onChange={(e) => updateClockDraft(position, { groupId: e.target.value })}
+                                  className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                                >
+                                  <option value="">— Kies groep —</option>
+                                  {groups.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
+                                  ))}
+                                </select>
+                                {d.groupId ? (
+                                  <span
+                                    className="h-9 w-9 shrink-0 rounded-md border border-zinc-300 dark:border-zinc-600"
+                                    style={{
+                                      backgroundColor: normalizeGroupColor(
+                                        groups.find((o) => o.id === d.groupId)?.color
+                                      ),
+                                    }}
+                                    aria-hidden
+                                  />
+                                ) : null}
+                              </div>
                             )}
                             {d.kind === "track" && (
                               <input
@@ -1462,7 +1487,7 @@ export default function SchedulerDetailPage() {
                     <div className="flex min-w-[220px] flex-1 items-center gap-2 text-sm">
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: `hsl(${sourceHueFromId(s.id)} 58% 48%)` }}
+                        style={{ backgroundColor: sourceSwatchBackground(s.type, s.id, s.groupColor) }}
                         aria-hidden
                       />
                       <span className="text-zinc-500 dark:text-zinc-400">{s.type}</span>

@@ -64,7 +64,7 @@ export async function PUT(
     where: { schedulerId: id },
     include: {
       trackedPlaylist: { select: { id: true, name: true } },
-      playlistGroup: { select: { id: true, name: true } },
+      playlistGroup: { select: { id: true, name: true, color: true } },
     },
     orderBy: { id: "asc" },
   });
@@ -77,6 +77,7 @@ export async function PUT(
       playlistGroupId: p.playlistGroupId,
       overlapPercent: p.overlapPercent,
       name: p.trackedPlaylist?.name ?? p.playlistGroup?.name ?? "",
+      groupColor: p.playlistGroup?.color ?? null,
     })),
   });
 }

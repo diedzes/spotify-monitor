@@ -70,6 +70,47 @@ export default async function DashboardPage({ searchParams }: Props) {
           Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
         </p>
 
+        {recentProjects.length > 0 && (
+          <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Recent projects</h2>
+            <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+              Laatst bijgewerkte reports en schedulers — direct verder werken.
+            </p>
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {recentProjects.map((p) => (
+                <li key={`${p.kind}-${p.id}`}>
+                  <a
+                    href={
+                      signedId
+                        ? `${p.kind === "report" ? `/reports/${p.id}` : `/scheduler/${p.id}`}?sid=${encodeURIComponent(signedId)}`
+                        : p.kind === "report"
+                          ? `/reports/${p.id}`
+                          : `/scheduler/${p.id}`
+                    }
+                    className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={
+                          p.kind === "report"
+                            ? "shrink-0 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-900/50 dark:text-violet-200"
+                            : "shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
+                        }
+                      >
+                        {p.kind === "report" ? "Report" : "Scheduler"}
+                      </span>
+                      <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                      {p.updatedAt.toLocaleString("nl-NL")}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
@@ -206,46 +247,6 @@ export default async function DashboardPage({ searchParams }: Props) {
           )}
         </section>
 
-        {recentProjects.length > 0 && (
-          <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Recent projects</h2>
-            <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-              Laatst bijgewerkte reports en schedulers — direct verder werken.
-            </p>
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {recentProjects.map((p) => (
-                <li key={`${p.kind}-${p.id}`}>
-                  <a
-                    href={
-                      signedId
-                        ? `${p.kind === "report" ? `/reports/${p.id}` : `/scheduler/${p.id}`}?sid=${encodeURIComponent(signedId)}`
-                        : p.kind === "report"
-                          ? `/reports/${p.id}`
-                          : `/scheduler/${p.id}`
-                    }
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className={
-                          p.kind === "report"
-                            ? "shrink-0 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-900/50 dark:text-violet-200"
-                            : "shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
-                        }
-                      >
-                        {p.kind === "report" ? "Report" : "Scheduler"}
-                      </span>
-                      <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
-                    </div>
-                    <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                      {p.updatedAt.toLocaleString("nl-NL")}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
         <div className="mb-8 grid gap-4 sm:grid-cols-2">
           <a
             href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"}

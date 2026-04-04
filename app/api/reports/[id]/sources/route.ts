@@ -80,7 +80,7 @@ export async function POST(
     },
     include: {
       trackedPlaylist: { select: { id: true, name: true } },
-      playlistGroup: { select: { id: true, name: true } },
+      playlistGroup: { select: { id: true, name: true, color: true } },
     },
   });
   return NextResponse.json({
@@ -93,6 +93,7 @@ export async function POST(
       include: source.include,
       type: source.trackedPlaylistId ? "playlist" : "group",
       name: source.trackedPlaylist?.name ?? source.playlistGroup?.name ?? "",
+      groupColor: source.playlistGroup?.color ?? null,
     },
   });
 }

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { GroupChip } from "@/components/GroupChip";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -59,7 +60,7 @@ type PlaylistDetail = {
     trackCount: number;
     lastSyncedAt: string | null;
     snapshotId: string | null;
-    groups?: Array<{ id: string; name: string }>;
+    groups?: Array<{ id: string; name: string; color: string }>;
   };
   snapshots: Array<{
     id: string;
@@ -275,12 +276,7 @@ export default function PlaylistDetailPage() {
             <ul className="flex flex-wrap gap-2">
               {playlist.groups?.map((g) => (
                 <li key={g.id}>
-                  <Link
-                    href={`/groups/${g.id}`}
-                    className="rounded bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-500"
-                  >
-                    {g.name}
-                  </Link>
+                  <GroupChip name={g.name} color={g.color} href={`/groups/${g.id}`} className="text-sm py-1" />
                 </li>
               ))}
             </ul>
