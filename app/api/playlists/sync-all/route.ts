@@ -29,13 +29,11 @@ export async function POST(request: Request): Promise<NextResponse<SyncAllRespon
 
   const errors: Array<{ playlistId: string; error: string }> = [];
   let synced = 0;
-  let anySnapshotChanged = false;
 
   for (const p of playlists) {
     const result = await syncTrackedPlaylist(p.id, session.access_token);
     if (result.ok) {
       synced++;
-      if (result.changed) anySnapshotChanged = true;
     } else {
       errors.push({ playlistId: p.id, error: result.error });
     }
@@ -44,7 +42,7 @@ export async function POST(request: Request): Promise<NextResponse<SyncAllRespon
   let hitlistNewMatches = 0;
   let hitlistRemovedMatches = 0;
   let hitlistSampleNew: Array<{ title: string; artistLabel: string; playlistName: string }> = [];
-  if (anySnapshotChanged) {
+  if (synced > 0) {
     const hit = await rebuildOrUpdateHitlistForUser(session.user.id);
     hitlistNewMatches = hit.newMatches;
     hitlistRemovedMatches = hit.removedMatches;

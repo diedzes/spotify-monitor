@@ -6,6 +6,9 @@ import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { formatArtistsLabel, getActiveHitlist, getRecentlyRemovedHitlist, spotifyTrackHref } from "@/lib/hitlist";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function DashboardPage({ searchParams }: Props) {

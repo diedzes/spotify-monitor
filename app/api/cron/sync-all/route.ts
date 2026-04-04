@@ -100,15 +100,12 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
 
     let synced = 0;
     let failed = 0;
-    let anyChanged = false;
     for (const p of playlists) {
       const result = await syncTrackedPlaylist(p.id, session.access_token);
-      if (result.ok) {
-        synced++;
-        if (result.changed) anyChanged = true;
-      } else failed++;
+      if (result.ok) synced++;
+      else failed++;
     }
-    if (anyChanged) {
+    if (synced > 0) {
       try {
         await rebuildOrUpdateHitlistForUser(session.user.id);
       } catch {

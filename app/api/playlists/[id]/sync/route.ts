@@ -35,7 +35,9 @@ export async function POST(
   let hitlistNewMatches = 0;
   let hitlistRemovedMatches = 0;
   let hitlistSampleNew: Array<{ title: string; artistLabel: string; playlistName: string }> = [];
-  if (result.changed && !deferHitlist) {
+  // Altijd herbouwen na geslaagde sync (niet alleen bij changed): andere playlists/main-wijzigingen
+  // en nieuwe hitlist-logica moeten direct zichtbaar zijn op het dashboard.
+  if (!deferHitlist) {
     const hit = await rebuildOrUpdateHitlistForUser(session.user.id);
     hitlistNewMatches = hit.newMatches;
     hitlistRemovedMatches = hit.removedMatches;

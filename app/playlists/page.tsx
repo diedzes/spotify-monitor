@@ -394,7 +394,6 @@ function PlaylistsPageContent() {
     const ids = Array.from(selectedIds);
     let synced = 0;
     const errors: string[] = [];
-    let anyChanged = false;
     const headers = getSessionHeaders(sidFromUrl);
     for (const id of ids) {
       try {
@@ -406,7 +405,6 @@ function PlaylistsPageContent() {
         const data = (await res.json()) as { ok?: boolean; error?: string; changed?: boolean };
         if (res.ok && data.ok) {
           synced += 1;
-          if (data.changed) anyChanged = true;
         } else errors.push(data.error ?? "Sync mislukt");
       } catch {
         errors.push("Sync mislukt");
@@ -415,7 +413,7 @@ function PlaylistsPageContent() {
     setBulkSyncResult({ synced, failed: ids.length - synced, errors });
     setBulkSyncLoading(false);
     await refreshPlaylists();
-    if (anyChanged) {
+    if (synced > 0) {
       try {
         const r = await fetch("/api/hitlist/rebuild", {
           method: "POST",
