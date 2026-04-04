@@ -10,6 +10,30 @@ function matchKey(mainId: string, matchedId: string, trackId: string): string {
   return `${mainId}|${matchedId}|${trackId}`;
 }
 
+/** Zwakkere match voor hetzelfde nummer met verschillende Spotify track-ids (bijv. regionale releases). */
+export function trackCanonicalKey(title: string, artistsJson: string): string | null {
+  const t = title.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!t) return null;
+  let first = "";
+  try {
+    const arr = JSON.parse(artistsJson) as Array<{ name?: string }>;
+    if (Array.isArray(arr) && arr[0]?.name) first = arr[0].name.trim().toLowerCase();
+  } catch {
+    return null;
+  }
+  if (!first) return null;
+  return `${first}\u0000${t}`;
+}
+
+function canonicalSetForPlaylist(trackMap: Map<string, { title: string; artistsJson: string }>): Set<string> {
+  const s = new Set<string>();
+  for (const meta of trackMap.values()) {
+    const c = trackCanonicalKey(meta.title, meta.artistsJson);
+    if (c) s.add(c);
+  }
+  return s;
+}
+
 export function formatArtistsLabel(artistsJson: string): string {
   try {
     const arr = JSON.parse(artistsJson) as Array<{ name?: string }>;
@@ -25,9 +49,11 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 }
 
 /**
- * Herberekent hitlist-matches op basis van de nieuwste snapshot per tracked playlist.
- * - Nieuwe intersecties → insert (firstDetectedAt = now) of heractiveer bestaande rij (zelfde unieke key) met removedAt=null.
- * - Verdwenen intersecties → isActive=false, removedAt=now (alleen als nog actief).
+ * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
+ * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
+ * - Match 1: dezelfde spotifyTrackId op main en andere playlist.
+ * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
+ * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
  */
 export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<HitlistRebuildResult> {
   const playlists = await prisma.trackedPlaylist.findMany({
@@ -36,14 +62,20 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
       id: true,
       name: true,
       isMainPlaylist: true,
-      snapshots: { orderBy: { syncedAt: "desc" }, take: 1, select: { id: true } },
+      snapshots: {
+        orderBy: { syncedAt: "desc" },
+        take: 12,
+        select: { id: true, _count: { select: { tracks: true } } },
+      },
     },
   });
 
   const snapshotToPlaylist = new Map<string, string>();
   const snapshotIds: string[] = [];
   for (const p of playlists) {
-    const sid = p.snapshots[0]?.id;
+    const withTracks = p.snapshots.find((s) => s._count.tracks > 0);
+    const chosen = withTracks ?? p.snapshots[0];
+    const sid = chosen?.id;
     if (sid) {
       snapshotToPlaylist.set(sid, p.id);
       snapshotIds.push(sid);
@@ -75,6 +107,11 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     { mainId: string; matchedId: string; trackId: string; title: string; artistsJson: string }
   >();
 
+  const canonByPlaylist = new Map<string, Set<string>>();
+  for (const [plId, tm] of playlistTracks) {
+    canonByPlaylist.set(plId, canonicalSetForPlaylist(tm));
+  }
+
   const mains = playlists.filter((p) => p.isMainPlaylist);
   for (const main of mains) {
     const mainMap = playlistTracks.get(main.id);
@@ -83,9 +120,19 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
       if (other.id === main.id) continue;
       const otherMap = playlistTracks.get(other.id);
       if (!otherMap) continue;
+      const otherCanons = canonByPlaylist.get(other.id);
+      if (!otherCanons) continue;
+
       for (const [trackId, meta] of mainMap) {
-        if (!otherMap.has(trackId)) continue;
         const key = matchKey(main.id, other.id, trackId);
+        const byId = otherMap.has(trackId);
+        let match = byId;
+        if (!match) {
+          const c = trackCanonicalKey(meta.title, meta.artistsJson);
+          if (c && otherCanons.has(c)) match = true;
+        }
+        if (!match) continue;
+
         desired.set(key, {
           mainId: main.id,
           matchedId: other.id,
