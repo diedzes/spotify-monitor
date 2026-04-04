@@ -157,6 +157,16 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
+    // Rijen waarvan de 'main'-playlist geen main meer is (bijv. vóór een eerdere fix) blijven anders actief.
+    await tx.hitlistMatch.updateMany({
+      where: {
+        userId,
+        isActive: true,
+        mainPlaylist: { isMainPlaylist: false },
+      },
+      data: { isActive: false, removedAt: now },
+    });
+
     for (const [, d] of desired) {
       const key = matchKey(d.mainId, d.matchedId, d.trackId);
       const row = existingByKey.get(key);
@@ -230,7 +240,11 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
 
 export async function getActiveHitlist(userId: string) {
   return prisma.hitlistMatch.findMany({
-    where: { userId, isActive: true },
+    where: {
+      userId,
+      isActive: true,
+      mainPlaylist: { isMainPlaylist: true },
+    },
     orderBy: { firstDetectedAt: "desc" },
     include: {
       mainPlaylist: { select: { id: true, name: true } },
