@@ -136,17 +136,21 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               ) : (
                 <div className="mb-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <table className="w-full min-w-[640px] text-left text-sm">
+                  <table className="w-full min-w-[800px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Main playlist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added to playlist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added at</th>
                       </tr>
                     </thead>
                     <tbody>
                       {activeHitlist.map((row) => {
+                        const mainHref = signedId
+                          ? `/playlists/${row.mainPlaylist.id}?sid=${encodeURIComponent(signedId)}`
+                          : `/playlists/${row.mainPlaylist.id}`;
                         const plHref = signedId
                           ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
                           : `/playlists/${row.matchedPlaylist.id}`;
@@ -169,6 +173,11 @@ export default async function DashboardPage({ searchParams }: Props) {
                               ) : (
                                 <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
                               )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Link href={mainHref} className="text-[#1DB954] hover:underline">
+                                {row.mainPlaylist.name}
+                              </Link>
                             </td>
                             <td className="px-3 py-2">
                               <Link href={plHref} className="text-[#1DB954] hover:underline">
@@ -193,17 +202,21 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <table className="w-full min-w-[640px] text-left text-sm">
+                  <table className="w-full min-w-[800px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Main playlist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed from playlist</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed at</th>
                       </tr>
                     </thead>
                     <tbody>
                       {removedHitlist.map((row) => {
+                        const mainHref = signedId
+                          ? `/playlists/${row.mainPlaylist.id}?sid=${encodeURIComponent(signedId)}`
+                          : `/playlists/${row.mainPlaylist.id}`;
                         const plHref = signedId
                           ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
                           : `/playlists/${row.matchedPlaylist.id}`;
@@ -227,6 +240,11 @@ export default async function DashboardPage({ searchParams }: Props) {
                               ) : (
                                 <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
                               )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Link href={mainHref} className="text-[#1DB954] hover:underline">
+                                {row.mainPlaylist.name}
+                              </Link>
                             </td>
                             <td className="px-3 py-2">
                               <Link href={plHref} className="text-[#1DB954] hover:underline">
