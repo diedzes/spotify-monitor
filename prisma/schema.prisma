@@ -36,6 +36,7 @@ model TrackedPlaylist {
   followerCount     Int                @default(0)
   isPublic          Boolean            @default(true)
   isCollaborative   Boolean            @default(false)
+  isMainPlaylist    Boolean            @default(false)
   lastSyncedAt      DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -45,9 +46,35 @@ model TrackedPlaylist {
   schedulerSources  SchedulerSource[]
   schedulerClockSlots SchedulerClockSlot[]
   schedulerOverlapPreferences SchedulerOverlapPreference[]
+  hitlistMatchesAsMain    HitlistMatch[] @relation("HitlistMain")
+  hitlistMatchesAsMatched HitlistMatch[] @relation("HitlistMatched")
 
   @@unique([userId, spotifyPlaylistId])
   @@map("tracked_playlists")
+}
+
+model HitlistMatch {
+  id                       String   @id @default(cuid())
+  userId                   String
+  spotifyTrackId           String
+  title                    String
+  artistsJson              String
+  mainTrackedPlaylistId    String
+  matchedTrackedPlaylistId String
+  firstDetectedAt          DateTime
+  lastSeenAt               DateTime
+  removedAt                DateTime?
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  mainPlaylist    TrackedPlaylist @relation("HitlistMain", fields: [mainTrackedPlaylistId], references: [id], onDelete: Cascade)
+  matchedPlaylist TrackedPlaylist @relation("HitlistMatched", fields: [matchedTrackedPlaylistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, spotifyTrackId, mainTrackedPlaylistId, matchedTrackedPlaylistId])
+  @@index([userId, isActive])
+  @@index([userId, removedAt])
+  @@map("hitlist_matches")
 }
 
 model PlaylistGroup {

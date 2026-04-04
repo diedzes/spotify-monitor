@@ -33,6 +33,7 @@ type PlaylistRow = {
   lastSyncedAt: string | null;
   spotifyPlaylistId: string;
   isPublic: boolean;
+  isMainPlaylist: boolean;
   groups: Array<{ id: string; name: string }>;
 };
 
@@ -45,6 +46,7 @@ function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
 
 type SyncStatusFilter = "all" | "never" | "synced";
 type IsPublicFilter = "all" | "public" | "private";
+type MainPlaylistFilter = "all" | "main" | "nonmain";
 type SortOption =
   | "name_asc"
   | "name_desc"
@@ -60,6 +62,7 @@ function filterAndSort(
   filterGroup: string,
   filterSyncStatus: SyncStatusFilter,
   filterIsPublic: IsPublicFilter,
+  filterMain: MainPlaylistFilter,
   sortBy: SortOption
 ): PlaylistRow[] {
   let list = playlists;
@@ -83,6 +86,11 @@ function filterAndSort(
     list = list.filter((p) => p.isPublic);
   } else if (filterIsPublic === "private") {
     list = list.filter((p) => !p.isPublic);
+  }
+  if (filterMain === "main") {
+    list = list.filter((p) => p.isMainPlaylist);
+  } else if (filterMain === "nonmain") {
+    list = list.filter((p) => !p.isMainPlaylist);
   }
 
   const sorted = [...list].sort((a, b) => {
@@ -112,6 +120,23 @@ function filterAndSort(
   return sorted;
 }
 
+function formatHitlistSummary(
+  newM: number,
+  removed: number,
+  sample?: Array<{ title: string; artistLabel: string; playlistName: string }>
+): string | null {
+  if (newM === 0 && removed === 0) return null;
+  const parts: string[] = [];
+  if (newM > 0) parts.push(`${newM} new hitlist match${newM === 1 ? "" : "es"} found`);
+  if (removed > 0) parts.push(`${removed} match${removed === 1 ? "" : "es"} removed`);
+  let s = parts.join(" · ");
+  if (sample && sample.length > 0 && newM > 0) {
+    const bits = sample.slice(0, 3).map((x) => `${x.title} → ${x.playlistName}`);
+    s += ` — ${bits.join("; ")}`;
+  }
+  return s;
+}
+
 function PlaylistsPageContent() {
   const searchParams = useSearchParams();
   const sidFromUrl = searchParams.get("sid");
@@ -130,6 +155,7 @@ function PlaylistsPageContent() {
   const [filterGroup, setFilterGroup] = useState("");
   const [filterSyncStatus, setFilterSyncStatus] = useState<SyncStatusFilter>("all");
   const [filterIsPublic, setFilterIsPublic] = useState<IsPublicFilter>("all");
+  const [filterMain, setFilterMain] = useState<MainPlaylistFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name_asc");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -143,6 +169,9 @@ function PlaylistsPageContent() {
   const [bulkAddResult, setBulkAddResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
   const [bulkSyncLoading, setBulkSyncLoading] = useState(false);
   const [bulkSyncResult, setBulkSyncResult] = useState<{ synced: number; failed: number; errors: string[] } | null>(null);
+  const [hitlistNotice, setHitlistNotice] = useState<string | null>(null);
+  const [mainToggleLoading, setMainToggleLoading] = useState<string | null>(null);
+  const [bulkMainLoading, setBulkMainLoading] = useState(false);
 
   const refreshPlaylists = useCallback(() => {
     const h = getSessionHeaders(sidFromUrl);
@@ -150,7 +179,13 @@ function PlaylistsPageContent() {
     return fetch("/api/playlists", { credentials: "include", headers: h })
       .then((res) => res.json())
       .then((data: { playlists?: PlaylistRow[] }) => {
-        if (data?.playlists) setPlaylists(data.playlists);
+        if (data?.playlists)
+          setPlaylists(
+            data.playlists.map((p) => ({
+              ...p,
+              isMainPlaylist: !!p.isMainPlaylist,
+            }))
+          );
       });
   }, [sidFromUrl]);
 
@@ -170,7 +205,12 @@ function PlaylistsPageContent() {
         const d = data as { user?: { name: string | null; email: string | null }; playlists?: PlaylistRow[] };
         if (d?.user) {
           setUser(d.user);
-          setPlaylists(d.playlists ?? []);
+          setPlaylists(
+            (d.playlists ?? []).map((p) => ({
+              ...p,
+              isMainPlaylist: !!(p as PlaylistRow).isMainPlaylist,
+            }))
+          );
         }
         setLoading(false);
       })
@@ -186,9 +226,10 @@ function PlaylistsPageContent() {
         filterGroup,
         filterSyncStatus,
         filterIsPublic,
+        filterMain,
         sortBy
       ),
-    [playlists, filterSearch, filterOwner, filterGroup, filterSyncStatus, filterIsPublic, sortBy]
+    [playlists, filterSearch, filterOwner, filterGroup, filterSyncStatus, filterIsPublic, filterMain, sortBy]
   );
 
   const uniqueOwners = useMemo(() => [...new Set(playlists.map((p) => p.ownerName))].sort(), [playlists]);
@@ -222,6 +263,7 @@ function PlaylistsPageContent() {
   const handleSyncAll = useCallback(async () => {
     setSyncError(null);
     setSyncAllResult(null);
+    setHitlistNotice(null);
     setSyncAllLoading(true);
     try {
       const res = await fetch("/api/playlists/sync-all", {
@@ -229,7 +271,15 @@ function PlaylistsPageContent() {
         credentials: "include",
         headers: getSessionHeaders(sidFromUrl),
       });
-      const data = (await res.json()) as { synced?: number; failed?: number; errors?: Array<{ playlistId: string; error: string }>; error?: string };
+      const data = (await res.json()) as {
+        synced?: number;
+        failed?: number;
+        errors?: Array<{ playlistId: string; error: string }>;
+        error?: string;
+        hitlistNewMatches?: number;
+        hitlistRemovedMatches?: number;
+        hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+      };
       if (res.status === 401) return;
       if (!res.ok) {
         setSyncError(typeof data.error === "string" ? data.error : "Sync all mislukt");
@@ -241,6 +291,12 @@ function PlaylistsPageContent() {
         failed: data.failed ?? 0,
         errors: data.errors ?? [],
       });
+      const hl = formatHitlistSummary(
+        data.hitlistNewMatches ?? 0,
+        data.hitlistRemovedMatches ?? 0,
+        data.hitlistSampleNew
+      );
+      setHitlistNotice(hl);
       await refreshPlaylists();
     } catch {
       setSyncError("Sync all mislukt");
@@ -319,21 +375,25 @@ function PlaylistsPageContent() {
 
   const handleBulkSyncSelected = useCallback(async () => {
     setBulkSyncResult(null);
+    setHitlistNotice(null);
     setBulkSyncLoading(true);
     const ids = Array.from(selectedIds);
     let synced = 0;
     const errors: string[] = [];
+    let anyChanged = false;
     const headers = getSessionHeaders(sidFromUrl);
     for (const id of ids) {
       try {
-        const res = await fetch(`/api/playlists/${id}/sync`, {
+        const res = await fetch(`/api/playlists/${id}/sync?deferHitlist=1`, {
           method: "POST",
           credentials: "include",
           headers,
         });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (res.ok && data.ok) synced += 1;
-        else errors.push(data.error ?? "Sync mislukt");
+        const data = (await res.json()) as { ok?: boolean; error?: string; changed?: boolean };
+        if (res.ok && data.ok) {
+          synced += 1;
+          if (data.changed) anyChanged = true;
+        } else errors.push(data.error ?? "Sync mislukt");
       } catch {
         errors.push("Sync mislukt");
       }
@@ -341,7 +401,111 @@ function PlaylistsPageContent() {
     setBulkSyncResult({ synced, failed: ids.length - synced, errors });
     setBulkSyncLoading(false);
     await refreshPlaylists();
+    if (anyChanged) {
+      try {
+        const r = await fetch("/api/hitlist/rebuild", {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+        });
+        const hit = (await r.json()) as {
+          ok?: boolean;
+          newMatches?: number;
+          removedMatches?: number;
+          sampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (r.ok && hit.ok) {
+          const hl = formatHitlistSummary(hit.newMatches ?? 0, hit.removedMatches ?? 0, hit.sampleNew);
+          setHitlistNotice(hl);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }, [sidFromUrl, selectedIds, refreshPlaylists]);
+
+  const toggleMainPlaylist = useCallback(
+    async (playlistId: string, nextMain: boolean) => {
+      setHitlistNotice(null);
+      setMainToggleLoading(playlistId);
+      try {
+        const res = await fetch(`/api/playlists/${playlistId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+          body: JSON.stringify({ isMainPlaylist: nextMain }),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          hitlistNewMatches?: number;
+          hitlistRemovedMatches?: number;
+          hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (!res.ok || !data.ok) {
+          setSyncError(data.error ?? "Main-markering mislukt");
+          return;
+        }
+        setPlaylists((prev) =>
+          prev.map((p) => (p.id === playlistId ? { ...p, isMainPlaylist: nextMain } : p))
+        );
+        const hl = formatHitlistSummary(
+          data.hitlistNewMatches ?? 0,
+          data.hitlistRemovedMatches ?? 0,
+          data.hitlistSampleNew
+        );
+        setHitlistNotice(hl);
+      } catch {
+        setSyncError("Main-markering mislukt");
+      } finally {
+        setMainToggleLoading(null);
+      }
+    },
+    [sidFromUrl]
+  );
+
+  const handleBulkMain = useCallback(
+    async (isMain: boolean) => {
+      if (selectedIds.size === 0) return;
+      setHitlistNotice(null);
+      setBulkMainLoading(true);
+      try {
+        const res = await fetch("/api/playlists/bulk-main", {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+          body: JSON.stringify({ trackedPlaylistIds: Array.from(selectedIds), isMainPlaylist: isMain }),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          hitlistNewMatches?: number;
+          hitlistRemovedMatches?: number;
+          hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (!res.ok || !data.ok) {
+          setSyncError(data.error ?? "Bulk main mislukt");
+          return;
+        }
+        const sel = new Set(selectedIds);
+        setPlaylists((prev) =>
+          prev.map((p) => (sel.has(p.id) ? { ...p, isMainPlaylist: isMain } : p))
+        );
+        const hl = formatHitlistSummary(
+          data.hitlistNewMatches ?? 0,
+          data.hitlistRemovedMatches ?? 0,
+          data.hitlistSampleNew
+        );
+        setHitlistNotice(hl);
+        clearSelection();
+      } catch {
+        setSyncError("Bulk main mislukt");
+      } finally {
+        setBulkMainLoading(false);
+      }
+    },
+    [sidFromUrl, selectedIds, clearSelection]
+  );
 
   const openBulkAddModal = useCallback(() => {
     setBulkAddResult(null);
@@ -431,6 +595,11 @@ function PlaylistsPageContent() {
         </div>
 
         {syncError && <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{syncError}</p>}
+        {hitlistNotice && (
+          <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+            <strong>Hitlist:</strong> {hitlistNotice}
+          </div>
+        )}
         {syncAllResult && (
           <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
             <p className="font-medium text-zinc-900 dark:text-zinc-100">
@@ -495,6 +664,15 @@ function PlaylistsPageContent() {
             <option value="private">Privé</option>
           </select>
           <select
+            value={filterMain}
+            onChange={(e) => setFilterMain(e.target.value as MainPlaylistFilter)}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+          >
+            <option value="all">Main: alle playlists</option>
+            <option value="main">Alleen main playlists</option>
+            <option value="nonmain">Geen main playlists</option>
+          </select>
+          <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -528,6 +706,22 @@ function PlaylistsPageContent() {
               className="rounded-full bg-[#1DB954] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
             >
               {bulkSyncLoading ? "Sync selected…" : "Sync selected"}
+            </button>
+            <button
+              type="button"
+              disabled={bulkMainLoading}
+              onClick={() => void handleBulkMain(true)}
+              className="rounded-full border border-amber-500/60 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
+            >
+              {bulkMainLoading ? "…" : "Mark selected as main"}
+            </button>
+            <button
+              type="button"
+              disabled={bulkMainLoading}
+              onClick={() => void handleBulkMain(false)}
+              className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            >
+              Unmark main
             </button>
             <button
               type="button"
@@ -568,6 +762,7 @@ function PlaylistsPageContent() {
                     />
                   ) : null}
                 </th>
+                <th className="px-3 py-3 font-medium text-zinc-900 dark:text-zinc-100">Main</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Naam</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Owner</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groepen</th>
@@ -579,7 +774,7 @@ function PlaylistsPageContent() {
             <tbody>
               {filteredPlaylists.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     {playlists.length === 0
                       ? "Nog geen playlists. Klik op \"Add playlist\" om een Spotify playlist toe te voegen."
                       : "Geen playlists voldoen aan de filters."}
@@ -596,6 +791,23 @@ function PlaylistsPageContent() {
                         aria-label={`Selecteer ${p.name}`}
                         className="h-4 w-4 rounded border-zinc-300 text-[#1DB954] focus:ring-[#1DB954]"
                       />
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={p.isMainPlaylist}
+                          disabled={mainToggleLoading === p.id}
+                          onChange={(e) => void toggleMainPlaylist(p.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+                          title="Main playlist (bron voor Hitlist)"
+                        />
+                        {p.isMainPlaylist && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                            Main
+                          </span>
+                        )}
+                      </label>
                     </td>
                     <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">
                       <Link href={`/playlists/${p.id}`} className="hover:underline">
@@ -635,6 +847,7 @@ function PlaylistsPageContent() {
                           disabled={syncingId === p.id}
                           onClick={async () => {
                             setSyncError(null);
+                            setHitlistNotice(null);
                             setSyncingId(p.id);
                             try {
                               const res = await fetch(`/api/playlists/${p.id}/sync`, {
@@ -642,9 +855,23 @@ function PlaylistsPageContent() {
                                 credentials: "include",
                                 headers: getSessionHeaders(sidFromUrl),
                               });
-                              const data = (await res.json()) as { ok?: boolean; error?: string };
+                              const data = (await res.json()) as {
+                                ok?: boolean;
+                                error?: string;
+                                hitlistNewMatches?: number;
+                                hitlistRemovedMatches?: number;
+                                hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+                              };
                               if (!res.ok || !data.ok) setSyncError(data.error ?? "Sync mislukt");
-                              else await refreshPlaylists();
+                              else {
+                                const hl = formatHitlistSummary(
+                                  data.hitlistNewMatches ?? 0,
+                                  data.hitlistRemovedMatches ?? 0,
+                                  data.hitlistSampleNew
+                                );
+                                setHitlistNotice(hl);
+                                await refreshPlaylists();
+                              }
                             } catch {
                               setSyncError("Sync mislukt");
                             } finally {

@@ -4,6 +4,7 @@ import { getSpotifySession, getSessionFromSignedValue, getSessionSignedIdFromCoo
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
+import { formatArtistsLabel, getActiveHitlist, getRecentlyRemovedHitlist, spotifyTrackHref } from "@/lib/hitlist";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -24,18 +25,22 @@ export default async function DashboardPage({ searchParams }: Props) {
     redirect("/");
   }
 
-  const [trackedPlaylistCount, reportCount, recentReports, recentSchedulers] = await Promise.all([
-    prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
-    prisma.report.count({ where: { userId: session.user.id } }),
-    prisma.report.findMany({
-      where: { userId: session.user.id },
-      select: { id: true, name: true, updatedAt: true },
-    }),
-    prisma.scheduler.findMany({
-      where: { userId: session.user.id },
-      select: { id: true, name: true, updatedAt: true },
-    }),
-  ]);
+  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlist, removedHitlist] =
+    await Promise.all([
+      prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
+      prisma.trackedPlaylist.count({ where: { userId: session.user.id, isMainPlaylist: true } }),
+      prisma.report.count({ where: { userId: session.user.id } }),
+      prisma.report.findMany({
+        where: { userId: session.user.id },
+        select: { id: true, name: true, updatedAt: true },
+      }),
+      prisma.scheduler.findMany({
+        where: { userId: session.user.id },
+        select: { id: true, name: true, updatedAt: true },
+      }),
+      getActiveHitlist(session.user.id),
+      getRecentlyRemovedHitlist(session.user.id, 14),
+    ]);
 
   type RecentItem =
     | { kind: "report"; id: string; name: string; updatedAt: Date }
@@ -64,6 +69,142 @@ export default async function DashboardPage({ searchParams }: Props) {
         <p className="mb-8 text-zinc-600 dark:text-zinc-400">
           Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
         </p>
+
+        <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
+          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+            Tracks uit je main playlists die ook op andere tracked playlists staan. Wordt bijgewerkt na sync.
+          </p>
+          {mainPlaylistCount === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+              Nog geen main playlists. Markeer playlists op{" "}
+              <a
+                href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"}
+                className="text-[#1DB954] hover:underline"
+              >
+                Playlists
+              </a>{" "}
+              als main om matches te zien.
+            </p>
+          ) : (
+            <>
+              <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Active Hitlist</h3>
+              {activeHitlist.length === 0 ? (
+                <p className="mb-6 rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  Geen actieve matches. Na een sync verschijnen hier nummers die op een main playlist én elders staan.
+                </p>
+              ) : (
+                <div className="mb-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added to playlist</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added at</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeHitlist.map((row) => {
+                        const plHref = signedId
+                          ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
+                          : `/playlists/${row.matchedPlaylist.id}`;
+                        const trackHref = spotifyTrackHref(row.spotifyTrackId);
+                        return (
+                          <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                            <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                              {formatArtistsLabel(row.artistsJson)}
+                            </td>
+                            <td className="px-3 py-2">
+                              {trackHref ? (
+                                <a
+                                  href={trackHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-[#1DB954] hover:underline"
+                                >
+                                  {row.title}
+                                </a>
+                              ) : (
+                                <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Link href={plHref} className="text-[#1DB954] hover:underline">
+                                {row.matchedPlaylist.name}
+                              </Link>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                              {row.firstDetectedAt.toLocaleString("nl-NL")}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Removed in last 14 days</h3>
+              {removedHitlist.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  Geen recent verwijderde matches.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed from playlist</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed at</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {removedHitlist.map((row) => {
+                        const plHref = signedId
+                          ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
+                          : `/playlists/${row.matchedPlaylist.id}`;
+                        const trackHref = spotifyTrackHref(row.spotifyTrackId);
+                        const removedAt = row.removedAt;
+                        return (
+                          <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                            <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                              {formatArtistsLabel(row.artistsJson)}
+                            </td>
+                            <td className="px-3 py-2">
+                              {trackHref ? (
+                                <a
+                                  href={trackHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-[#1DB954] hover:underline"
+                                >
+                                  {row.title}
+                                </a>
+                              ) : (
+                                <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Link href={plHref} className="text-[#1DB954] hover:underline">
+                                {row.matchedPlaylist.name}
+                              </Link>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                              {removedAt ? removedAt.toLocaleString("nl-NL") : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </section>
 
         {recentProjects.length > 0 && (
           <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">

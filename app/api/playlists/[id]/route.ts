@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
+import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ export async function GET(
       trackCount: playlist.trackCount,
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
+      isMainPlaylist: playlist.isMainPlaylist,
       groups: playlist.groupPlaylists.map((gp) => ({ id: gp.group.id, name: gp.group.name })),
     },
     snapshots: playlist.snapshots.map((s) => ({
@@ -81,5 +83,42 @@ export async function GET(
       trackCount: s._count.tracks,
     })),
     latestTracks,
+  });
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSpotifySessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+
+  const { id } = await params;
+  let body: { isMainPlaylist?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+  }
+  if (typeof body.isMainPlaylist !== "boolean") {
+    return NextResponse.json({ error: "isMainPlaylist (boolean) is verplicht" }, { status: 400 });
+  }
+
+  const updated = await prisma.trackedPlaylist.updateMany({
+    where: { id, userId: session.user.id },
+    data: { isMainPlaylist: body.isMainPlaylist },
+  });
+  if (updated.count === 0) {
+    return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+  }
+
+  const hitlist = await rebuildOrUpdateHitlistForUser(session.user.id);
+
+  return NextResponse.json({
+    ok: true,
+    isMainPlaylist: body.isMainPlaylist,
+    hitlistNewMatches: hitlist.newMatches,
+    hitlistRemovedMatches: hitlist.removedMatches,
+    hitlistSampleNew: hitlist.sampleNew,
   });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { syncTrackedPlaylist } from "@/lib/sync-playlists";
+import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ export type SyncAllResponse = {
   synced: number;
   failed: number;
   errors: Array<{ playlistId: string; error: string }>;
+  hitlistNewMatches?: number;
+  hitlistRemovedMatches?: number;
+  hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
 };
 
 export async function POST(request: Request): Promise<NextResponse<SyncAllResponse | { error: string }>> {
@@ -25,14 +29,26 @@ export async function POST(request: Request): Promise<NextResponse<SyncAllRespon
 
   const errors: Array<{ playlistId: string; error: string }> = [];
   let synced = 0;
+  let anySnapshotChanged = false;
 
   for (const p of playlists) {
     const result = await syncTrackedPlaylist(p.id, session.access_token);
     if (result.ok) {
       synced++;
+      if (result.changed) anySnapshotChanged = true;
     } else {
       errors.push({ playlistId: p.id, error: result.error });
     }
+  }
+
+  let hitlistNewMatches = 0;
+  let hitlistRemovedMatches = 0;
+  let hitlistSampleNew: Array<{ title: string; artistLabel: string; playlistName: string }> = [];
+  if (anySnapshotChanged) {
+    const hit = await rebuildOrUpdateHitlistForUser(session.user.id);
+    hitlistNewMatches = hit.newMatches;
+    hitlistRemovedMatches = hit.removedMatches;
+    hitlistSampleNew = hit.sampleNew;
   }
 
   return NextResponse.json({
@@ -40,5 +56,8 @@ export async function POST(request: Request): Promise<NextResponse<SyncAllRespon
     synced,
     failed: errors.length,
     errors,
+    hitlistNewMatches,
+    hitlistRemovedMatches,
+    hitlistSampleNew,
   });
 }

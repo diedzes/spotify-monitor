@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getValidSessionFromRow } from "@/lib/spotify-auth";
 import { syncTrackedPlaylist } from "@/lib/sync-playlists";
+import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min voor veel playlists
@@ -99,10 +100,20 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
 
     let synced = 0;
     let failed = 0;
+    let anyChanged = false;
     for (const p of playlists) {
       const result = await syncTrackedPlaylist(p.id, session.access_token);
-      if (result.ok) synced++;
-      else failed++;
+      if (result.ok) {
+        synced++;
+        if (result.changed) anyChanged = true;
+      } else failed++;
+    }
+    if (anyChanged) {
+      try {
+        await rebuildOrUpdateHitlistForUser(session.user.id);
+      } catch {
+        // hitlist bijwerken mag cron-sync niet laten falen
+      }
     }
     totalSynced += synced;
     totalFailed += failed;
