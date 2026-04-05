@@ -126,8 +126,8 @@ export default async function DashboardPage({ searchParams }: Props) {
           </div>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Nummers die in de Hitlist-hoofdgroep staan én (via dezelfde Spotify-track-ID of artiest+titel) ook op een
-            andere tracked playlist. De knop <strong>Refresh</strong> herberekent op basis van de nieuwste snapshots
-            (zoals na sync).
+            tracked playlist die <strong>niet</strong> in die hoofdgroep zit. Overlap alleen tussen hoofdgroep-playlists
+            onderling telt niet mee. <strong>Refresh</strong> herberekent op de nieuwste snapshots (zoals na sync).
           </p>
           {mainPlaylistCount === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">

@@ -53,7 +53,7 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
  * - Bron: playlists in de Hitlist-hoofdgroep (isMainGroup).
- * - Match-kant: alle andere tracked playlists van de gebruiker.
+ * - Match-kant: tracked playlists die niet in de Hitlist-hoofdgroep zitten (geen kruisingen hoofdgroep-onderling).
  * - Match 1: dezelfde spotifyTrackId op bron- en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
  * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
@@ -122,6 +122,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     if (!mainMap) continue;
     for (const other of playlists) {
       if (other.id === main.id) continue;
+      if (mainIdSet.has(other.id)) continue;
       const otherMap = playlistTracks.get(other.id);
       if (!otherMap) continue;
       const otherCanons = canonByPlaylist.get(other.id);
@@ -239,6 +240,16 @@ export async function getActiveHitlist(userId: string) {
       mainPlaylist: {
         groupPlaylists: {
           some: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
+      },
+      matchedPlaylist: {
+        groupPlaylists: {
+          none: {
             group: {
               userId,
               isMainGroup: true,
