@@ -36,7 +36,6 @@ model TrackedPlaylist {
   followerCount     Int                @default(0)
   isPublic          Boolean            @default(true)
   isCollaborative   Boolean            @default(false)
-  isMainPlaylist    Boolean            @default(false)
   lastSyncedAt      DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -83,6 +82,8 @@ model PlaylistGroup {
   name           String
   description    String?
   color          String          @default("#71717a")
+  /// Precies één groep per gebruiker met isMainGroup=true: Hitlist-bron playlists.
+  isMainGroup    Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   groupPlaylists GroupPlaylist[]

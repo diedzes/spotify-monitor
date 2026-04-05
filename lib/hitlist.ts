@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
 
 export type HitlistRebuildResult = {
   newMatches: number;
@@ -51,17 +52,19 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
+ * - "Main"-kant: playlists in de Hitlist-hoofdgroep (isMainGroup).
  * - Match 1: dezelfde spotifyTrackId op main en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
  * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
  */
 export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<HitlistRebuildResult> {
+  const mainIdSet = await getMainSourcePlaylistIds(userId);
+
   const playlists = await prisma.trackedPlaylist.findMany({
     where: { userId },
     select: {
       id: true,
       name: true,
-      isMainPlaylist: true,
       snapshots: {
         orderBy: { syncedAt: "desc" },
         take: 12,
@@ -112,7 +115,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     canonByPlaylist.set(plId, canonicalSetForPlaylist(tm));
   }
 
-  const mains = playlists.filter((p) => p.isMainPlaylist);
+  const mains = playlists.filter((p) => mainIdSet.has(p.id));
   for (const main of mains) {
     const mainMap = playlistTracks.get(main.id);
     if (!mainMap) continue;
@@ -157,16 +160,6 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
-    // Rijen waarvan de 'main'-playlist geen main meer is (bijv. vóór een eerdere fix) blijven anders actief.
-    await tx.hitlistMatch.updateMany({
-      where: {
-        userId,
-        isActive: true,
-        mainPlaylist: { isMainPlaylist: false },
-      },
-      data: { isActive: false, removedAt: now },
-    });
-
     for (const [, d] of desired) {
       const key = matchKey(d.mainId, d.matchedId, d.trackId);
       const row = existingByKey.get(key);
@@ -243,7 +236,16 @@ export async function getActiveHitlist(userId: string) {
     where: {
       userId,
       isActive: true,
-      mainPlaylist: { isMainPlaylist: true },
+      mainPlaylist: {
+        groupPlaylists: {
+          some: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
+      },
     },
     orderBy: { firstDetectedAt: "desc" },
     include: {

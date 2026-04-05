@@ -8,10 +8,19 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
   if (session) {
-    const playlists = await prisma.trackedPlaylist.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const [playlists, mainGroup] = await Promise.all([
+      prisma.trackedPlaylist.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.playlistGroup.findFirst({
+        where: { userId: session.user.id, isMainGroup: true },
+        include: { groupPlaylists: { select: { trackedPlaylistId: true } } },
+      }),
+    ]);
+
+    const mainPlaylistIds = new Set(mainGroup?.groupPlaylists.map((gp) => gp.trackedPlaylistId) ?? []);
+
     const playlistIds = playlists.map((p) => p.id);
     const groupLinks = playlistIds.length
       ? await prisma.groupPlaylist.findMany({
@@ -19,17 +28,25 @@ export async function GET(request: Request) {
             trackedPlaylistId: { in: playlistIds },
             group: { userId: session.user.id },
           },
-          include: { group: { select: { id: true, name: true, color: true } } },
+          include: { group: { select: { id: true, name: true, color: true, isMainGroup: true } } },
         })
       : [];
-    const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string; color: string }>>();
+    const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string; color: string; isMainGroup: boolean }>>();
     for (const link of groupLinks) {
       const list = groupsByPlaylistId.get(link.trackedPlaylistId) ?? [];
-      list.push({ id: link.group.id, name: link.group.name, color: link.group.color });
+      list.push({
+        id: link.group.id,
+        name: link.group.name,
+        color: link.group.color,
+        isMainGroup: link.group.isMainGroup,
+      });
       groupsByPlaylistId.set(link.trackedPlaylistId, list);
     }
     return NextResponse.json({
       user: session.user,
+      hitlistMainGroup: mainGroup
+        ? { id: mainGroup.id, name: mainGroup.name, color: mainGroup.color }
+        : null,
       playlists: playlists.map((p) => ({
         id: p.id,
         name: p.name,
@@ -38,7 +55,7 @@ export async function GET(request: Request) {
         lastSyncedAt: p.lastSyncedAt?.toISOString() ?? null,
         spotifyPlaylistId: p.spotifyPlaylistId,
         isPublic: p.isPublic,
-        isMainPlaylist: p.isMainPlaylist,
+        inHitlistMainGroup: mainPlaylistIds.has(p.id),
         groups: groupsByPlaylistId.get(p.id) ?? [],
       })),
     });

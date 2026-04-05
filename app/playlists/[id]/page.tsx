@@ -60,7 +60,8 @@ type PlaylistDetail = {
     trackCount: number;
     lastSyncedAt: string | null;
     snapshotId: string | null;
-    groups?: Array<{ id: string; name: string; color: string }>;
+    groups?: Array<{ id: string; name: string; color: string; isMainGroup?: boolean }>;
+    inHitlistMainGroup?: boolean;
   };
   snapshots: Array<{
     id: string;
@@ -267,6 +268,11 @@ export default function PlaylistDetailPage() {
           </h2>
           <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
             Deze playlist zit in de volgende groepen.
+            {playlist.inHitlistMainGroup ? (
+              <span className="ml-1 font-medium text-emerald-700 dark:text-emerald-400">
+                Staat in de Hitlist-hoofdgroep (bron voor de hitlist).
+              </span>
+            ) : null}
           </p>
           {(playlist.groups?.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
@@ -276,7 +282,13 @@ export default function PlaylistDetailPage() {
             <ul className="flex flex-wrap gap-2">
               {playlist.groups?.map((g) => (
                 <li key={g.id}>
-                  <GroupChip name={g.name} color={g.color} href={`/groups/${g.id}`} className="text-sm py-1" />
+                  <GroupChip
+                    name={g.name}
+                    color={g.color}
+                    href={`/groups/${g.id}`}
+                    className="text-sm py-1"
+                    isHitlistMainGroup={!!g.isMainGroup}
+                  />
                 </li>
               ))}
             </ul>

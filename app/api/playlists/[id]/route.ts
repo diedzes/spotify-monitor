@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
+import { addPlaylistToGroup, removePlaylistFromGroup } from "@/lib/playlist-groups";
+import { ensureMainPlaylistGroup, getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,7 @@ export async function GET(
       },
       groupPlaylists: {
         where: { group: { userId: session.user.id } },
-        include: { group: { select: { id: true, name: true, color: true } } },
+        include: { group: { select: { id: true, name: true, color: true, isMainGroup: true } } },
       },
     },
   });
@@ -33,6 +35,8 @@ export async function GET(
   if (!playlist) {
     return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
   }
+
+  const mainIds = await getMainSourcePlaylistIds(session.user.id);
 
   const latestSnapshot = playlist.snapshots[0] ?? null;
   let latestTracks: Array<{
@@ -73,11 +77,12 @@ export async function GET(
       trackCount: playlist.trackCount,
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
-      isMainPlaylist: playlist.isMainPlaylist,
+      inHitlistMainGroup: mainIds.has(playlist.id),
       groups: playlist.groupPlaylists.map((gp) => ({
         id: gp.group.id,
         name: gp.group.name,
         color: gp.group.color,
+        isMainGroup: gp.group.isMainGroup,
       })),
     },
     snapshots: playlist.snapshots.map((s) => ({
@@ -98,29 +103,37 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
 
   const { id } = await params;
-  let body: { isMainPlaylist?: boolean };
+  let body: { inHitlistMainGroup?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
   }
-  if (typeof body.isMainPlaylist !== "boolean") {
-    return NextResponse.json({ error: "isMainPlaylist (boolean) is verplicht" }, { status: 400 });
+  if (typeof body.inHitlistMainGroup !== "boolean") {
+    return NextResponse.json({ error: "inHitlistMainGroup (boolean) is verplicht" }, { status: 400 });
   }
 
-  const updated = await prisma.trackedPlaylist.updateMany({
+  const playlist = await prisma.trackedPlaylist.findFirst({
     where: { id, userId: session.user.id },
-    data: { isMainPlaylist: body.isMainPlaylist },
+    select: { id: true },
   });
-  if (updated.count === 0) {
+  if (!playlist) {
     return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+  }
+
+  const mainGroup = await ensureMainPlaylistGroup(session.user.id);
+  if (body.inHitlistMainGroup) {
+    await addPlaylistToGroup(session.user.id, mainGroup.id, id);
+  } else {
+    await removePlaylistFromGroup(session.user.id, mainGroup.id, id);
   }
 
   const hitlist = await rebuildOrUpdateHitlistForUser(session.user.id);
 
   return NextResponse.json({
     ok: true,
-    isMainPlaylist: body.isMainPlaylist,
+    inHitlistMainGroup: body.inHitlistMainGroup,
+    hitlistMainGroupId: mainGroup.id,
     hitlistNewMatches: hitlist.newMatches,
     hitlistRemovedMatches: hitlist.removedMatches,
     hitlistSampleNew: hitlist.sampleNew,

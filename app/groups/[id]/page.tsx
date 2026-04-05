@@ -46,6 +46,7 @@ type GroupDetail = {
     name: string;
     description: string | null;
     color: string;
+    isMainGroup: boolean;
     createdAt: string;
     updatedAt: string;
   };
@@ -176,6 +177,12 @@ export default function GroupDetailPage() {
           </h1>
           {group.description && (
             <p className="mt-1 text-zinc-600 dark:text-zinc-400">{group.description}</p>
+          )}
+          {group.isMainGroup && (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+              Dit is je <strong>Hitlist-hoofdgroep</strong>: playlists in deze groep zijn de bron voor de hitlist op het
+              dashboard. Je kunt ze ook beheren vanaf het playlists-overzicht (kolom Hitlist-bron).
+            </p>
           )}
         </div>
 

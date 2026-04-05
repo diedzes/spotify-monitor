@@ -30,6 +30,7 @@ type GroupRow = {
   name: string;
   description: string | null;
   color: string;
+  isMainGroup: boolean;
   createdAt: string;
   playlistCount: number;
 };
@@ -54,6 +55,7 @@ function GroupsPageContent() {
               (data.groups as GroupRow[]).map((g) => ({
                 ...g,
                 color: g.color ?? "#71717a",
+                isMainGroup: !!g.isMainGroup,
               }))
             );
         });
@@ -127,7 +129,14 @@ function GroupsPageContent() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h2 className="font-medium text-zinc-900 dark:text-zinc-100">{g.name}</h2>
+                      <h2 className="flex flex-wrap items-center gap-2 font-medium text-zinc-900 dark:text-zinc-100">
+                        <span className="min-w-0 truncate">{g.name}</span>
+                        {g.isMainGroup ? (
+                          <span className="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
+                            Hitlist-bron
+                          </span>
+                        ) : null}
+                      </h2>
                       {g.description && (
                         <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1">
                           {g.description}

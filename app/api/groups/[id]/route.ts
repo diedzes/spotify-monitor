@@ -24,6 +24,7 @@ export async function GET(
       name: group.name,
       description: group.description,
       color: group.color,
+      isMainGroup: group.isMainGroup,
       createdAt: group.createdAt.toISOString(),
       updatedAt: group.updatedAt.toISOString(),
     },

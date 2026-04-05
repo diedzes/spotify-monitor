@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { addPlaylistToGroup, removePlaylistFromGroup } from "@/lib/playlist-groups";
+import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
+import { isMainHitlistGroup } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,9 @@ export async function POST(
   }
   try {
     await addPlaylistToGroup(session.user.id, groupId, trackedPlaylistId);
+    if (await isMainHitlistGroup(session.user.id, groupId)) {
+      await rebuildOrUpdateHitlistForUser(session.user.id);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kon playlist niet toevoegen";
@@ -48,6 +53,9 @@ export async function DELETE(
   }
   try {
     await removePlaylistFromGroup(session.user.id, groupId, trackedPlaylistId);
+    if (await isMainHitlistGroup(session.user.id, groupId)) {
+      await rebuildOrUpdateHitlistForUser(session.user.id);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kon playlist niet verwijderen";

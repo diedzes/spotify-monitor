@@ -31,7 +31,9 @@ export default async function DashboardPage({ searchParams }: Props) {
   const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlist, removedHitlist] =
     await Promise.all([
       prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
-      prisma.trackedPlaylist.count({ where: { userId: session.user.id, isMainPlaylist: true } }),
+      prisma.groupPlaylist.count({
+        where: { group: { userId: session.user.id, isMainGroup: true } },
+      }),
       prisma.report.count({ where: { userId: session.user.id } }),
       prisma.report.findMany({
         where: { userId: session.user.id },
@@ -117,25 +119,25 @@ export default async function DashboardPage({ searchParams }: Props) {
         <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-            Tracks uit je main playlists die ook op andere tracked playlists staan. Wordt bijgewerkt na sync.
+            Tracks uit je Hitlist-hoofdgroep die ook op andere tracked playlists staan. Wordt bijgewerkt na sync.
           </p>
           {mainPlaylistCount === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-              Nog geen main playlists. Markeer playlists op{" "}
+              Nog geen playlists in de Hitlist-hoofdgroep. Voeg playlists toe aan die groep op{" "}
               <a
                 href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"}
                 className="text-[#1DB954] hover:underline"
               >
                 Playlists
               </a>{" "}
-              als main om matches te zien.
+              of via Groepen.
             </p>
           ) : (
             <>
               <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Active Hitlist</h3>
               {activeHitlist.length === 0 ? (
                 <p className="mb-6 rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  Geen actieve matches. Na een sync verschijnen hier nummers die op een main playlist én elders staan.
+                  Geen actieve matches. Na een sync verschijnen hier nummers die in de Hitlist-hoofdgroep én elders staan.
                 </p>
               ) : (
                 <div className="mb-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">

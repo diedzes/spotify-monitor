@@ -37,6 +37,7 @@ type GroupOption = {
   description: string | null;
   playlistCount: number;
   color: string;
+  isMainGroup?: boolean;
 };
 
 export default function AddPlaylistToGroupPage() {
@@ -85,6 +86,7 @@ export default function AddPlaylistToGroupPage() {
             (groupsRes.groups as GroupOption[]).map((g) => ({
               ...g,
               color: g.color ?? "#71717a",
+              isMainGroup: !!g.isMainGroup,
             }))
           );
       })
@@ -193,7 +195,14 @@ export default function AddPlaylistToGroupPage() {
                 style={{ borderLeftWidth: 4, borderLeftColor: normalizeGroupColor(g.color) }}
               >
                 <div>
-                  <p className="font-medium text-zinc-900 dark:text-zinc-100">{g.name}</p>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {g.name}
+                    {g.isMainGroup ? (
+                      <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-400">
+                        (Hitlist-bron)
+                      </span>
+                    ) : null}
+                  </p>
                   {g.description && (
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1">{g.description}</p>
                   )}

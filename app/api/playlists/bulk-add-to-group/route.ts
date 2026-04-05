@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { addPlaylistToGroup } from "@/lib/playlist-groups";
+import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
+import { isMainHitlistGroup } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,10 @@ export async function POST(
         error: e instanceof Error ? e.message : "Kon niet toevoegen",
       });
     }
+  }
+
+  if (result.added > 0 && (await isMainHitlistGroup(session.user.id, groupId))) {
+    await rebuildOrUpdateHitlistForUser(session.user.id);
   }
 
   return NextResponse.json(result);

@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       name: g.name,
       description: g.description,
       color: g.color,
+      isMainGroup: g.isMainGroup,
       createdAt: g.createdAt.toISOString(),
       playlistCount: g._count.groupPlaylists,
     })),

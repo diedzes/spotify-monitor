@@ -34,8 +34,8 @@ type PlaylistRow = {
   lastSyncedAt: string | null;
   spotifyPlaylistId: string;
   isPublic: boolean;
-  isMainPlaylist: boolean;
-  groups: Array<{ id: string; name: string; color: string }>;
+  inHitlistMainGroup: boolean;
+  groups: Array<{ id: string; name: string; color: string; isMainGroup: boolean }>;
 };
 
 function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
@@ -47,7 +47,7 @@ function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
 
 type SyncStatusFilter = "all" | "never" | "synced";
 type IsPublicFilter = "all" | "public" | "private";
-type MainPlaylistFilter = "all" | "main" | "nonmain";
+type HitlistMainFilter = "all" | "inMain" | "notInMain";
 type SortOption =
   | "name_asc"
   | "name_desc"
@@ -63,7 +63,7 @@ function filterAndSort(
   filterGroup: string,
   filterSyncStatus: SyncStatusFilter,
   filterIsPublic: IsPublicFilter,
-  filterMain: MainPlaylistFilter,
+  filterHitlistMain: HitlistMainFilter,
   sortBy: SortOption
 ): PlaylistRow[] {
   let list = playlists;
@@ -88,10 +88,10 @@ function filterAndSort(
   } else if (filterIsPublic === "private") {
     list = list.filter((p) => !p.isPublic);
   }
-  if (filterMain === "main") {
-    list = list.filter((p) => p.isMainPlaylist);
-  } else if (filterMain === "nonmain") {
-    list = list.filter((p) => !p.isMainPlaylist);
+  if (filterHitlistMain === "inMain") {
+    list = list.filter((p) => p.inHitlistMainGroup);
+  } else if (filterHitlistMain === "notInMain") {
+    list = list.filter((p) => !p.inHitlistMainGroup);
   }
 
   const sorted = [...list].sort((a, b) => {
@@ -156,14 +156,14 @@ function PlaylistsPageContent() {
   const [filterGroup, setFilterGroup] = useState("");
   const [filterSyncStatus, setFilterSyncStatus] = useState<SyncStatusFilter>("all");
   const [filterIsPublic, setFilterIsPublic] = useState<IsPublicFilter>("all");
-  const [filterMain, setFilterMain] = useState<MainPlaylistFilter>("all");
+  const [filterHitlistMain, setFilterHitlistMain] = useState<HitlistMainFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name_asc");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncAllLoading, setSyncAllLoading] = useState(false);
   const [syncAllResult, setSyncAllResult] = useState<{ synced: number; failed: number; errors: Array<{ playlistId: string; error: string }> } | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
-  const [groups, setGroups] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; color: string; isMainGroup?: boolean }>>([]);
   const [bulkAddGroupId, setBulkAddGroupId] = useState("");
   const [bulkAddNewGroupName, setBulkAddNewGroupName] = useState("");
   const [bulkAddLoading, setBulkAddLoading] = useState(false);
@@ -171,6 +171,7 @@ function PlaylistsPageContent() {
   const [bulkSyncLoading, setBulkSyncLoading] = useState(false);
   const [bulkSyncResult, setBulkSyncResult] = useState<{ synced: number; failed: number; errors: string[] } | null>(null);
   const [hitlistNotice, setHitlistNotice] = useState<string | null>(null);
+  const [hitlistMainGroup, setHitlistMainGroup] = useState<{ id: string; name: string; color: string } | null>(null);
   const [mainToggleLoading, setMainToggleLoading] = useState<string | null>(null);
   const [bulkMainLoading, setBulkMainLoading] = useState(false);
 
@@ -179,19 +180,26 @@ function PlaylistsPageContent() {
     (h as Record<string, string>)["X-Debug-Client-Had-Session-Cookie"] = "0";
     return fetch("/api/playlists", { credentials: "include", headers: h })
       .then((res) => res.json())
-      .then((data: { playlists?: PlaylistRow[] }) => {
-        if (data?.playlists)
-          setPlaylists(
-            data.playlists.map((p) => ({
-              ...p,
-              isMainPlaylist: !!p.isMainPlaylist,
-              groups: (p.groups ?? []).map((g) => ({
-                ...g,
-                color: (g as { color?: string }).color ?? "#71717a",
-              })),
-            }))
-          );
-      });
+      .then(
+        (data: {
+          playlists?: PlaylistRow[];
+          hitlistMainGroup?: { id: string; name: string; color: string } | null;
+        }) => {
+          if (data.hitlistMainGroup !== undefined) setHitlistMainGroup(data.hitlistMainGroup);
+          if (data?.playlists)
+            setPlaylists(
+              data.playlists.map((p) => ({
+                ...p,
+                inHitlistMainGroup: !!p.inHitlistMainGroup,
+                groups: (p.groups ?? []).map((g) => ({
+                  ...g,
+                  color: (g as { color?: string }).color ?? "#71717a",
+                  isMainGroup: !!(g as { isMainGroup?: boolean }).isMainGroup,
+                })),
+              }))
+            );
+        }
+      );
   }, [sidFromUrl]);
 
   useEffect(() => {
@@ -207,13 +215,23 @@ function PlaylistsPageContent() {
           setLoading(false);
           return;
         }
-        const d = data as { user?: { name: string | null; email: string | null }; playlists?: PlaylistRow[] };
+        const d = data as {
+          user?: { name: string | null; email: string | null };
+          playlists?: PlaylistRow[];
+          hitlistMainGroup?: { id: string; name: string; color: string } | null;
+        };
         if (d?.user) {
           setUser(d.user);
+          if (d.hitlistMainGroup !== undefined) setHitlistMainGroup(d.hitlistMainGroup);
           setPlaylists(
             (d.playlists ?? []).map((p) => ({
               ...p,
-              isMainPlaylist: !!(p as PlaylistRow).isMainPlaylist,
+              inHitlistMainGroup: !!(p as PlaylistRow).inHitlistMainGroup,
+              groups: ((p as PlaylistRow).groups ?? []).map((g) => ({
+                ...g,
+                color: g.color ?? "#71717a",
+                isMainGroup: !!g.isMainGroup,
+              })),
             }))
           );
         }
@@ -231,10 +249,10 @@ function PlaylistsPageContent() {
         filterGroup,
         filterSyncStatus,
         filterIsPublic,
-        filterMain,
+        filterHitlistMain,
         sortBy
       ),
-    [playlists, filterSearch, filterOwner, filterGroup, filterSyncStatus, filterIsPublic, filterMain, sortBy]
+    [playlists, filterSearch, filterOwner, filterGroup, filterSyncStatus, filterIsPublic, filterHitlistMain, sortBy]
   );
 
   const uniqueOwners = useMemo(() => [...new Set(playlists.map((p) => p.ownerName))].sort(), [playlists]);
@@ -436,8 +454,8 @@ function PlaylistsPageContent() {
     }
   }, [sidFromUrl, selectedIds, refreshPlaylists]);
 
-  const toggleMainPlaylist = useCallback(
-    async (playlistId: string, nextMain: boolean) => {
+  const toggleHitlistMainGroup = useCallback(
+    async (playlistId: string, inGroup: boolean) => {
       setHitlistNotice(null);
       setMainToggleLoading(playlistId);
       try {
@@ -445,7 +463,7 @@ function PlaylistsPageContent() {
           method: "PATCH",
           credentials: "include",
           headers: getSessionHeaders(sidFromUrl),
-          body: JSON.stringify({ isMainPlaylist: nextMain }),
+          body: JSON.stringify({ inHitlistMainGroup: inGroup }),
         });
         const data = (await res.json()) as {
           ok?: boolean;
@@ -453,14 +471,13 @@ function PlaylistsPageContent() {
           hitlistNewMatches?: number;
           hitlistRemovedMatches?: number;
           hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+          hitlistMainGroupId?: string;
         };
         if (!res.ok || !data.ok) {
-          setSyncError(data.error ?? "Main-markering mislukt");
+          setSyncError(data.error ?? "Hitlist-hoofdgroep bijwerken mislukt");
           return;
         }
-        setPlaylists((prev) =>
-          prev.map((p) => (p.id === playlistId ? { ...p, isMainPlaylist: nextMain } : p))
-        );
+        await refreshPlaylists();
         const hl = formatHitlistSummary(
           data.hitlistNewMatches ?? 0,
           data.hitlistRemovedMatches ?? 0,
@@ -468,25 +485,25 @@ function PlaylistsPageContent() {
         );
         setHitlistNotice(hl);
       } catch {
-        setSyncError("Main-markering mislukt");
+        setSyncError("Hitlist-hoofdgroep bijwerken mislukt");
       } finally {
         setMainToggleLoading(null);
       }
     },
-    [sidFromUrl]
+    [sidFromUrl, refreshPlaylists]
   );
 
-  const handleBulkMain = useCallback(
-    async (isMain: boolean) => {
+  const handleBulkHitlistMain = useCallback(
+    async (inGroup: boolean) => {
       if (selectedIds.size === 0) return;
       setHitlistNotice(null);
       setBulkMainLoading(true);
       try {
-        const res = await fetch("/api/playlists/bulk-main", {
+        const res = await fetch("/api/playlists/main-source", {
           method: "POST",
           credentials: "include",
           headers: getSessionHeaders(sidFromUrl),
-          body: JSON.stringify({ trackedPlaylistIds: Array.from(selectedIds), isMainPlaylist: isMain }),
+          body: JSON.stringify({ trackedPlaylistIds: Array.from(selectedIds), inHitlistMainGroup: inGroup }),
         });
         const data = (await res.json()) as {
           ok?: boolean;
@@ -494,15 +511,13 @@ function PlaylistsPageContent() {
           hitlistNewMatches?: number;
           hitlistRemovedMatches?: number;
           hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+          hitlistMainGroupId?: string;
         };
         if (!res.ok || !data.ok) {
-          setSyncError(data.error ?? "Bulk main mislukt");
+          setSyncError(data.error ?? "Hitlist-hoofdgroep (bulk) mislukt");
           return;
         }
-        const sel = new Set(selectedIds);
-        setPlaylists((prev) =>
-          prev.map((p) => (sel.has(p.id) ? { ...p, isMainPlaylist: isMain } : p))
-        );
+        await refreshPlaylists();
         const hl = formatHitlistSummary(
           data.hitlistNewMatches ?? 0,
           data.hitlistRemovedMatches ?? 0,
@@ -511,12 +526,12 @@ function PlaylistsPageContent() {
         setHitlistNotice(hl);
         clearSelection();
       } catch {
-        setSyncError("Bulk main mislukt");
+        setSyncError("Hitlist-hoofdgroep (bulk) mislukt");
       } finally {
         setBulkMainLoading(false);
       }
     },
-    [sidFromUrl, selectedIds, clearSelection]
+    [sidFromUrl, selectedIds, clearSelection, refreshPlaylists]
   );
 
   const openBulkAddModal = useCallback(() => {
@@ -525,12 +540,13 @@ function PlaylistsPageContent() {
     setBulkAddNewGroupName("");
     fetch("/api/groups", { credentials: "include", headers: getSessionHeaders(sidFromUrl) })
       .then((res) => res.json())
-      .then((data: { groups?: Array<{ id: string; name: string; color?: string }> }) => {
+      .then((data: { groups?: Array<{ id: string; name: string; color?: string; isMainGroup?: boolean }> }) => {
         setGroups(
           (data.groups ?? []).map((g) => ({
             id: g.id,
             name: g.name,
             color: g.color ?? "#71717a",
+            isMainGroup: g.isMainGroup,
           }))
         );
         setBulkAddOpen(true);
@@ -590,10 +606,26 @@ function PlaylistsPageContent() {
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <AppHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Tracked playlists
-          </h1>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Tracked playlists
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+              De hitlist vergelijkt playlists in de{" "}
+              {hitlistMainGroup ? (
+                <Link
+                  href={sidFromUrl ? `/groups/${hitlistMainGroup.id}?sid=${encodeURIComponent(sidFromUrl)}` : `/groups/${hitlistMainGroup.id}`}
+                  className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  Hitlist-hoofdgroep ({hitlistMainGroup.name})
+                </Link>
+              ) : (
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">Hitlist-hoofdgroep</span>
+              )}{" "}
+              met je overige tracked playlists. Voeg playlists toe via de kolom rechts, via Groepen, of bulkacties.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -684,13 +716,13 @@ function PlaylistsPageContent() {
             <option value="private">Privé</option>
           </select>
           <select
-            value={filterMain}
-            onChange={(e) => setFilterMain(e.target.value as MainPlaylistFilter)}
+            value={filterHitlistMain}
+            onChange={(e) => setFilterHitlistMain(e.target.value as HitlistMainFilter)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="all">Main: alle playlists</option>
-            <option value="main">Alleen main playlists</option>
-            <option value="nonmain">Geen main playlists</option>
+            <option value="all">Hitlist-bron: alle playlists</option>
+            <option value="inMain">In Hitlist-hoofdgroep</option>
+            <option value="notInMain">Niet in Hitlist-hoofdgroep</option>
           </select>
           <select
             value={sortBy}
@@ -730,18 +762,18 @@ function PlaylistsPageContent() {
             <button
               type="button"
               disabled={bulkMainLoading}
-              onClick={() => void handleBulkMain(true)}
-              className="rounded-full border border-amber-500/60 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
+              onClick={() => void handleBulkHitlistMain(true)}
+              className="rounded-full border border-emerald-500/60 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/60"
             >
-              {bulkMainLoading ? "…" : "Mark selected as main"}
+              {bulkMainLoading ? "…" : "Add to Hitlist-hoofdgroep"}
             </button>
             <button
               type="button"
               disabled={bulkMainLoading}
-              onClick={() => void handleBulkMain(false)}
+              onClick={() => void handleBulkHitlistMain(false)}
               className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              Unmark main
+              Remove from Hitlist-hoofdgroep
             </button>
             <button
               type="button"
@@ -788,7 +820,7 @@ function PlaylistsPageContent() {
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Laatste sync</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Acties</th>
-                <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Main</th>
+                <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Hitlist-bron</th>
               </tr>
             </thead>
             <tbody>
@@ -829,6 +861,7 @@ function PlaylistsPageContent() {
                               name={g.name}
                               color={g.color}
                               href={`/groups/${g.id}`}
+                              isHitlistMainGroup={g.isMainGroup}
                             />
                           ))
                         )}
@@ -898,15 +931,15 @@ function PlaylistsPageContent() {
                       <label className="inline-flex cursor-pointer items-center justify-end gap-2">
                         <input
                           type="checkbox"
-                          checked={p.isMainPlaylist}
+                          checked={p.inHitlistMainGroup}
                           disabled={mainToggleLoading === p.id}
-                          onChange={(e) => void toggleMainPlaylist(p.id, e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
-                          title="Main playlist (bron voor Hitlist)"
+                          onChange={(e) => void toggleHitlistMainGroup(p.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                          title="Zit in Hitlist-hoofdgroep (zelfde als groep met Hitlist-label)"
                         />
-                        {p.isMainPlaylist && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-                            Main
+                        {p.inHitlistMainGroup && (
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
+                            Bron
                           </span>
                         )}
                       </label>
@@ -942,7 +975,10 @@ function PlaylistsPageContent() {
                 >
                   <option value="">Kies een groep…</option>
                   {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                      {g.isMainGroup ? " — Hitlist-bron" : ""}
+                    </option>
                   ))}
                 </select>
               </>
