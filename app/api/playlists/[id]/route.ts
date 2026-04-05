@@ -78,6 +78,7 @@ export async function GET(
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
       inHitlistMainGroup: mainIds.has(playlist.id),
+      excludeFromHitlist: playlist.excludeFromHitlist,
       groups: playlist.groupPlaylists.map((gp) => ({
         id: gp.group.id,
         name: gp.group.name,
@@ -103,14 +104,19 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
 
   const { id } = await params;
-  let body: { inHitlistMainGroup?: boolean };
+  let body: { inHitlistMainGroup?: boolean; excludeFromHitlist?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
   }
-  if (typeof body.inHitlistMainGroup !== "boolean") {
-    return NextResponse.json({ error: "inHitlistMainGroup (boolean) is verplicht" }, { status: 400 });
+  const hasMain = typeof body.inHitlistMainGroup === "boolean";
+  const hasExclude = typeof body.excludeFromHitlist === "boolean";
+  if (!hasMain && !hasExclude) {
+    return NextResponse.json(
+      { error: "Geef minstens één van: inHitlistMainGroup (boolean), excludeFromHitlist (boolean)" },
+      { status: 400 }
+    );
   }
 
   const playlist = await prisma.trackedPlaylist.findFirst({
@@ -121,19 +127,31 @@ export async function PATCH(
     return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
   }
 
-  const mainGroup = await ensureMainPlaylistGroup(session.user.id);
-  if (body.inHitlistMainGroup) {
-    await addPlaylistToGroup(session.user.id, mainGroup.id, id);
-  } else {
-    await removePlaylistFromGroup(session.user.id, mainGroup.id, id);
+  let mainGroupId: string | undefined;
+
+  if (hasMain) {
+    const mainGroup = await ensureMainPlaylistGroup(session.user.id);
+    mainGroupId = mainGroup.id;
+    if (body.inHitlistMainGroup) {
+      await addPlaylistToGroup(session.user.id, mainGroup.id, id);
+    } else {
+      await removePlaylistFromGroup(session.user.id, mainGroup.id, id);
+    }
+  }
+
+  if (hasExclude) {
+    await prisma.trackedPlaylist.updateMany({
+      where: { id, userId: session.user.id },
+      data: { excludeFromHitlist: body.excludeFromHitlist },
+    });
   }
 
   const hitlist = await rebuildOrUpdateHitlistForUser(session.user.id);
 
   return NextResponse.json({
     ok: true,
-    inHitlistMainGroup: body.inHitlistMainGroup,
-    hitlistMainGroupId: mainGroup.id,
+    ...(hasMain && { inHitlistMainGroup: body.inHitlistMainGroup, hitlistMainGroupId: mainGroupId }),
+    ...(hasExclude && { excludeFromHitlist: body.excludeFromHitlist }),
     hitlistNewMatches: hitlist.newMatches,
     hitlistRemovedMatches: hitlist.removedMatches,
     hitlistSampleNew: hitlist.sampleNew,

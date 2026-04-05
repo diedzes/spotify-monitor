@@ -62,6 +62,7 @@ type PlaylistDetail = {
     snapshotId: string | null;
     groups?: Array<{ id: string; name: string; color: string; isMainGroup?: boolean }>;
     inHitlistMainGroup?: boolean;
+    excludeFromHitlist?: boolean;
   };
   snapshots: Array<{
     id: string;
@@ -108,6 +109,7 @@ export default function PlaylistDetailPage() {
   const [changesLoading, setChangesLoading] = useState(false);
   const [hasEnoughSnapshots, setHasEnoughSnapshots] = useState(true);
   const [changeFilter, setChangeFilter] = useState<ChangeFilter>("all");
+  const [excludeSaving, setExcludeSaving] = useState(false);
 
   const load = () => {
     setError(null);
@@ -273,6 +275,11 @@ export default function PlaylistDetailPage() {
                 Staat in de Hitlist-hoofdgroep (bron voor de hitlist).
               </span>
             ) : null}
+            {playlist.excludeFromHitlist ? (
+              <span className="ml-1 font-medium text-violet-700 dark:text-violet-400">
+                Telt niet mee voor de hitlist.
+              </span>
+            ) : null}
           </p>
           {(playlist.groups?.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
@@ -299,6 +306,45 @@ export default function PlaylistDetailPage() {
           >
             Add to group
           </Link>
+        </section>
+
+        <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-2 text-lg font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+              checked={!(playlist.excludeFromHitlist ?? false)}
+              disabled={excludeSaving}
+              onChange={(e) => {
+                const exclude = !e.target.checked;
+                setSyncMessage(null);
+                setExcludeSaving(true);
+                const headers = new Headers(getSessionHeaders());
+                headers.set("Content-Type", "application/json");
+                fetch(`/api/playlists/${id}`, {
+                  method: "PATCH",
+                  credentials: "include",
+                  headers,
+                  body: JSON.stringify({ excludeFromHitlist: exclude }),
+                })
+                  .then(async (res) => {
+                    const j = (await res.json()) as { ok?: boolean; error?: string };
+                    if (!res.ok || !j.ok) throw new Error(j.error ?? "Mislukt");
+                    load();
+                  })
+                  .catch(() => setSyncMessage("Hitlist-voorkeur opslaan mislukt."))
+                  .finally(() => setExcludeSaving(false));
+              }}
+            />
+            <span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">Meetellen in hitlist</span>
+              <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                Uitgeschakeld = deze playlist is geen bron en wordt niet als &quot;ook op&quot;-playlist gebruikt. Sync en
+                groepen blijven gewoon werken.
+              </span>
+            </span>
+          </label>
         </section>
 
         <section className="mb-8">

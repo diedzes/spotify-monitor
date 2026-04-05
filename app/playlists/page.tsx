@@ -35,6 +35,7 @@ type PlaylistRow = {
   spotifyPlaylistId: string;
   isPublic: boolean;
   inHitlistMainGroup: boolean;
+  excludeFromHitlist: boolean;
   groups: Array<{ id: string; name: string; color: string; isMainGroup: boolean }>;
 };
 
@@ -173,6 +174,7 @@ function PlaylistsPageContent() {
   const [hitlistNotice, setHitlistNotice] = useState<string | null>(null);
   const [hitlistMainGroup, setHitlistMainGroup] = useState<{ id: string; name: string; color: string } | null>(null);
   const [mainToggleLoading, setMainToggleLoading] = useState<string | null>(null);
+  const [excludeToggleLoading, setExcludeToggleLoading] = useState<string | null>(null);
   const [bulkMainLoading, setBulkMainLoading] = useState(false);
 
   const refreshPlaylists = useCallback(() => {
@@ -191,6 +193,7 @@ function PlaylistsPageContent() {
               data.playlists.map((p) => ({
                 ...p,
                 inHitlistMainGroup: !!p.inHitlistMainGroup,
+                excludeFromHitlist: !!p.excludeFromHitlist,
                 groups: (p.groups ?? []).map((g) => ({
                   ...g,
                   color: (g as { color?: string }).color ?? "#71717a",
@@ -227,6 +230,7 @@ function PlaylistsPageContent() {
             (d.playlists ?? []).map((p) => ({
               ...p,
               inHitlistMainGroup: !!(p as PlaylistRow).inHitlistMainGroup,
+              excludeFromHitlist: !!(p as PlaylistRow).excludeFromHitlist,
               groups: ((p as PlaylistRow).groups ?? []).map((g) => ({
                 ...g,
                 color: g.color ?? "#71717a",
@@ -493,6 +497,44 @@ function PlaylistsPageContent() {
     [sidFromUrl, refreshPlaylists]
   );
 
+  const toggleExcludeFromHitlist = useCallback(
+    async (playlistId: string, exclude: boolean) => {
+      setHitlistNotice(null);
+      setExcludeToggleLoading(playlistId);
+      try {
+        const res = await fetch(`/api/playlists/${playlistId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+          body: JSON.stringify({ excludeFromHitlist: exclude }),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          hitlistNewMatches?: number;
+          hitlistRemovedMatches?: number;
+          hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (!res.ok || !data.ok) {
+          setSyncError(data.error ?? "Hitlist-voorkeur bijwerken mislukt");
+          return;
+        }
+        await refreshPlaylists();
+        const hl = formatHitlistSummary(
+          data.hitlistNewMatches ?? 0,
+          data.hitlistRemovedMatches ?? 0,
+          data.hitlistSampleNew
+        );
+        setHitlistNotice(hl);
+      } catch {
+        setSyncError("Hitlist-voorkeur bijwerken mislukt");
+      } finally {
+        setExcludeToggleLoading(null);
+      }
+    },
+    [sidFromUrl, refreshPlaylists]
+  );
+
   const handleBulkHitlistMain = useCallback(
     async (inGroup: boolean) => {
       if (selectedIds.size === 0) return;
@@ -623,7 +665,8 @@ function PlaylistsPageContent() {
               ) : (
                 <span className="font-medium text-zinc-800 dark:text-zinc-200">Hitlist-hoofdgroep</span>
               )}{" "}
-              met je overige tracked playlists. Voeg playlists toe via de kolom rechts, via Groepen, of bulkacties.
+              met je overige tracked playlists. Kolom <strong>Meetelt</strong>: uit = playlist doet nergens mee in de
+              hitlist. Voeg bron-playlists toe via <strong>Hitlist-bron</strong>, Groepen of bulkacties.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -820,13 +863,14 @@ function PlaylistsPageContent() {
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Laatste sync</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Acties</th>
+                <th className="px-3 py-3 text-center font-medium text-zinc-900 dark:text-zinc-100">Meetelt</th>
                 <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Hitlist-bron</th>
               </tr>
             </thead>
             <tbody>
               {filteredPlaylists.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     {playlists.length === 0
                       ? "Nog geen playlists. Klik op \"Add playlist\" om een Spotify playlist toe te voegen."
                       : "Geen playlists voldoen aan de filters."}
@@ -926,6 +970,21 @@ function PlaylistsPageContent() {
                           Open in Spotify
                         </a>
                       </span>
+                    </td>
+                    <td className="px-3 py-3 align-top text-center">
+                      <label className="inline-flex cursor-pointer flex-col items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={!p.excludeFromHitlist}
+                          disabled={excludeToggleLoading === p.id}
+                          onChange={(e) => void toggleExcludeFromHitlist(p.id, !e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                          title="Uit = playlist telt nergens mee voor de hitlist (geen bron, geen match)"
+                        />
+                        <span className="max-w-[5rem] text-[10px] leading-tight text-zinc-500 dark:text-zinc-400">
+                          {p.excludeFromHitlist ? "Nee" : "Ja"}
+                        </span>
+                      </label>
                     </td>
                     <td className="px-3 py-3 align-top text-right">
                       <label className="inline-flex cursor-pointer items-center justify-end gap-2">

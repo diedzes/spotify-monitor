@@ -56,6 +56,7 @@ export async function GET(request: Request) {
         spotifyPlaylistId: p.spotifyPlaylistId,
         isPublic: p.isPublic,
         inHitlistMainGroup: mainPlaylistIds.has(p.id),
+        excludeFromHitlist: p.excludeFromHitlist,
         groups: groupsByPlaylistId.get(p.id) ?? [],
       })),
     });

@@ -52,8 +52,8 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
- * - Bron: playlists in de Hitlist-hoofdgroep (isMainGroup).
- * - Match-kant: tracked playlists die niet in de Hitlist-hoofdgroep zitten (geen kruisingen hoofdgroep-onderling).
+ * - Bron: playlists in de Hitlist-hoofdgroep (isMainGroup), met excludeFromHitlist=false.
+ * - Match-kant: overige tracked playlists met excludeFromHitlist=false, niet in hoofdgroep (geen kruisingen hoofdgroep-onderling).
  * - Match 1: dezelfde spotifyTrackId op bron- en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
  * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
@@ -66,6 +66,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     select: {
       id: true,
       name: true,
+      excludeFromHitlist: true,
       snapshots: {
         orderBy: { syncedAt: "desc" },
         take: 12,
@@ -116,13 +117,14 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     canonByPlaylist.set(plId, canonicalSetForPlaylist(tm));
   }
 
-  const mains = playlists.filter((p) => mainIdSet.has(p.id));
+  const mains = playlists.filter((p) => mainIdSet.has(p.id) && !p.excludeFromHitlist);
   for (const main of mains) {
     const mainMap = playlistTracks.get(main.id);
     if (!mainMap) continue;
     for (const other of playlists) {
       if (other.id === main.id) continue;
       if (mainIdSet.has(other.id)) continue;
+      if (other.excludeFromHitlist) continue;
       const otherMap = playlistTracks.get(other.id);
       if (!otherMap) continue;
       const otherCanons = canonByPlaylist.get(other.id);
@@ -238,6 +240,7 @@ export async function getActiveHitlist(userId: string) {
       userId,
       isActive: true,
       mainPlaylist: {
+        excludeFromHitlist: false,
         groupPlaylists: {
           some: {
             group: {
@@ -248,6 +251,7 @@ export async function getActiveHitlist(userId: string) {
         },
       },
       matchedPlaylist: {
+        excludeFromHitlist: false,
         groupPlaylists: {
           none: {
             group: {
