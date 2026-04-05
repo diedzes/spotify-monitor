@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { formatArtistsLabel, getActiveHitlist, getRecentlyRemovedHitlist, spotifyTrackHref } from "@/lib/hitlist";
+import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -117,9 +118,16 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
 
         <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
+          <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+            <h2 className="font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
+            {mainPlaylistCount > 0 ? (
+              <HitlistRefreshButton signedId={signedId} />
+            ) : null}
+          </div>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-            Tracks uit je Hitlist-hoofdgroep die ook op andere tracked playlists staan. Wordt bijgewerkt na sync.
+            Nummers die in de Hitlist-hoofdgroep staan én (via dezelfde Spotify-track-ID of artiest+titel) ook op een
+            andere tracked playlist. De knop <strong>Refresh</strong> herberekent op basis van de nieuwste snapshots
+            (zoals na sync).
           </p>
           {mainPlaylistCount === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
@@ -137,18 +145,19 @@ export default async function DashboardPage({ searchParams }: Props) {
               <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Active Hitlist</h3>
               {activeHitlist.length === 0 ? (
                 <p className="mb-6 rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  Geen actieve matches. Na een sync verschijnen hier nummers die in de Hitlist-hoofdgroep én elders staan.
+                  Geen actieve matches. Sync de playlists in de Hitlist-hoofdgroep en andere tracked playlists, of gebruik{" "}
+                  <strong>Refresh</strong> om op de nieuwste snapshots te controleren.
                 </p>
               ) : (
                 <div className="mb-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <table className="w-full min-w-[800px] text-left text-sm">
+                  <table className="w-full min-w-[880px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artists</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Main playlist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added to playlist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Added at</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Also playlisted at</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Date added</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -165,7 +174,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                             <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
                               {formatArtistsLabel(row.artistsJson)}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="max-w-[220px] px-3 py-2">
                               {trackHref ? (
                                 <a
                                   href={trackHref}
@@ -178,6 +187,9 @@ export default async function DashboardPage({ searchParams }: Props) {
                               ) : (
                                 <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
                               )}
+                              <span className="mt-0.5 block break-all font-mono text-[10px] leading-tight text-zinc-400 dark:text-zinc-500">
+                                {row.spotifyTrackId}
+                              </span>
                             </td>
                             <td className="px-3 py-2">
                               <Link href={mainHref} className="text-[#1DB954] hover:underline">
@@ -190,7 +202,10 @@ export default async function DashboardPage({ searchParams }: Props) {
                               </Link>
                             </td>
                             <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                              {row.firstDetectedAt.toLocaleString("nl-NL")}
+                              {row.firstDetectedAt.toLocaleString("en-GB", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}
                             </td>
                           </tr>
                         );

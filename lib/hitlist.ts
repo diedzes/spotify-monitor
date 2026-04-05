@@ -52,8 +52,9 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
- * - "Main"-kant: playlists in de Hitlist-hoofdgroep (isMainGroup).
- * - Match 1: dezelfde spotifyTrackId op main en andere playlist.
+ * - Bron: playlists in de Hitlist-hoofdgroep (isMainGroup).
+ * - Match-kant: alle andere tracked playlists van de gebruiker.
+ * - Match 1: dezelfde spotifyTrackId op bron- en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
  * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
  */
