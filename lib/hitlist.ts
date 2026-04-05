@@ -160,74 +160,73 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
   const sampleNew: HitlistRebuildResult["sampleNew"] = [];
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
-    for (const [, d] of desired) {
-      const key = matchKey(d.mainId, d.matchedId, d.trackId);
-      const row = existingByKey.get(key);
-      const matchedName = playlistNameById.get(d.matchedId) ?? "Playlist";
+  // Geen interactieve $transaction: die breekt vaak achter Supabase PgBouncer (transaction pool mode).
+  for (const [, d] of desired) {
+    const key = matchKey(d.mainId, d.matchedId, d.trackId);
+    const row = existingByKey.get(key);
+    const matchedName = playlistNameById.get(d.matchedId) ?? "Playlist";
 
-      if (!row) {
-        await tx.hitlistMatch.create({
-          data: {
-            userId,
-            spotifyTrackId: d.trackId,
-            title: d.title,
-            artistsJson: d.artistsJson,
-            mainTrackedPlaylistId: d.mainId,
-            matchedTrackedPlaylistId: d.matchedId,
-            firstDetectedAt: now,
-            lastSeenAt: now,
-            removedAt: null,
-            isActive: true,
-          },
-        });
-        newMatches += 1;
-        if (sampleNew.length < 5) {
-          sampleNew.push({
-            title: d.title,
-            artistLabel: formatArtistsLabel(d.artistsJson),
-            playlistName: matchedName,
-          });
-        }
-      } else if (!row.isActive) {
-        await tx.hitlistMatch.update({
-          where: { id: row.id },
-          data: {
-            isActive: true,
-            removedAt: null,
-            lastSeenAt: now,
-            title: d.title,
-            artistsJson: d.artistsJson,
-          },
-        });
-        newMatches += 1;
-        if (sampleNew.length < 5) {
-          sampleNew.push({
-            title: d.title,
-            artistLabel: formatArtistsLabel(d.artistsJson),
-            playlistName: matchedName,
-          });
-        }
-      } else {
-        await tx.hitlistMatch.update({
-          where: { id: row.id },
-          data: { lastSeenAt: now, title: d.title, artistsJson: d.artistsJson },
+    if (!row) {
+      await prisma.hitlistMatch.create({
+        data: {
+          userId,
+          spotifyTrackId: d.trackId,
+          title: d.title,
+          artistsJson: d.artistsJson,
+          mainTrackedPlaylistId: d.mainId,
+          matchedTrackedPlaylistId: d.matchedId,
+          firstDetectedAt: now,
+          lastSeenAt: now,
+          removedAt: null,
+          isActive: true,
+        },
+      });
+      newMatches += 1;
+      if (sampleNew.length < 5) {
+        sampleNew.push({
+          title: d.title,
+          artistLabel: formatArtistsLabel(d.artistsJson),
+          playlistName: matchedName,
         });
       }
-    }
-
-    for (const row of existing) {
-      const key = matchKey(row.mainTrackedPlaylistId, row.matchedTrackedPlaylistId, row.spotifyTrackId);
-      if (desired.has(key)) continue;
-      if (row.isActive) {
-        await tx.hitlistMatch.update({
-          where: { id: row.id },
-          data: { isActive: false, removedAt: now },
+    } else if (!row.isActive) {
+      await prisma.hitlistMatch.update({
+        where: { id: row.id },
+        data: {
+          isActive: true,
+          removedAt: null,
+          lastSeenAt: now,
+          title: d.title,
+          artistsJson: d.artistsJson,
+        },
+      });
+      newMatches += 1;
+      if (sampleNew.length < 5) {
+        sampleNew.push({
+          title: d.title,
+          artistLabel: formatArtistsLabel(d.artistsJson),
+          playlistName: matchedName,
         });
-        removedMatches += 1;
       }
+    } else {
+      await prisma.hitlistMatch.update({
+        where: { id: row.id },
+        data: { lastSeenAt: now, title: d.title, artistsJson: d.artistsJson },
+      });
     }
-  });
+  }
+
+  for (const row of existing) {
+    const key = matchKey(row.mainTrackedPlaylistId, row.matchedTrackedPlaylistId, row.spotifyTrackId);
+    if (desired.has(key)) continue;
+    if (row.isActive) {
+      await prisma.hitlistMatch.update({
+        where: { id: row.id },
+        data: { isActive: false, removedAt: now },
+      });
+      removedMatches += 1;
+    }
+  }
 
   return { newMatches, removedMatches, sampleNew };
 }
