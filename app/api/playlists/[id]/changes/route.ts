@@ -11,7 +11,7 @@ export async function GET(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   const { id } = await params;
@@ -27,7 +27,7 @@ export async function GET(
   });
 
   if (!playlist) {
-    return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
   const [currentSnapshot, previousSnapshot] = playlist.snapshots;

@@ -15,20 +15,20 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
 
   const scheduler = await prisma.scheduler.findFirst({
     where: { id, userId: session.user.id },
     select: { id: true },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: { items?: Item[] };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const items = Array.isArray(body.items) ? body.items : [];
@@ -37,12 +37,12 @@ export async function PUT(
     const hasG = !!it.playlistGroupId?.trim();
     if (hasP === hasG) {
       return NextResponse.json(
-        { error: "Elke overlap-regel moet precies één playlist of één groep hebben." },
+        { error: "Each overlap rule must reference exactly one playlist or one group." },
         { status: 400 }
       );
     }
     if (!Number.isInteger(it.overlapPercent) || it.overlapPercent < 0 || it.overlapPercent > 100) {
-      return NextResponse.json({ error: "overlapPercent moet tussen 0 en 100 liggen." }, { status: 400 });
+      return NextResponse.json({ error: "overlapPercent must be between 0 and 100." }, { status: 400 });
     }
   }
 

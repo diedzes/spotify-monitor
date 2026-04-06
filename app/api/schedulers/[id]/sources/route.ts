@@ -10,13 +10,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId } = await params;
 
   const scheduler = await prisma.scheduler.findFirst({
     where: { id: schedulerId, userId: session.user.id },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: {
     trackedPlaylistId?: string;
@@ -29,7 +29,7 @@ export async function POST(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const trackedPlaylistId =
@@ -37,20 +37,20 @@ export async function POST(
   const playlistGroupId =
     typeof body.playlistGroupId === "string" ? body.playlistGroupId.trim() || null : null;
   if ((trackedPlaylistId && playlistGroupId) || (!trackedPlaylistId && !playlistGroupId)) {
-    return NextResponse.json({ error: "Geef playlist of groep op (exact 1)" }, { status: 400 });
+    return NextResponse.json({ error: "Provide playlist or group (exactly one)" }, { status: 400 });
   }
 
   if (trackedPlaylistId) {
     const p = await prisma.trackedPlaylist.findFirst({
       where: { id: trackedPlaylistId, userId: session.user.id },
     });
-    if (!p) return NextResponse.json({ error: "Playlist niet gevonden of geen toegang" }, { status: 404 });
+    if (!p) return NextResponse.json({ error: "Playlist not found or no access" }, { status: 404 });
   }
   if (playlistGroupId) {
     const g = await prisma.playlistGroup.findFirst({
       where: { id: playlistGroupId, userId: session.user.id },
     });
-    if (!g) return NextResponse.json({ error: "Groep niet gevonden of geen toegang" }, { status: 404 });
+    if (!g) return NextResponse.json({ error: "Group not found or no access" }, { status: 404 });
   }
 
   const include = typeof body.include === "boolean" ? body.include : true;

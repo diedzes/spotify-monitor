@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
   try {
@@ -33,7 +33,7 @@ export async function GET(
       },
     });
     if (!report) {
-      return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
     const latestResult = report.results[0] ?? null;
     return NextResponse.json({
@@ -68,10 +68,10 @@ export async function GET(
       : null,
   });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Databasefout";
+    const message = err instanceof Error ? err.message : "Database error";
     console.error("[GET /api/reports/[id]]", message);
     return NextResponse.json(
-      { error: `Kon report niet laden: ${message}` },
+      { error: `Could not load report: ${message}` },
       { status: 500 }
     );
   }
@@ -83,20 +83,20 @@ export async function PUT(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
   const report = await prisma.report.findFirst({
     where: { id, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   let body: { name?: string; description?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
   const description =
@@ -126,14 +126,14 @@ export async function DELETE(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
   const report = await prisma.report.findFirst({
     where: { id, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   await prisma.report.delete({ where: { id } });
   return NextResponse.json({ ok: true });

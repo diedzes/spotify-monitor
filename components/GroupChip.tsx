@@ -8,7 +8,7 @@ type Props = {
   color?: string | null;
   href?: string;
   className?: string;
-  /** Hitlist-bron groep (isMainGroup) — extra accent en titel. */
+  /** Hitlist source group (isMainGroup) — extra accent and label. */
   isHitlistMainGroup?: boolean;
 };
 
@@ -16,7 +16,7 @@ export function GroupChip({ name, color, href, className = "", isHitlistMainGrou
   const c = normalizeGroupColor(color);
   const inner = (
     <span
-      title={isHitlistMainGroup ? "Hitlist-hoofdgroep (bron voor vergelijking)" : undefined}
+      title={isHitlistMainGroup ? "Hitlist main group (source for comparison)" : undefined}
       className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium ring-1 ${
         isHitlistMainGroup
           ? "border-emerald-300/90 bg-emerald-50 text-emerald-950 ring-emerald-500/25 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100 dark:ring-emerald-500/20"

@@ -16,18 +16,18 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId } = await params;
   const scheduler = await prisma.scheduler.findFirst({
     where: { id: schedulerId, userId: session.user.id },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: Partial<Record<SchedulerRuleType, number | null>>;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   for (const ruleType of RULE_TYPES) {
@@ -39,7 +39,7 @@ export async function PUT(
           ? null
           : NaN;
     if (Number.isNaN(valueInt)) {
-      return NextResponse.json({ error: `Ongeldige waarde voor ${ruleType}` }, { status: 400 });
+      return NextResponse.json({ error: `Invalid value for ${ruleType}` }, { status: 400 });
     }
 
     const existing = await prisma.schedulerRule.findFirst({

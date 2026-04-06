@@ -20,10 +20,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; sourceId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId, sourceId } = await params;
   const source = await getOwnedSource(session.user.id, schedulerId, sourceId);
-  if (!source) return NextResponse.json({ error: "Bron niet gevonden" }, { status: 404 });
+  if (!source) return NextResponse.json({ error: "Source not found" }, { status: 404 });
 
   let body: {
     include?: boolean;
@@ -34,7 +34,7 @@ export async function PUT(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const include = typeof body.include === "boolean" ? body.include : undefined;
@@ -82,10 +82,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; sourceId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId, sourceId } = await params;
   const source = await getOwnedSource(session.user.id, schedulerId, sourceId);
-  if (!source) return NextResponse.json({ error: "Bron niet gevonden" }, { status: 404 });
+  if (!source) return NextResponse.json({ error: "Source not found" }, { status: 404 });
   await prisma.schedulerSource.delete({ where: { id: sourceId } });
   return NextResponse.json({ ok: true });
 }

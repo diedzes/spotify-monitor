@@ -57,7 +57,7 @@ export async function GET(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
 
@@ -69,11 +69,11 @@ export async function GET(
       },
     });
     if (!report) {
-      return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
     const latestResult = report.results[0] ?? null;
     if (!latestResult) {
-      return NextResponse.json({ error: "Geen resultaat om te exporteren. Genereer eerst een chart." }, { status: 400 });
+      return NextResponse.json({ error: "No result to export. Generate a chart first." }, { status: 400 });
     }
 
     const rawJson = latestResult.editedRowsJson ?? latestResult.rowsJson;
@@ -83,10 +83,10 @@ export async function GET(
         typeof rawJson === "string" ? rawJson : JSON.stringify(rawJson);
       rows = JSON.parse(rowsJson) as ChartRow[];
     } catch {
-      return NextResponse.json({ error: "Kon chart-data niet lezen." }, { status: 500 });
+      return NextResponse.json({ error: "Could not read chart data." }, { status: 500 });
     }
     if (!rows.length) {
-      return NextResponse.json({ error: "Geen tracks in dit resultaat om te exporteren." }, { status: 400 });
+      return NextResponse.json({ error: "No tracks in this result to export." }, { status: 400 });
     }
 
     const csv = rowsToCsv(rows);
@@ -99,7 +99,7 @@ export async function GET(
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Onbekende fout";
+    const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[GET /api/reports/[id]/export/csv]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }

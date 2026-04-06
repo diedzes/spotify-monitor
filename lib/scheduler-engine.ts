@@ -147,7 +147,7 @@ export function validateTrackAgainstRules(
           .includes(artist)
       ).length;
       if (count >= rules.artistMaximum) {
-        return { ok: false, reason: `artist_maximum bereikt voor ${artist}` };
+        return { ok: false, reason: `artist_maximum_reached_for_${artist}` };
       }
     }
   }
@@ -158,7 +158,7 @@ export function validateTrackAgainstRules(
       if (Math.abs(position - prev.position) <= gap) {
         const prevArtists = prev.artists.split(",").map((a) => normalizeText(a));
         if (artists.some((a) => prevArtists.includes(a))) {
-          return { ok: false, reason: "artist_separation geschonden" };
+          return { ok: false, reason: "artist_separation_violated" };
         }
       }
     }
@@ -168,7 +168,7 @@ export function validateTrackAgainstRules(
     const gap = rules.titleSeparation;
     for (const prev of scheduled) {
       if (Math.abs(position - prev.position) <= gap && normalizeText(prev.title) === normalizedTitle) {
-        return { ok: false, reason: "title_separation geschonden" };
+        return { ok: false, reason: "title_separation_violated" };
       }
     }
   }
@@ -417,7 +417,7 @@ export async function computeRunQuality(
     const achievedPercent = eligible > 0 ? (matched / eligible) * 100 : 0;
     overlapBySource.push({
       sourceKey: key,
-      sourceName: src.trackedPlaylist?.name ?? src.playlistGroup?.name ?? "Bron",
+      sourceName: src.trackedPlaylist?.name ?? src.playlistGroup?.name ?? "Source",
       targetPercent: targetPct,
       achievedPercent: Math.round(achievedPercent * 10) / 10,
       matchedTracks: matched,
@@ -452,7 +452,7 @@ export async function computeRunQuality(
 
 async function buildGenerationContext(schedulerId: string): Promise<GenerationContext> {
   const scheduler = await getSchedulerWithConfig(schedulerId);
-  if (!scheduler) throw new Error("Scheduler niet gevonden");
+  if (!scheduler) throw new Error("Scheduler not found");
 
   const rulesMap = new Map<SchedulerRuleType, number | null>();
   for (const r of scheduler.rules) rulesMap.set(r.ruleType, r.valueInt);
@@ -468,7 +468,7 @@ async function buildGenerationContext(schedulerId: string): Promise<GenerationCo
   for (const src of scheduler.sources) {
     if (!src.include) continue;
     const key = src.id;
-    const sourceName = src.trackedPlaylist?.name ?? src.playlistGroup?.name ?? "Onbekende bron";
+    const sourceName = src.trackedPlaylist?.name ?? src.playlistGroup?.name ?? "Unknown source";
     const candidates: CandidateTrack[] = [];
 
     if (src.trackedPlaylist && src.trackedPlaylist.snapshots[0]) {
@@ -548,10 +548,10 @@ function pickForSource(
       artists: "",
       album: "",
       spotifyUrl: "",
-      sourceName: "Onbekende bron",
+      sourceName: "Unknown source",
       status: "conflict",
-      conflictReason: "bron niet beschikbaar",
-      conflictDetail: humanizeConflictReason("bron niet beschikbaar"),
+      conflictReason: "source_unavailable",
+      conflictDetail: humanizeConflictReason("source_unavailable"),
       locked: false,
       replacedManually: false,
       overlapsReference: false,
@@ -630,8 +630,8 @@ function pickForSource(
     spotifyUrl: "",
     sourceName: sourcePool.sourceName,
     status: "conflict",
-    conflictReason: "geen geldige kandidaat (rules of duplicates)",
-    conflictDetail: humanizeConflictReason("geen geldige kandidaat (rules of duplicates)"),
+    conflictReason: "no_valid_candidate_rules_or_duplicates",
+    conflictDetail: humanizeConflictReason("no_valid_candidate_rules_or_duplicates"),
     locked: false,
     replacedManually: false,
     overlapsReference: false,
@@ -678,8 +678,8 @@ export async function generateSchedulerRun(schedulerId: string) {
             spotifyUrl: "",
             sourceName: "",
             status: "conflict",
-            conflictReason: "geen clock-slot geconfigureerd",
-            conflictDetail: humanizeConflictReason("geen clock-slot geconfigureerd"),
+            conflictReason: "no_clock_slot_configured",
+            conflictDetail: humanizeConflictReason("no_clock_slot_configured"),
             locked: false,
             replacedManually: false,
             overlapsReference: false,
@@ -698,10 +698,10 @@ export async function generateSchedulerRun(schedulerId: string) {
               artists: "",
               album: "",
               spotifyUrl: "",
-              sourceName: "Vast nummer",
+              sourceName: "Fixed track",
               status: "conflict",
-              conflictReason: "vast nummer niet gevonden in snapshots",
-              conflictDetail: humanizeConflictReason("vast nummer niet gevonden in snapshots"),
+              conflictReason: "fixed_track_not_found_in_snapshots",
+              conflictDetail: humanizeConflictReason("fixed_track_not_found_in_snapshots"),
               locked: false,
               replacedManually: false,
               overlapsReference: false,
@@ -717,10 +717,10 @@ export async function generateSchedulerRun(schedulerId: string) {
               artists: "",
               album: "",
               spotifyUrl: "",
-              sourceName: "Vast nummer",
+              sourceName: "Fixed track",
               status: "conflict",
-              conflictReason: "nummer al gebruikt",
-              conflictDetail: humanizeConflictReason("nummer al gebruikt"),
+              conflictReason: "track_already_used",
+              conflictDetail: humanizeConflictReason("track_already_used"),
               locked: false,
               replacedManually: false,
               overlapsReference: false,
@@ -737,7 +737,7 @@ export async function generateSchedulerRun(schedulerId: string) {
               artists: "",
               album: "",
               spotifyUrl: "",
-              sourceName: "Vast nummer",
+              sourceName: "Fixed track",
               status: "conflict",
               conflictReason: check.reason,
               conflictDetail: humanizeConflictReason(check.reason),
@@ -757,7 +757,7 @@ export async function generateSchedulerRun(schedulerId: string) {
             artists: t.artists.join(", "),
             album: t.album,
             spotifyUrl: t.spotifyUrl,
-            sourceName: "Vast nummer",
+            sourceName: "Fixed track",
             status: "scheduled",
             conflictReason: null,
             conflictDetail: null,
@@ -807,7 +807,7 @@ export async function generateSchedulerRun(schedulerId: string) {
       quality,
     };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Onbekende fout";
+    const message = e instanceof Error ? e.message : "Unknown error";
     await prisma.schedulerRun.update({
       where: { id: run.id },
       data: { status: "failed", resultJson: JSON.stringify({ error: message }) },
@@ -820,9 +820,9 @@ async function getRunRowsOrThrow(schedulerId: string, runId: string) {
   const run = await prisma.schedulerRun.findFirst({
     where: { id: runId, schedulerId },
   });
-  if (!run) throw new Error("Run niet gevonden");
+  if (!run) throw new Error("Run not found");
   const raw = run.editedResultJson ?? run.resultJson;
-  if (!raw) throw new Error("Run heeft geen resultaat");
+  if (!raw) throw new Error("Run has no result");
   const { rows, quality } = parseRunResultJson(raw);
   return { run, rows: normalizeRows(rows), quality };
 }
@@ -845,7 +845,7 @@ export async function suggestAlternativesForSlot(
 ) {
   const { rows } = await getRunRowsOrThrow(schedulerId, runId);
   const row = rows.find((r) => r.position === position);
-  if (!row) throw new Error("Positie niet gevonden");
+  if (!row) throw new Error("Position not found");
   if (!row.sourceKey || row.sourceKey.startsWith("track:")) return [];
 
   const { rules, sourcePools } = await buildGenerationContext(schedulerId);
@@ -928,7 +928,7 @@ export async function replaceTrackInRun(
 ) {
   const { rows } = await getRunRowsOrThrow(schedulerId, runId);
   const rowIdx = rows.findIndex((r) => r.position === position);
-  if (rowIdx < 0) throw new Error("Positie niet gevonden");
+  if (rowIdx < 0) throw new Error("Position not found");
   const { rules, sourcePools, globalTrackLookup } = await buildGenerationContext(schedulerId);
 
   let sourceKey = payload.sourceKey ?? rows[rowIdx].sourceKey;
@@ -937,19 +937,19 @@ export async function replaceTrackInRun(
     candidate = sourcePools.get(sourceKey)?.candidates.find((c) => c.spotifyTrackId === payload.spotifyTrackId);
   }
   if (!candidate) candidate = globalTrackLookup.get(payload.spotifyTrackId);
-  if (!candidate) throw new Error("Track niet gevonden in candidates");
+  if (!candidate) throw new Error("Track not found in candidates");
 
   const usedElsewhere = new Set(
     rows
       .filter((r) => r.status === "scheduled" && r.position !== position)
       .map((r) => r.spotifyTrackId ?? "")
   );
-  if (usedElsewhere.has(candidate.spotifyTrackId)) throw new Error("Track is al gebruikt in deze run");
+  if (usedElsewhere.has(candidate.spotifyTrackId)) throw new Error("Track is already used in this run");
   const check = validateTrackAgainstRules(candidate, rows, rules, position, position);
   if (!check.ok) throw new Error(check.reason);
 
   const sourceName =
-    (sourceKey && sourcePools.get(sourceKey)?.sourceName) || rows[rowIdx].sourceName || "Handmatige keuze";
+    (sourceKey && sourcePools.get(sourceKey)?.sourceName) || rows[rowIdx].sourceName || "Manual pick";
   const schedulerRow = await getSchedulerWithConfig(schedulerId);
   const refIds = parseReferenceTrackIds(schedulerRow?.reference?.rowsJson);
   rows[rowIdx] = {
@@ -979,7 +979,7 @@ export async function setLockForSlot(
 ) {
   const { rows } = await getRunRowsOrThrow(schedulerId, runId);
   const idx = rows.findIndex((r) => r.position === position);
-  if (idx < 0) throw new Error("Positie niet gevonden");
+  if (idx < 0) throw new Error("Position not found");
   rows[idx] = { ...rows[idx], locked };
   await persistRunEdits(runId, schedulerId, rows);
   return normalizeRows(rows);
@@ -1036,12 +1036,12 @@ export async function moveSlotInRun(
   const { rows, quality } = await getRunRowsOrThrow(schedulerId, runId);
   const normalized = normalizeRows(rows);
   const maxPos = normalized.length;
-  if (fromPosition < 1 || fromPosition > maxPos) throw new Error("fromPosition buiten bereik");
-  if (toPosition < 1 || toPosition > maxPos) throw new Error("toPosition buiten bereik");
+  if (fromPosition < 1 || fromPosition > maxPos) throw new Error("fromPosition out of range");
+  if (toPosition < 1 || toPosition > maxPos) throw new Error("toPosition out of range");
   if (fromPosition === toPosition) return normalized;
 
   const moving = normalized[fromPosition - 1];
-  if (!moving) throw new Error("Positie niet gevonden");
+  if (!moving) throw new Error("Position not found");
 
   const without = normalized.filter((r) => r.position !== fromPosition);
   without.splice(toPosition - 1, 0, moving);
@@ -1073,7 +1073,7 @@ export async function reorderRunRows(
   const { rows, quality } = await getRunRowsOrThrow(schedulerId, runId);
   const normalized = normalizeRows(rows);
   const size = normalized.length;
-  if (!Array.isArray(rowsInput) || rowsInput.length !== size) throw new Error("Ongeldige reorder payload");
+  if (!Array.isArray(rowsInput) || rowsInput.length !== size) throw new Error("Invalid reorder payload");
 
   const normalizedInput = normalizeRows(rowsInput).map((r, idx) => ({
     ...r,

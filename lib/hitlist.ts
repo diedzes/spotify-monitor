@@ -52,7 +52,7 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
- * - Bron: playlists in de Hitlist-hoofdgroep (isMainGroup), met excludeFromHitlist=false.
+ * - Bron: playlists in de Hitlist main group (isMainGroup), met excludeFromHitlist=false.
  * - Match-kant: overige tracked playlists met excludeFromHitlist=false, niet in hoofdgroep (geen kruisingen hoofdgroep-onderling).
  * - Match 1: dezelfde spotifyTrackId op bron- en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
@@ -163,7 +163,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
   const sampleNew: HitlistRebuildResult["sampleNew"] = [];
   const now = new Date();
 
-  // Geen interactieve $transaction: die breekt vaak achter Supabase PgBouncer (transaction pool mode).
+  // No interactive $transaction: often breaks behind Supabase PgBouncer (transaction pool mode).
   for (const [, d] of desired) {
     const key = matchKey(d.mainId, d.matchedId, d.trackId);
     const row = existingByKey.get(key);

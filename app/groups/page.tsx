@@ -69,7 +69,7 @@ function GroupsPageContent() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -81,9 +81,9 @@ function GroupsPageContent() {
         <AppHeader />
         <div className="p-6">
           <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
-            <p className="text-amber-800 dark:text-amber-200">Niet ingelogd.</p>
+            <p className="text-amber-800 dark:text-amber-200">Not signed in.</p>
             <Link href="/" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-              Naar startpagina
+              To home page
             </Link>
           </div>
         </div>
@@ -97,7 +97,7 @@ function GroupsPageContent() {
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Playlistgroepen
+            Playlist groups
           </h1>
           <Link
             href="/groups/new"
@@ -109,7 +109,7 @@ function GroupsPageContent() {
         {groups.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-6 py-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-zinc-500 dark:text-zinc-400">
-              Nog geen groepen. Maak een groep om playlists te organiseren.
+              No groups yet. Create a group to organize playlists.
             </p>
             <Link
               href="/groups/new"
@@ -133,7 +133,7 @@ function GroupsPageContent() {
                         <span className="min-w-0 truncate">{g.name}</span>
                         {g.isMainGroup ? (
                           <span className="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
-                            Hitlist-bron
+                            Hitlist source
                           </span>
                         ) : null}
                       </h2>
@@ -162,7 +162,7 @@ export default function GroupsPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       }
     >

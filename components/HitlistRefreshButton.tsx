@@ -29,12 +29,12 @@ export function HitlistRefreshButton({ signedId, disabled }: Props) {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(typeof data.error === "string" ? data.error : "Vernieuwen mislukt");
+        setError(typeof data.error === "string" ? data.error : "Refresh failed");
         return;
       }
       router.refresh();
     } catch {
-      setError("Vernieuwen mislukt");
+      setError("Refresh failed");
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export function HitlistRefreshButton({ signedId, disabled }: Props) {
         onClick={() => void refresh()}
         className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
       >
-        {loading ? "Bezig…" : "Refresh"}
+        {loading ? "Working…" : "Refresh"}
       </button>
       {error ? <p className="max-w-xs text-right text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </div>

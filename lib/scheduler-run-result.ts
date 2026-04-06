@@ -28,22 +28,46 @@ export type RunResultPayload = {
   quality: RunQualitySummary;
 };
 
+const CONFLICT_MESSAGES: Record<string, string> = {
+  // English keys (current)
+  source_unavailable:
+    "The selected source is unavailable (missing playlist/group or excluded).",
+  no_valid_candidate_rules_or_duplicates:
+    "No suitable track: all candidates conflict with rules or are already used.",
+  no_clock_slot_configured: "No clock slot is configured for this position.",
+  fixed_track_not_found_in_snapshots:
+    "The fixed track is not in the synced snapshots. Sync the source playlists first.",
+  track_already_used: "This track was already placed earlier in the schedule (no duplicates).",
+  artist_separation_violated: "Artist separation: same artist too close to an earlier track.",
+  title_separation_violated: "Title separation: same title too close to an earlier track.",
+
+  // Legacy rule violation strings (may appear as dynamic check.reason)
+  "artist_separation geschonden": "Artist separation: same artist too close to an earlier track.",
+  "title_separation geschonden": "Title separation: same title too close to an earlier track.",
+
+  // Legacy Dutch keys (older stored run JSON)
+  "bron niet beschikbaar":
+    "The selected source is unavailable (missing playlist/group or excluded).",
+  "geen geldige kandidaat (rules of duplicates)":
+    "No suitable track: all candidates conflict with rules or are already used.",
+  "geen clock-slot geconfigureerd": "No clock slot is configured for this position.",
+  "vast nummer niet gevonden in snapshots":
+    "The fixed track is not in the synced snapshots. Sync the source playlists first.",
+  "nummer al gebruikt": "This track was already placed earlier in the schedule (no duplicates).",
+};
+
 export function humanizeConflictReason(reason: string | null): string | null {
   if (!reason) return null;
-  const map: Record<string, string> = {
-    "geen clock-slot geconfigureerd": "Er is geen clock-slot ingesteld voor deze positie.",
-    "bron niet beschikbaar": "De gekozen bron is niet beschikbaar (playlist/groep ontbreekt of is uitgesloten).",
-    "geen geldige kandidaat (rules of duplicates)":
-      "Geen passend nummer gevonden: alle kandidaten botsen met de ingestelde regels of zijn al gebruikt.",
-    "vast nummer niet gevonden in snapshots":
-      "Het vaste nummer staat niet in de gesynchroniseerde snapshots. Sync de bron-playlists eerst.",
-    "nummer al gebruikt": "Dit nummer is al eerder in de schedule geplaatst (geen duplicaten).",
-    "artist_separation geschonden": "Artist separation: hetzelfde artiest te dicht bij een eerder nummer.",
-    "title_separation geschonden": "Title separation: dezelfde titel te dicht bij een eerder nummer.",
-  };
-  if (map[reason]) return map[reason];
+  if (CONFLICT_MESSAGES[reason]) return CONFLICT_MESSAGES[reason];
   if (reason.startsWith("artist_maximum")) {
-    return `Artist maximum: ${reason.replace("artist_maximum bereikt voor ", "te veel nummers van artiest ")}.`;
+    if (reason.startsWith("artist_maximum_reached_for_")) {
+      const artist = reason.slice("artist_maximum_reached_for_".length);
+      return `Artist maximum: too many tracks from artist ${artist}.`;
+    }
+    if (reason.startsWith("artist_maximum bereikt voor ")) {
+      const artist = reason.slice("artist_maximum bereikt voor ".length);
+      return `Artist maximum: too many tracks from artist ${artist}.`;
+    }
   }
   return reason;
 }

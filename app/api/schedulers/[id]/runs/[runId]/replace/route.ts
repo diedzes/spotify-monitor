@@ -10,10 +10,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string; runId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id, runId } = await params;
   const scheduler = await prisma.scheduler.findFirst({ where: { id, userId: session.user.id }, select: { id: true } });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   const body = (await request.json().catch(() => ({}))) as {
     position?: number;
@@ -21,7 +21,7 @@ export async function POST(
     sourceKey?: string | null;
   };
   if (!Number.isInteger(body.position) || (body.position ?? 0) <= 0 || !body.spotifyTrackId) {
-    return NextResponse.json({ error: "position en spotifyTrackId zijn verplicht" }, { status: 400 });
+    return NextResponse.json({ error: "position and spotifyTrackId are required" }, { status: 400 });
   }
   try {
     const rows = await replaceTrackInRun(id, runId, body.position!, {
@@ -31,7 +31,7 @@ export async function POST(
     const quality = await computeRunQuality(id, rows);
     return NextResponse.json({ ok: true, rows, quality });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Vervangen mislukt";
+    const message = e instanceof Error ? e.message : "Replace failed";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

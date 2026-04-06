@@ -19,14 +19,14 @@ export async function POST(
 ): Promise<NextResponse<BulkAddToGroupResult | { error: string }>> {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   let body: { groupId?: string; trackedPlaylistIds?: string[] };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const groupId = typeof body.groupId === "string" ? body.groupId.trim() : "";
@@ -34,10 +34,10 @@ export async function POST(
     ? body.trackedPlaylistIds.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean)
     : [];
   if (!groupId) {
-    return NextResponse.json({ error: "groupId is verplicht" }, { status: 400 });
+    return NextResponse.json({ error: "groupId is required" }, { status: 400 });
   }
   if (ids.length === 0) {
-    return NextResponse.json({ error: "trackedPlaylistIds mag niet leeg zijn" }, { status: 400 });
+    return NextResponse.json({ error: "trackedPlaylistIds cannot be empty" }, { status: 400 });
   }
 
   const result: BulkAddToGroupResult = { ok: true, added: 0, skipped: 0, errors: [] };
@@ -57,7 +57,7 @@ export async function POST(
     } catch (e) {
       result.errors.push({
         trackedPlaylistId,
-        error: e instanceof Error ? e.message : "Kon niet toevoegen",
+        error: e instanceof Error ? e.message : "Could not add",
       });
     }
   }

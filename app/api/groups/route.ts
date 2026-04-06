@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const groups = await getPlaylistGroups(session.user.id);
   return NextResponse.json({
@@ -26,13 +26,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   let body: { name?: string; description?: string; color?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const name = typeof body.name === "string" ? body.name : "";
   const description = typeof body.description === "string" ? body.description : undefined;
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Kon groep niet aanmaken";
+    const message = e instanceof Error ? e.message : "Could not create group";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

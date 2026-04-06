@@ -41,7 +41,7 @@ export function clearStoredSessionId(): void {
   }
 }
 
-/** Gebruik op de startpagina: wis opgeslagen sessie na logout. */
+/** Home page: clear stored session after logout. */
 export function ClearSessionOnHome() {
   useEffect(() => {
     clearStoredSessionId();

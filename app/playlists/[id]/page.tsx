@@ -26,7 +26,7 @@ function getSessionHeaders(): HeadersInit {
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("nl-NL", {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(iso));
@@ -120,13 +120,13 @@ export default function PlaylistDetailPage() {
           return;
         }
         if (res.status === 404) {
-          setError("Playlist niet gevonden");
+          setError("Playlist not found");
           return;
         }
         const body = await res.json();
         setData(body);
       })
-      .catch(() => setError("Kon playlist niet laden"))
+      .catch(() => setError("Could not load playlist"))
       .finally(() => setLoading(false));
   };
 
@@ -165,13 +165,13 @@ export default function PlaylistDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string; changed?: boolean };
       if (!res.ok || !body.ok) {
-        setSyncMessage(body.error ?? "Sync mislukt");
+        setSyncMessage(body.error ?? "Sync failed");
         return;
       }
-      setSyncMessage(body.changed ? "Playlist bijgewerkt; nieuwe snapshot opgeslagen." : "Geen wijzigingen; metadata bijgewerkt.");
+      setSyncMessage(body.changed ? "Playlist updated; new snapshot saved." : "No changes; metadata updated.");
       load();
     } catch {
-      setSyncMessage("Sync mislukt");
+      setSyncMessage("Sync failed");
     } finally {
       setSyncing(false);
     }
@@ -182,7 +182,7 @@ export default function PlaylistDetailPage() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -196,7 +196,7 @@ export default function PlaylistDetailPage() {
           <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
             <p className="text-amber-800 dark:text-amber-200">{error}</p>
             <Link href="/playlists" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-              ← Terug naar playlists
+              ← Back to playlists
             </Link>
           </div>
         </div>
@@ -234,7 +234,7 @@ export default function PlaylistDetailPage() {
                 </p>
               )}
               <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
-                Laatste sync: {formatDate(playlist.lastSyncedAt)}
+                Last sync: {formatDate(playlist.lastSyncedAt)}
               </p>
             </div>
           </div>
@@ -266,24 +266,24 @@ export default function PlaylistDetailPage() {
 
         <section className="mb-8">
           <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">
-            Groepen
+            Groups
           </h2>
           <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Deze playlist zit in de volgende groepen.
+            This playlist is in the following groups.
             {playlist.inHitlistMainGroup ? (
               <span className="ml-1 font-medium text-emerald-700 dark:text-emerald-400">
-                Staat in de Hitlist-hoofdgroep (bron voor de hitlist).
+                In the Hitlist main group (source for the hitlist).
               </span>
             ) : null}
             {playlist.excludeFromHitlist ? (
               <span className="ml-1 font-medium text-violet-700 dark:text-violet-400">
-                Telt niet mee voor de hitlist.
+                Does not count toward the hitlist.
               </span>
             ) : null}
           </p>
           {(playlist.groups?.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-              Nog in geen groep. Voeg toe via &quot;Add to group&quot; op het playlists-overzicht of hieronder.
+              Not in any group yet. Add via &quot;Add to group&quot; on the playlists overview or below.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2">
@@ -333,15 +333,15 @@ export default function PlaylistDetailPage() {
                     if (!res.ok || !j.ok) throw new Error(j.error ?? "Mislukt");
                     load();
                   })
-                  .catch(() => setSyncMessage("Hitlist-voorkeur opslaan mislukt."))
+                  .catch(() => setSyncMessage("Failed to save Hitlist preference."))
                   .finally(() => setExcludeSaving(false));
               }}
             />
             <span>
               <span className="font-medium text-zinc-900 dark:text-zinc-100">Meetellen in hitlist</span>
               <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                Uitgeschakeld = deze playlist is geen bron en wordt niet als &quot;ook op&quot;-playlist gebruikt. Sync en
-                groepen blijven gewoon werken.
+                Off = this playlist is not a source and is not used as an &quot;also on&quot; playlist. Sync and
+                groups still work as usual.
               </span>
             </span>
           </label>
@@ -353,7 +353,7 @@ export default function PlaylistDetailPage() {
           </h2>
           {snapshots.length === 0 ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Nog geen snapshots. Klik op &quot;Sync now&quot; om de eerste op te slaan.
+              No snapshots yet. Click &quot;Sync now&quot; to save the first one.
             </p>
           ) : (
             <ul className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -395,11 +395,11 @@ export default function PlaylistDetailPage() {
           {activeTab === "tracks" && (
             <>
               <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-                Tracks uit de laatste snapshot.
+                Tracks from the latest snapshot.
               </p>
               {latestTracks.length === 0 ? (
                 <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                  Geen tracks. Sync de playlist om een snapshot te maken.
+                  No tracks. Sync the playlist to create a snapshot.
                 </p>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -407,7 +407,7 @@ export default function PlaylistDetailPage() {
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-700">
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">#</th>
-                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
+                        <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artist</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Album</th>
                         <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Duration</th>
@@ -451,15 +451,15 @@ export default function PlaylistDetailPage() {
           {activeTab === "changes" && (
             <>
               <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-                Vergelijking tussen de twee meest recente snapshots.
+                Comparison between the two most recent snapshots.
               </p>
               {changesLoading ? (
                 <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                  Laden…
+                  Loading…
                 </p>
               ) : !hasEnoughSnapshots ? (
                 <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                  Er zijn minimaal 2 snapshots nodig om wijzigingen te vergelijken. Sync de playlist nog een keer om een tweede snapshot te maken.
+                  At least 2 snapshots are needed to compare changes. Sync the playlist again to create a second snapshot.
                 </p>
               ) : (
                 <>
@@ -483,7 +483,7 @@ export default function PlaylistDetailPage() {
                     if (filtered.length === 0) {
                       return (
                         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                          Geen wijzigingen in deze filter.
+                          No changes in this filter.
                         </p>
                       );
                     }
@@ -493,7 +493,7 @@ export default function PlaylistDetailPage() {
                           <thead>
                             <tr className="border-b border-zinc-200 dark:border-zinc-700">
                               <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Status</th>
-                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artiest</th>
+                              <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artist</th>
                               <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Titel</th>
                               <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Vorige pos.</th>
                               <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Huidige pos.</th>

@@ -12,21 +12,21 @@ import { Prisma } from "@prisma/client";
 export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   let body: { playlistUrlOrId?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const playlistUrlOrId = typeof body.playlistUrlOrId === "string" ? body.playlistUrlOrId.trim() : "";
   const playlistId = parsePlaylistIdFromInput(playlistUrlOrId);
   if (!playlistId) {
     return NextResponse.json(
-      { error: "Ongeldige Spotify playlist URL of ID. Gebruik een link zoals https://open.spotify.com/playlist/... of alleen het playlist ID." },
+      { error: "Invalid Spotify playlist URL or ID. Use a link like https://open.spotify.com/playlist/... or the playlist ID only." },
       { status: 400 }
     );
   }
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (err instanceof Error) {
       if (err.message.startsWith("Spotify API 404")) {
         return NextResponse.json(
-          { error: "Playlist niet gevonden. Controleer de URL of ID en of de playlist openbaar is." },
+          { error: "Playlist not found. Controleer de URL of ID en of de playlist openbaar is." },
           { status: 400 }
         );
       }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
     console.error("[playlists/add]", err);
     return NextResponse.json(
-      { error: "Kon playlist niet toevoegen. Probeer het later opnieuw." },
+      { error: "Could not add playlist. Please try again later." },
       { status: 500 }
     );
   }

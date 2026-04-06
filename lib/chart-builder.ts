@@ -55,7 +55,7 @@ function pointsForPosition(position0Based: number, trackCount: number, mode: Sco
 
 /**
  * Bouw gewogen chart uit een report.
- * - Groepen worden uitgeklapt naar hun gekoppelde playlists; het gewicht van de groep geldt voor elk van die playlists.
+ * - Groups worden uitgeklapt naar hun gekoppelde playlists; het gewicht van de groep geldt voor elk van die playlists.
  * - Dedupe: als een playlist zowel expliciet als via een groep voorkomt, wordt alleen de expliciete bron gebruikt.
  * - Per playlist wordt de nieuwste snapshot gebruikt; ontbreekt die, dan wordt die bron overgeslagen en een fout gemeld.
  */
@@ -85,7 +85,7 @@ export async function buildChart(
     },
   });
 
-  if (!report) throw new Error("Report niet gevonden");
+  if (!report) throw new Error("Report not found");
 
   const errors: string[] = [];
 
@@ -101,7 +101,7 @@ export async function buildChart(
       const name = src.trackedPlaylist.name;
       const snap = src.trackedPlaylist.snapshots[0];
       if (!snap) {
-        errors.push(`Playlist "${name}" heeft nog geen snapshot; sync eerst de playlist.`);
+        errors.push(`Playlist "${name}" has no snapshot yet; sync the playlist first.`);
         continue;
       }
       playlistWeights.set(src.trackedPlaylistId, {
@@ -117,7 +117,7 @@ export async function buildChart(
         if (!tp) continue;
         const snap = tp.snapshots[0];
         if (!snap) {
-          errors.push(`Playlist "${tp.name}" (uit groep "${groupName}") heeft nog geen snapshot; sync eerst.`);
+          errors.push(`Playlist "${tp.name}" (from group "${groupName}") has no snapshot yet; sync first.`);
           continue;
         }
         if (!playlistWeights.has(tp.id)) {

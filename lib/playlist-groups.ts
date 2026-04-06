@@ -1,5 +1,5 @@
 /**
- * Playlistgroepen: groepen van tracked playlists per gebruiker.
+ * Playlist groups: groepen van tracked playlists per gebruiker.
  */
 
 import { prisma } from "@/lib/db";
@@ -12,7 +12,7 @@ export async function createPlaylistGroup(
   color?: string | null
 ) {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("Naam is verplicht");
+  if (!trimmed) throw new Error("Name is required");
   return prisma.playlistGroup.create({
     data: {
       userId,
@@ -33,12 +33,12 @@ export async function updatePlaylistGroupForUser(
   const existing = await prisma.playlistGroup.findFirst({
     where: { id: groupId, userId },
   });
-  if (!existing) throw new Error("Groep niet gevonden");
+  if (!existing) throw new Error("Group not found");
 
   const data: { name?: string; description?: string | null; color?: string } = {};
   if (patch.name !== undefined) {
     const t = patch.name.trim();
-    if (!t) throw new Error("Naam mag niet leeg zijn");
+    if (!t) throw new Error("Name cannot be empty");
     data.name = t;
   }
   if (patch.description !== undefined) {
@@ -89,12 +89,12 @@ export async function addPlaylistToGroup(
   const group = await prisma.playlistGroup.findFirst({
     where: { id: groupId, userId },
   });
-  if (!group) throw new Error("Groep niet gevonden");
+  if (!group) throw new Error("Group not found");
 
   const playlist = await prisma.trackedPlaylist.findFirst({
     where: { id: trackedPlaylistId, userId },
   });
-  if (!playlist) throw new Error("Playlist niet gevonden");
+  if (!playlist) throw new Error("Playlist not found");
 
   const existing = await prisma.groupPlaylist.findUnique({
     where: {
@@ -116,7 +116,7 @@ export async function removePlaylistFromGroup(
   const group = await prisma.playlistGroup.findFirst({
     where: { id: groupId, userId },
   });
-  if (!group) throw new Error("Groep niet gevonden");
+  if (!group) throw new Error("Group not found");
 
   await prisma.groupPlaylist.deleteMany({
     where: {

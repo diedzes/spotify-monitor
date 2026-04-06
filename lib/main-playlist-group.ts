@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export const HITLIST_MAIN_GROUP_DESCRIPTION =
-  "Bron-playlists voor de Hitlist. Voeg hier playlists toe om te vergelijken met je overige tracked playlists.";
+  "Source playlists for the Hitlist. Add playlists here to compare with your other tracked playlists.";
 
 /** Standaardnaam voor de automatisch aangemaakte hoofdgroep (uniek per gebruiker via suffix). */
 export const HITLIST_MAIN_GROUP_BASE_NAME = "Hoofdplaylist";
@@ -22,7 +22,7 @@ export async function getMainSourcePlaylistIds(userId: string): Promise<Set<stri
 }
 
 /**
- * Zorgt dat de gebruiker precies één Hitlist-hoofdgroep heeft (lege groep als die nog niet bestond).
+ * Zorgt dat de gebruiker precies één Hitlist main group heeft (lege groep als die nog niet bestond).
  */
 export async function ensureMainPlaylistGroup(userId: string) {
   const existing = await getMainPlaylistGroup(userId);
@@ -45,7 +45,7 @@ export async function ensureMainPlaylistGroup(userId: string) {
       throw e;
     }
   }
-  throw new Error("Kon Hitlist-hoofdgroep niet aanmaken");
+  throw new Error("Could not create Hitlist main group");
 }
 
 export async function isMainHitlistGroup(userId: string, groupId: string): Promise<boolean> {

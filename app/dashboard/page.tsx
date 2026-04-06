@@ -80,7 +80,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Recent projects</h2>
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-              Laatst bijgewerkte reports en schedulers — direct verder werken.
+              Recently updated reports and schedulers — continue where you left off.
             </p>
             <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {recentProjects.map((p) => (
@@ -108,7 +108,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                       <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
                     </div>
                     <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                      {p.updatedAt.toLocaleString("nl-NL")}
+                      {p.updatedAt.toLocaleString("en-GB")}
                     </span>
                   </a>
                 </li>
@@ -125,28 +125,28 @@ export default async function DashboardPage({ searchParams }: Props) {
             ) : null}
           </div>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-            Nummers die in de Hitlist-hoofdgroep staan én (via dezelfde Spotify-track-ID of artiest+titel) ook op een
-            tracked playlist die <strong>niet</strong> in die hoofdgroep zit. Overlap alleen tussen hoofdgroep-playlists
-            onderling telt niet mee. <strong>Refresh</strong> herberekent op de nieuwste snapshots (zoals na sync).
+            Tracks that appear in the Hitlist main group and (via the same Spotify track ID or artist+title) also on a
+            tracked playlist that is <strong>not</strong> in that main group. Overlap between main-group playlists only
+            does not count. <strong>Refresh</strong> recomputes from the latest snapshots (e.g. after a sync).
           </p>
           {mainPlaylistCount === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-              Nog geen playlists in de Hitlist-hoofdgroep. Voeg playlists toe aan die groep op{" "}
+              No playlists in the Hitlist main group yet. Add playlists to that group on{" "}
               <a
                 href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"}
                 className="text-[#1DB954] hover:underline"
               >
                 Playlists
               </a>{" "}
-              of via Groepen.
+              of via Groups.
             </p>
           ) : (
             <>
               <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Active Hitlist</h3>
               {activeHitlist.length === 0 ? (
                 <p className="mb-6 rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  Geen actieve matches. Sync de playlists in de Hitlist-hoofdgroep en andere tracked playlists, of gebruik{" "}
-                  <strong>Refresh</strong> om op de nieuwste snapshots te controleren.
+                  No active matches. Sync playlists in the Hitlist main group and other tracked playlists, or use{" "}
+                  <strong>Refresh</strong> to check against the latest snapshots.
                 </p>
               ) : (
                 <div className="mb-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -218,7 +218,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Removed in last 14 days</h3>
               {removedHitlist.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  Geen recent verwijderde matches.
+                  No recently removed matches.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -272,7 +272,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                               </Link>
                             </td>
                             <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                              {removedAt ? removedAt.toLocaleString("nl-NL") : "—"}
+                              {removedAt ? removedAt.toLocaleString("en-GB") : "—"}
                             </td>
                           </tr>
                         );
@@ -297,7 +297,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               {trackedPlaylistCount}
             </p>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Playlists die je volgt
+              Playlists you follow
             </p>
           </a>
           <a
@@ -305,10 +305,10 @@ export default async function DashboardPage({ searchParams }: Props) {
             className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
           >
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
-              Playlistgroepen
+              Playlist groups
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Groepen om playlists in te organiseren
+              Organize playlists into groups
             </p>
           </a>
           <a
@@ -322,17 +322,17 @@ export default async function DashboardPage({ searchParams }: Props) {
               {reportCount}
             </p>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Gewogen charts uit playlists en groepen
+              Weighted charts from playlists and groups
             </p>
           </a>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">
-            Sessie
+            Session
           </h2>
           <dl className="space-y-1 text-sm">
             <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">Naam</dt>
+              <dt className="text-zinc-500 dark:text-zinc-400">Name</dt>
               <dd className="text-zinc-900 dark:text-zinc-100">
                 {session.user.name ?? "—"}
               </dd>

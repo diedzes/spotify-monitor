@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id: reportId, sourceId } = await params;
   const report = await prisma.report.findFirst({
@@ -18,13 +18,13 @@ export async function PUT(
     include: { sources: { where: { id: sourceId } } },
   });
   if (!report || report.sources.length === 0) {
-    return NextResponse.json({ error: "Bron niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Source not found" }, { status: 404 });
   }
   let body: { weight?: number; include?: boolean };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const weight =
     typeof body.weight === "number" && body.weight >= 0 ? body.weight : undefined;
@@ -52,20 +52,20 @@ export async function DELETE(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id: reportId, sourceId } = await params;
   const report = await prisma.report.findFirst({
     where: { id: reportId, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   const source = await prisma.reportSource.findFirst({
     where: { id: sourceId, reportId },
   });
   if (!source) {
-    return NextResponse.json({ error: "Bron niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Source not found" }, { status: 404 });
   }
   await prisma.reportSource.delete({ where: { id: sourceId } });
   return NextResponse.json({ ok: true });

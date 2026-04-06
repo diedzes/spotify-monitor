@@ -14,26 +14,26 @@ export async function PUT(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id: reportId, resultId } = await params;
   const report = await prisma.report.findFirst({
     where: { id: reportId, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   const result = await prisma.reportResult.findFirst({
     where: { id: resultId, reportId },
   });
   if (!result) {
-    return NextResponse.json({ error: "Resultaat niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Result not found" }, { status: 404 });
   }
   let body: { editedRowsJson?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const raw =
     typeof body.editedRowsJson === "string" ? body.editedRowsJson.trim() || null : null;

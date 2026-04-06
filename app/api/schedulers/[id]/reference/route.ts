@@ -11,7 +11,7 @@ async function buildRowsJsonFromTrackedPlaylist(trackedPlaylistId: string, userI
     include: { snapshots: { orderBy: { syncedAt: "desc" }, take: 1 } },
   });
   if (!tp?.snapshots[0]) {
-    throw new Error("Geen snapshot voor deze playlist. Sync de playlist eerst op de Playlists-pagina.");
+    throw new Error("No snapshot for this playlist. Sync the playlist first on the Playlists page.");
   }
   const tracks = await prisma.snapshotTrack.findMany({
     where: { snapshotId: tp.snapshots[0].id },
@@ -33,20 +33,20 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
 
   const scheduler = await prisma.scheduler.findFirst({
     where: { id, userId: session.user.id },
     select: { id: true },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: { trackedPlaylistId?: string; playlistUrl?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   let trackedPlaylistId = typeof body.trackedPlaylistId === "string" ? body.trackedPlaylistId.trim() : "";
@@ -55,7 +55,7 @@ export async function PUT(
     const spotifyId = parsePlaylistIdFromInput(body.playlistUrl.trim());
     if (!spotifyId) {
       return NextResponse.json(
-        { error: "Ongeldige playlist-URL. Gebruik een open.spotify.com/playlist/… link." },
+        { error: "Invalid playlist URL. Use an open.spotify.com/playlist/… link." },
         { status: 400 }
       );
     }
@@ -67,7 +67,7 @@ export async function PUT(
       return NextResponse.json(
         {
           error:
-            "Deze playlist staat nog niet in je tracked playlists. Voeg hem eerst toe via Playlists (of plak dezelfde URL daar).",
+            "This playlist is not in your tracked playlists yet. Add it first via Playlists (or paste the same URL there).",
         },
         { status: 400 }
       );
@@ -97,7 +97,7 @@ export async function PUT(
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Importeren mislukt";
+    const message = e instanceof Error ? e.message : "Import failed";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -107,14 +107,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
 
   const scheduler = await prisma.scheduler.findFirst({
     where: { id, userId: session.user.id },
     select: { id: true },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   await prisma.schedulerReference.deleteMany({ where: { schedulerId: id } });
   return NextResponse.json({ ok: true });

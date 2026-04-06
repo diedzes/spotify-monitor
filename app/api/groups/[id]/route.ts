@@ -11,12 +11,12 @@ export async function GET(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
   const group = await getPlaylistGroupById(session.user.id, id);
   if (!group) {
-    return NextResponse.json({ error: "Groep niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
   return NextResponse.json({
     group: {
@@ -47,14 +47,14 @@ export async function PATCH(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
   let body: { name?: string; description?: string | null; color?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const patch: { name?: string; description?: string | null; color?: string } = {};
@@ -63,7 +63,7 @@ export async function PATCH(
   if (typeof body.color === "string") patch.color = body.color;
 
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: "Geen velden om bij te werken" }, { status: 400 });
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
   try {
@@ -80,16 +80,16 @@ export async function PATCH(
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "";
-    if (message === "Groep niet gevonden") {
-      return NextResponse.json({ error: "Groep niet gevonden" }, { status: 404 });
+    if (message === "Group not found") {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
-    if (message === "Naam mag niet leeg zijn") {
+    if (message === "Name cannot be empty") {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json({ error: "Er bestaat al een groep met deze naam" }, { status: 409 });
+      return NextResponse.json({ error: "A group with this name already exists" }, { status: 409 });
     }
     console.error("[PATCH /api/groups/[id]]", e);
-    return NextResponse.json({ error: "Kon groep niet bijwerken" }, { status: 500 });
+    return NextResponse.json({ error: "Could not update group" }, { status: 500 });
   }
 }

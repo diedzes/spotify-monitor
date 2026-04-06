@@ -26,7 +26,7 @@ function getSessionHeaders(): HeadersInit {
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
 }
 
 type PlaylistInGroup = {
@@ -71,14 +71,14 @@ export default function GroupDetailPage() {
     fetch(`/api/groups/${id}`, { credentials: "include", headers: getSessionHeaders() })
       .then((res) => {
         if (res.status === 401) router.replace("/groups");
-        else if (res.status === 404) setError("Groep niet gevonden");
+        else if (res.status === 404) setError("Group not found");
         else
           return res.json().then((d: GroupDetail) => {
             setData(d);
             if (d.group?.color) setGroupColor(normalizeGroupColor(d.group.color));
           });
       })
-      .catch(() => setError("Kon groep niet laden"))
+      .catch(() => setError("Could not load group"))
       .finally(() => setLoading(false));
   };
 
@@ -99,13 +99,13 @@ export default function GroupDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setColorError(body.error ?? "Kleur opslaan mislukt.");
+        setColorError(body.error ?? "Failed to save color.");
         return;
       }
-      setSuccess("Kleur opgeslagen.");
+      setSuccess("Color saved.");
       load();
     } catch {
-      setColorError("Kleur opslaan mislukt.");
+      setColorError("Failed to save color.");
     } finally {
       setColorSaving(false);
     }
@@ -121,13 +121,13 @@ export default function GroupDetailPage() {
       );
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Kon playlist niet verwijderen.");
+        setError(body.error ?? "Could not remove playlist.");
         return;
       }
-      setSuccess("Playlist uit groep verwijderd.");
+      setSuccess("Playlist removed from group.");
       load();
     } catch {
-      setError("Kon playlist niet verwijderen.");
+      setError("Could not remove playlist.");
     } finally {
       setRemovingId(null);
     }
@@ -138,7 +138,7 @@ export default function GroupDetailPage() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -152,7 +152,7 @@ export default function GroupDetailPage() {
           <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
             <p className="text-amber-800 dark:text-amber-200">{error}</p>
             <Link href="/groups" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-              ← Terug naar groepen
+              ← Back to groups
             </Link>
           </div>
         </div>
@@ -180,16 +180,16 @@ export default function GroupDetailPage() {
           )}
           {group.isMainGroup && (
             <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
-              Dit is je <strong>Hitlist-hoofdgroep</strong>: playlists in deze groep zijn de bron voor de hitlist op het
-              dashboard. Je kunt ze ook beheren vanaf het playlists-overzicht (kolom Hitlist-bron).
+              This is your <strong>Hitlist main group</strong>: playlists in this group are the source for the hitlist on the
+              dashboard. You can also manage them from the playlists overview (Hitlist source column).
             </p>
           )}
         </div>
 
         <section className="mb-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">Groepskleur</h2>
+          <h2 className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">Group color</h2>
           <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Zichtbaar op playlists-overzicht, in reports en scheduler.
+            Visible on the playlists overview, in reports and scheduler.
           </p>
           {colorError && (
             <p className="mb-2 text-sm text-red-600 dark:text-red-400">{colorError}</p>
@@ -200,7 +200,7 @@ export default function GroupDetailPage() {
               value={groupColor}
               onChange={(e) => setGroupColor(e.target.value)}
               className="h-10 w-14 cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600"
-              aria-label="Groepskleur"
+              aria-label="Group color"
             />
             <div className="flex flex-wrap gap-2">
               {GROUP_COLOR_PRESETS.map((preset) => (
@@ -222,7 +222,7 @@ export default function GroupDetailPage() {
               onClick={() => void saveGroupColor()}
               className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
             >
-              {colorSaving ? "Opslaan…" : "Kleur opslaan"}
+              {colorSaving ? "Saving…" : "Save color"}
             </button>
           </div>
         </section>
@@ -239,25 +239,25 @@ export default function GroupDetailPage() {
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Playlists in deze groep</h2>
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Playlists in this group</h2>
           <Link
             href={`/groups/${id}/add-playlist`}
             className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760]"
           >
-            Playlist toevoegen
+            Add playlist
           </Link>
         </div>
 
         {playlists.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-zinc-500 dark:text-zinc-400">
-              Nog geen playlists in deze groep. Voeg playlists toe via de knop hierboven of via het playlists-overzicht.
+              No playlists in this group yet. Add playlists via the button above or from the playlists overview.
             </p>
             <Link
               href={`/groups/${id}/add-playlist`}
               className="mt-4 inline-block rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760]"
             >
-              Playlist toevoegen
+              Add playlist
             </Link>
           </div>
         ) : (
@@ -275,7 +275,7 @@ export default function GroupDetailPage() {
                     {p.ownerName} · {p.trackCount} tracks
                   </p>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                    Laatste sync: {formatDate(p.lastSyncedAt)} · {p.snapshotCount} snapshot{p.snapshotCount !== 1 ? "s" : ""}
+                    Last sync: {formatDate(p.lastSyncedAt)} · {p.snapshotCount} snapshot{p.snapshotCount !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <span className="flex flex-wrap items-center gap-2">
@@ -305,7 +305,7 @@ export default function GroupDetailPage() {
                     onClick={() => handleRemove(p.trackedPlaylistId)}
                     className="rounded bg-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:bg-zinc-600 dark:text-zinc-200 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                   >
-                    {removingId === p.trackedPlaylistId ? "Verwijderen…" : "Uit groep"}
+                    {removingId === p.trackedPlaylistId ? "Removing…" : "Remove from group"}
                   </button>
                 </span>
               </li>

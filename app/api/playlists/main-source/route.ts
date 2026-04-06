@@ -9,20 +9,20 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   let body: { trackedPlaylistIds?: string[]; inHitlistMainGroup?: boolean };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const ids = Array.isArray(body.trackedPlaylistIds)
     ? body.trackedPlaylistIds.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean)
     : [];
   if (ids.length === 0 || typeof body.inHitlistMainGroup !== "boolean") {
     return NextResponse.json(
-      { error: "trackedPlaylistIds (niet leeg) en inHitlistMainGroup (boolean) zijn verplicht" },
+      { error: "trackedPlaylistIds (non-empty) and inHitlistMainGroup (boolean) are required" },
       { status: 400 }
     );
   }

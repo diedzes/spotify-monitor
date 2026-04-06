@@ -73,7 +73,7 @@ export async function GET(request: Request) {
   const validIdButNotInDb = !!sessionId && !dbRow;
   return NextResponse.json(
     {
-      error: "Niet ingelogd",
+      error: "Not signed in",
       hint: validIdButNotInDb ? "session_not_in_db" : undefined,
       debug: {
         hasCookie: !!cookieValue,

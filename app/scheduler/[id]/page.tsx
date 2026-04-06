@@ -225,16 +225,16 @@ export default function SchedulerDetailPage() {
           return;
         }
         if (res.status === 404) {
-          setError("Scheduler niet gevonden");
+          setError("Scheduler not found");
           return;
         }
         if (!res.ok) {
-          setError((body as { error?: string }).error ?? "Kon scheduler niet laden");
+          setError((body as { error?: string }).error ?? "Could not load scheduler");
           return;
         }
         setData(body as SchedulerDetail);
       })
-      .catch(() => setError("Kon scheduler niet laden"))
+      .catch(() => setError("Could not load scheduler"))
       .finally(() => setLoading(false));
   };
 
@@ -396,11 +396,11 @@ export default function SchedulerDetailPage() {
     setSuccess(null);
     const trimmed = editingName.trim();
     if (!trimmed) {
-      setError("Naam is verplicht");
+      setError("Name is required");
       return;
     }
     if (!Number.isInteger(editingTargetTrackCount) || editingTargetTrackCount < 1) {
-      setError("Target track count moet een positief geheel getal zijn");
+      setError("Target track count must be a positive integer");
       return;
     }
     setSavingHeader(true);
@@ -419,13 +419,13 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Opslaan mislukt");
+        setError(body.error ?? "Save failed");
         return;
       }
-      setSuccess("Scheduler opgeslagen.");
+      setSuccess("Scheduler saved.");
       loadScheduler();
     } catch {
-      setError("Opslaan mislukt");
+      setError("Save failed");
     } finally {
       setSavingHeader(false);
     }
@@ -433,7 +433,7 @@ export default function SchedulerDetailPage() {
 
   const handleDeleteScheduler = async () => {
     if (!scheduler) return;
-    if (!window.confirm(`Verwijder scheduler "${scheduler.name}"?`)) return;
+    if (!window.confirm(`Delete scheduler "${scheduler.name}"?`)) return;
     const res = await fetch(`/api/schedulers/${id}`, {
       method: "DELETE",
       credentials: "include",
@@ -441,7 +441,7 @@ export default function SchedulerDetailPage() {
     });
     const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (!res.ok || !body.ok) {
-      setError(body.error ?? "Verwijderen mislukt");
+      setError(body.error ?? "Delete failed");
       return;
     }
     router.push("/scheduler");
@@ -469,15 +469,15 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Bron toevoegen mislukt");
+        setError(body.error ?? "Failed to add source");
         return;
       }
-      setSuccess("Bron toegevoegd.");
+      setSuccess("Source added.");
       setAddSourcePlaylistId("");
       setAddSourceGroupId("");
       loadScheduler();
     } catch {
-      setError("Bron toevoegen mislukt");
+      setError("Failed to add source");
     } finally {
       setAddingSource(false);
     }
@@ -491,7 +491,7 @@ export default function SchedulerDetailPage() {
       body: JSON.stringify(payload),
     });
     const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    if (!res.ok || !body.ok) throw new Error(body.error ?? "Bron bijwerken mislukt");
+    if (!res.ok || !body.ok) throw new Error(body.error ?? "Failed to update source");
   };
 
   const handleDeleteSource = async (sourceId: string) => {
@@ -502,10 +502,10 @@ export default function SchedulerDetailPage() {
     });
     const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (!res.ok || !body.ok) {
-      setError(body.error ?? "Bron verwijderen mislukt");
+      setError(body.error ?? "Failed to remove source");
       return;
     }
-    setSuccess("Bron verwijderd.");
+    setSuccess("Source removed.");
     loadScheduler();
   };
 
@@ -525,7 +525,7 @@ export default function SchedulerDetailPage() {
     try {
       if (draft.kind === "none") {
         if (!draft.slotId) {
-          setSuccess(`Positie ${position} geleegd.`);
+          setSuccess(`Position ${position} cleared.`);
           return;
         }
         const del = await fetch(`/api/schedulers/${id}/clock-slots/${draft.slotId}`, {
@@ -534,8 +534,8 @@ export default function SchedulerDetailPage() {
           headers: getSessionHeaders(),
         });
         const delBody = (await del.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (!del.ok || !delBody.ok) throw new Error(delBody.error ?? "Slot verwijderen mislukt");
-        setSuccess(`Positie ${position} geleegd.`);
+        if (!del.ok || !delBody.ok) throw new Error(delBody.error ?? "Failed to delete slot");
+        setSuccess(`Position ${position} cleared.`);
         loadScheduler();
         return;
       }
@@ -545,7 +545,7 @@ export default function SchedulerDetailPage() {
       if (draft.kind === "group") payload.playlistGroupId = draft.groupId || "";
       if (draft.kind === "track") {
         const parsed = parseSpotifyTrackId(draft.trackInput);
-        if (!parsed) throw new Error("Ongeldige Spotify track-id of URL");
+        if (!parsed) throw new Error("Invalid Spotify track ID or URL");
         payload.spotifyTrackId = parsed;
       }
 
@@ -557,7 +557,7 @@ export default function SchedulerDetailPage() {
           body: JSON.stringify(payload),
         });
         const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (!res.ok || !body.ok) throw new Error(body.error ?? "Slot bijwerken mislukt");
+        if (!res.ok || !body.ok) throw new Error(body.error ?? "Failed to update slot");
       } else {
         const res = await fetch(`/api/schedulers/${id}/clock-slots`, {
           method: "POST",
@@ -566,12 +566,12 @@ export default function SchedulerDetailPage() {
           body: JSON.stringify(payload),
         });
         const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (!res.ok || !body.ok) throw new Error(body.error ?? "Slot opslaan mislukt");
+        if (!res.ok || !body.ok) throw new Error(body.error ?? "Failed to save slot");
       }
-      setSuccess(`Positie ${position} opgeslagen.`);
+      setSuccess(`Position ${position} saved.`);
       loadScheduler();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Clock-positie opslaan mislukt");
+      setError(e instanceof Error ? e.message : "Failed to save clock position");
     } finally {
       setSavingClockPos(null);
     }
@@ -598,7 +598,7 @@ export default function SchedulerDetailPage() {
       Number.isNaN(payload.artist_separation) ||
       Number.isNaN(payload.title_separation)
     ) {
-      setError("Rules moeten lege waarde of een geheel getal >= 0 zijn.");
+      setError("Rules must be empty or an integer >= 0.");
       setSavingRules(false);
       return;
     }
@@ -611,13 +611,13 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Rules opslaan mislukt");
+        setError(body.error ?? "Failed to save rules");
         return;
       }
-      setSuccess("Rules opgeslagen.");
+      setSuccess("Rules saved.");
       loadScheduler();
     } catch {
-      setError("Rules opslaan mislukt");
+      setError("Failed to save rules");
     } finally {
       setSavingRules(false);
     }
@@ -640,21 +640,21 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string; reference?: { trackCount: number } };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Reference opslaan mislukt");
+        setError(body.error ?? "Failed to save reference");
         return;
       }
-      setSuccess(`Reference playlist opgeslagen (${body.reference?.trackCount ?? 0} tracks).`);
+      setSuccess(`Reference playlist saved (${body.reference?.trackCount ?? 0} tracks).`);
       setRefUrl("");
       loadScheduler();
     } catch {
-      setError("Reference opslaan mislukt");
+      setError("Failed to save reference");
     } finally {
       setSavingReference(false);
     }
   };
 
   const handleClearReference = async () => {
-    if (!window.confirm("Reference playlist verwijderen?")) return;
+    if (!window.confirm("Remove reference playlist?")) return;
     setError(null);
     try {
       const res = await fetch(`/api/schedulers/${id}/reference`, {
@@ -664,13 +664,13 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Verwijderen mislukt");
+        setError(body.error ?? "Delete failed");
         return;
       }
-      setSuccess("Reference verwijderd.");
+      setSuccess("Reference removed.");
       loadScheduler();
     } catch {
-      setError("Verwijderen mislukt");
+      setError("Delete failed");
     }
   };
 
@@ -693,13 +693,13 @@ export default function SchedulerDetailPage() {
       });
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Overlap opslaan mislukt");
+        setError(body.error ?? "Failed to save overlap");
         return;
       }
-      setSuccess("Overlap-voorkeuren opgeslagen.");
+      setSuccess("Overlap preferences saved.");
       loadScheduler();
     } catch {
-      setError("Overlap opslaan mislukt");
+      setError("Failed to save overlap");
     } finally {
       setSavingOverlap(false);
     }
@@ -723,17 +723,17 @@ export default function SchedulerDetailPage() {
         quality?: RunQualitySummary;
       };
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Genereren mislukt");
+        setError(body.error ?? "Generation failed");
         return;
       }
-      setSuccess("Schedule gegenereerd.");
+      setSuccess("Schedule generated.");
       setLatestRunRows(body.rows ? normalizeSchedulerRunRows(body.rows as ScheduledRow[]) : []);
       setLatestQuality(body.quality ?? null);
       if (body.run?.id) setActiveRunId(body.run.id);
       loadScheduler();
       setTab("runs");
     } catch {
-      setError("Genereren mislukt");
+      setError("Generation failed");
     } finally {
       setGeneratingRun(false);
     }
@@ -759,12 +759,12 @@ export default function SchedulerDetailPage() {
         quality?: RunQualitySummary;
         items?: Array<Record<string, unknown>>;
       };
-      if (!res.ok || !body.ok) throw new Error(body.error ?? "Actie mislukt");
+      if (!res.ok || !body.ok) throw new Error(body.error ?? "Action failed");
       if (body.rows) setLatestRunRows(normalizeSchedulerRunRows(body.rows as ScheduledRow[]));
       if (body.quality) setLatestQuality(body.quality);
       return body;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Actie mislukt");
+      setError(e instanceof Error ? e.message : "Action failed");
       return null;
     } finally {
       setLoadingEditor(false);
@@ -784,17 +784,17 @@ export default function SchedulerDetailPage() {
   const replaceAtPosition = async (spotifyTrackId: string, sourceKey?: string) => {
     if (!activePosition) return;
     const body = await runAction("replace", { position: activePosition, spotifyTrackId, sourceKey: sourceKey ?? null });
-    if (body?.ok) setSuccess(`Positie ${activePosition} vervangen.`);
+    if (body?.ok) setSuccess(`Position ${activePosition} replaced.`);
   };
 
   const toggleLock = async (position: number, locked: boolean) => {
     const body = await runAction("lock", { position, locked });
-    if (body?.ok) setSuccess(`Positie ${position} ${locked ? "gelockt" : "unlocked"}.`);
+    if (body?.ok) setSuccess(`Position ${position} ${locked ? "locked" : "unlocked"}.`);
   };
 
   const rescheduleFrom = async (fromPosition: number) => {
     const body = await runAction("reschedule", { fromPosition });
-    if (body?.ok) setSuccess(`Reschedule vanaf positie ${fromPosition} voltooid.`);
+    if (body?.ok) setSuccess(`Reschedule from position ${fromPosition} complete.`);
   };
 
   const exportRunCsv = async () => {
@@ -809,7 +809,7 @@ export default function SchedulerDetailPage() {
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "CSV export mislukt");
+        throw new Error(body.error ?? "CSV export failed");
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -822,9 +822,9 @@ export default function SchedulerDetailPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setSuccess("CSV export gestart.");
+      setSuccess("CSV export started.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "CSV export mislukt");
+      setError(e instanceof Error ? e.message : "CSV export failed");
     } finally {
       setExportingCsv(false);
     }
@@ -847,12 +847,12 @@ export default function SchedulerDetailPage() {
         spotifyPlaylistUrl?: string;
       };
       if (!res.ok || !body.ok || !body.spotifyPlaylistUrl) {
-        throw new Error(body.error ?? "Spotify export mislukt");
+        throw new Error(body.error ?? "Spotify export failed");
       }
-      setSuccess("Spotify-playlist aangemaakt.");
+      setSuccess("Spotify playlist created.");
       window.open(body.spotifyPlaylistUrl, "_blank", "noopener,noreferrer");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Spotify export mislukt");
+      setError(e instanceof Error ? e.message : "Spotify export failed");
     } finally {
       setExportingPlaylist(false);
     }
@@ -883,7 +883,7 @@ export default function SchedulerDetailPage() {
       const body = await runAction("reorder", { rows: pendingRows });
       setSavingOrder(false);
       if (body?.ok) {
-        setSuccess("Volgorde opgeslagen.");
+        setSuccess("Order saved.");
         pendingOrderRef.current = null;
         return;
       }
@@ -898,7 +898,7 @@ export default function SchedulerDetailPage() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -912,7 +912,7 @@ export default function SchedulerDetailPage() {
           <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
             <p className="text-amber-800 dark:text-amber-200">{error}</p>
             <Link href="/scheduler" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-              ← Terug naar scheduler
+              ← Back to scheduler
             </Link>
           </div>
         </div>
@@ -934,7 +934,7 @@ export default function SchedulerDetailPage() {
             onClick={handleDeleteScheduler}
             className="text-sm text-red-600 hover:underline dark:text-red-400"
           >
-            Verwijderen
+            Delete
           </button>
         </div>
 
@@ -1000,9 +1000,9 @@ export default function SchedulerDetailPage() {
                     className="mt-0.5"
                   />
                   <span>
-                    Gelijkmatig verspreiden over de hele playlist
+                    Spread evenly across the full playlist
                     <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-                      Houdt gewichten aan, maar verdeelt elke bron zo gelijk mogelijk over alle posities.
+                      Keeps weights but spreads each source as evenly as possible across all positions.
                     </span>
                   </span>
                 </label>
@@ -1015,7 +1015,7 @@ export default function SchedulerDetailPage() {
             onClick={handleSaveHeader}
             className="mt-3 rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
           >
-            {savingHeader ? "Opslaan…" : "Scheduler opslaan"}
+            {savingHeader ? "Saving…" : "Save scheduler"}
           </button>
         </section>
 
@@ -1046,7 +1046,7 @@ export default function SchedulerDetailPage() {
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Sources</h2>
             {data.sources.length === 0 ? (
-              <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">Nog geen bronnen toegevoegd.</p>
+              <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">No sources added yet.</p>
             ) : (
               <ul className="mb-4 space-y-2">
                 {data.sources.map((s) => (
@@ -1056,7 +1056,7 @@ export default function SchedulerDetailPage() {
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           style={{ backgroundColor: sourceSwatchBackground(s.type, s.id, s.groupColor) }}
-                          title="Bronkleur"
+                          title="Source color"
                           aria-hidden
                         />
                         <span className="text-zinc-500 dark:text-zinc-400">{s.type}</span>
@@ -1067,7 +1067,7 @@ export default function SchedulerDetailPage() {
                         onClick={() => handleDeleteSource(s.id)}
                         className="text-sm text-red-600 hover:underline dark:text-red-400"
                       >
-                        Verwijderen
+                        Delete
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -1080,7 +1080,7 @@ export default function SchedulerDetailPage() {
                               await patchSource(s.id, { include: e.target.checked });
                               loadScheduler();
                             } catch (err) {
-                              setError(err instanceof Error ? err.message : "Bron bijwerken mislukt");
+                              setError(err instanceof Error ? err.message : "Failed to update source");
                             }
                           }}
                         />
@@ -1098,7 +1098,7 @@ export default function SchedulerDetailPage() {
                                 await patchSource(s.id, { weight: Number(e.target.value) || 0 });
                                 loadScheduler();
                               } catch (err) {
-                                setError(err instanceof Error ? err.message : "Bron bijwerken mislukt");
+                                setError(err instanceof Error ? err.message : "Failed to update source");
                               }
                             }}
                             className="w-20 rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -1114,7 +1114,7 @@ export default function SchedulerDetailPage() {
                               await patchSource(s.id, { selectionMode: e.target.value });
                               loadScheduler();
                             } catch (err) {
-                              setError(err instanceof Error ? err.message : "Bron bijwerken mislukt");
+                              setError(err instanceof Error ? err.message : "Failed to update source");
                             }
                           }}
                           className="rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -1135,7 +1135,7 @@ export default function SchedulerDetailPage() {
                               await patchSource(s.id, { rankBiasStrength: v ? Number(v) : null });
                               loadScheduler();
                             } catch (err) {
-                              setError(err instanceof Error ? err.message : "Bron bijwerken mislukt");
+                              setError(err instanceof Error ? err.message : "Failed to update source");
                             }
                           }}
                           className="w-20 rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -1156,11 +1156,11 @@ export default function SchedulerDetailPage() {
                   className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
                   <option value="playlist">Playlist</option>
-                  <option value="group">Groep</option>
+                  <option value="group">Group</option>
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">{addSourceKind === "playlist" ? "Playlist" : "Groep"}</label>
+                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">{addSourceKind === "playlist" ? "Playlist" : "Group"}</label>
                 <select
                   value={addSourceKind === "playlist" ? addSourcePlaylistId : addSourceGroupId}
                   onChange={(e) => (addSourceKind === "playlist" ? setAddSourcePlaylistId(e.target.value) : setAddSourceGroupId(e.target.value))}
@@ -1218,7 +1218,7 @@ export default function SchedulerDetailPage() {
                 disabled={addingSource || !canAddSource}
                 className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
               >
-                {addingSource ? "Toevoegen…" : "Bron toevoegen"}
+                {addingSource ? "Adding…" : "Add source"}
               </button>
             </form>
           </section>
@@ -1228,11 +1228,11 @@ export default function SchedulerDetailPage() {
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Clock</h2>
             {scheduler.mode !== "clock" ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Clock tab is alleen actief in clock mode.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Clock tab is only available in clock mode.</p>
             ) : (
               <>
                 <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  Vaste clock met {scheduler.targetTrackCount} posities (afgeleid van Target track count). Per positie kies je playlist, groep of vaste Spotify track.
+                  Fixed clock with {scheduler.targetTrackCount} positions (from Target track count). For each position choose playlist, group, or fixed Spotify track.
                 </p>
                 <div className="space-y-2">
                   {Array.from({ length: scheduler.targetTrackCount }, (_, i) => i + 1).map((position) => {
@@ -1250,7 +1250,7 @@ export default function SchedulerDetailPage() {
                       >
                         <div className="grid gap-2 md:grid-cols-[80px,140px,1fr,120px] md:items-end">
                           <div>
-                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Positie</label>
+                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Position</label>
                             <div className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100">
                               #{position}
                             </div>
@@ -1272,12 +1272,12 @@ export default function SchedulerDetailPage() {
                             >
                               <option value="none">Leeg</option>
                               <option value="playlist">Playlist</option>
-                              <option value="group">Playlistgroep</option>
+                              <option value="group">Playlist group</option>
                               <option value="track">Spotify track ID/URL</option>
                             </select>
                           </div>
                           <div>
-                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Bron</label>
+                            <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Source</label>
                             {d.kind === "playlist" && (
                               <select
                                 value={d.playlistId}
@@ -1297,7 +1297,7 @@ export default function SchedulerDetailPage() {
                                   onChange={(e) => updateClockDraft(position, { groupId: e.target.value })}
                                   className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                                 >
-                                  <option value="">— Kies groep —</option>
+                                  <option value="">— Choose group —</option>
                                   {groups.map((o) => (
                                     <option key={o.id} value={o.id}>{o.name}</option>
                                   ))}
@@ -1326,7 +1326,7 @@ export default function SchedulerDetailPage() {
                             )}
                             {d.kind === "none" && (
                               <div className="rounded border border-zinc-200 bg-zinc-100 px-2 py-1.5 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-                                Geen bron
+                                No source
                               </div>
                             )}
                           </div>
@@ -1341,7 +1341,7 @@ export default function SchedulerDetailPage() {
                             }
                             className="rounded-full bg-[#1DB954] px-3 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
                           >
-                            {savingClockPos === position ? "Opslaan…" : "Opslaan"}
+                            {savingClockPos === position ? "Saving…" : "Save"}
                           </button>
                         </div>
                       </div>
@@ -1397,7 +1397,7 @@ export default function SchedulerDetailPage() {
               onClick={handleSaveRules}
               className="mt-3 rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
             >
-              {savingRules ? "Opslaan…" : "Rules opslaan"}
+              {savingRules ? "Saving…" : "Save rules"}
             </button>
           </section>
         )}
@@ -1406,15 +1406,15 @@ export default function SchedulerDetailPage() {
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">Reference playlist</h2>
             <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-              De engine geeft voorkeur aan nummers die ook in deze reference staan. Importeer vanuit een tracked playlist (snapshot) of plak een Spotify playlist-URL die al in je account staat.
+              The engine prefers tracks that also appear in this reference. Import from a tracked playlist (snapshot) or paste a Spotify playlist URL that is already in your account.
             </p>
             {data.reference ? (
               <p className="mb-3 text-sm text-zinc-700 dark:text-zinc-300">
                 Ingesteld: <strong>{data.reference.trackCount}</strong> tracks (bijgewerkt{" "}
-                {new Date(data.reference.updatedAt).toLocaleString("nl-NL")})
+                {new Date(data.reference.updatedAt).toLocaleString("en-GB")})
               </p>
             ) : (
-              <p className="mb-3 text-sm text-amber-800 dark:text-amber-200">Nog geen reference ingesteld.</p>
+              <p className="mb-3 text-sm text-amber-800 dark:text-amber-200">No reference set yet.</p>
             )}
             <form onSubmit={handleSaveReference} className="space-y-3">
               <div>
@@ -1474,12 +1474,12 @@ export default function SchedulerDetailPage() {
 
         {tab === "overlap" && (
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">Overlap per bron</h2>
+            <h2 className="mb-2 font-medium text-zinc-900 dark:text-zinc-100">Overlap per source</h2>
             <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-              Streefpercentage: hoeveel van de gekozen slots per bron (ongeveer) ook in de reference playlist moet voorkomen. 0 = geen overlap-doel.
+              Target percent: roughly how many of the chosen slots per source should also appear in the reference playlist. 0 = no overlap target.
             </p>
             {data.sources.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Voeg eerst bronnen toe.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Add sources first.</p>
             ) : (
               <ul className="mb-4 space-y-3">
                 {data.sources.map((s) => (
@@ -1519,7 +1519,7 @@ export default function SchedulerDetailPage() {
               onClick={handleSaveOverlap}
               className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
             >
-              {savingOverlap ? "Opslaan…" : "Overlap opslaan"}
+              {savingOverlap ? "Saving…" : "Save overlap"}
             </button>
           </section>
         )}
@@ -1528,10 +1528,10 @@ export default function SchedulerDetailPage() {
           <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Runs</h2>
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-              Kies een positie en gebruik het suggestiepaneel rechts (of onderaan op mobiel) voor alternatieven — geen scrollen naar onder nodig.
+              Pick a position and use the suggestion panel on the right (or at the bottom on mobile) for alternatives — no need to scroll.
             </p>
             <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
-              Reorder: gebruik ↑/↓ per rij of sleep een rij naar een andere positie.
+              Reorder: use ↑/↓ per row or drag a row to another position.
             </p>
 
             {activePosition != null && (
@@ -1551,7 +1551,7 @@ export default function SchedulerDetailPage() {
                 {data.runs.length > 0 && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                      Actieve run {savingOrder ? "· volgorde opslaan…" : ""}
+                      Active run {savingOrder ? "· saving order…" : ""}
                     </label>
                     <select
                       value={currentRun?.id ?? ""}
@@ -1564,7 +1564,7 @@ export default function SchedulerDetailPage() {
                     >
                       {data.runs.map((run) => (
                         <option key={run.id} value={run.id}>
-                          {new Date(run.createdAt).toLocaleString("nl-NL")} - {run.status}
+                          {new Date(run.createdAt).toLocaleString("en-GB")} - {run.status}
                         </option>
                       ))}
                     </select>
@@ -1630,7 +1630,7 @@ export default function SchedulerDetailPage() {
                         <tr className="border-b border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
                           <th className="px-2 py-2">#</th>
                           <th className="px-2 py-2">Song</th>
-                          <th className="px-2 py-2">Bron</th>
+                          <th className="px-2 py-2">Source</th>
                           <th className="hidden sm:table-cell px-2 py-2">Overlap</th>
                           <th className="px-2 py-2">Status</th>
                           <th className="px-2 py-2">Lock</th>
@@ -1800,13 +1800,13 @@ export default function SchedulerDetailPage() {
                   </div>
                 ) : data.runs.length > 0 && currentRun?.status === "success" ? (
                   <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                    Geen rijen om te tonen. Genereer opnieuw of kies een andere run.
+                    No rows to show. Generate again or pick another run.
                   </p>
                 ) : null}
 
                 {data.runs.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                    Nog geen runs. Klik op <strong>Generate schedule</strong> om te starten.
+                    No runs yet. Click <strong>Generate schedule</strong> to start.
                   </p>
                 ) : (
                   <ul className="space-y-2 text-sm">
@@ -1817,7 +1817,7 @@ export default function SchedulerDetailPage() {
                       >
                         <span className="font-medium text-zinc-900 dark:text-zinc-100">{run.status}</span>
                         <span className="ml-2 text-zinc-500 dark:text-zinc-400">
-                          {new Date(run.createdAt).toLocaleString("nl-NL")}
+                          {new Date(run.createdAt).toLocaleString("en-GB")}
                         </span>
                       </li>
                     ))}
@@ -1835,7 +1835,7 @@ export default function SchedulerDetailPage() {
                       Suggesties
                     </p>
                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {activePosition != null ? `Positie #${activePosition}` : "Geen slot"}
+                      {activePosition != null ? `Position #${activePosition}` : "No slot"}
                     </p>
                   </div>
                   {activePosition != null && (
@@ -1855,7 +1855,7 @@ export default function SchedulerDetailPage() {
                 <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
                   {activePosition == null ? (
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      Selecteer een rij met <strong>Select</strong> of <strong>Suggest</strong> om alternatieven te zien.
+                      Select a row with <strong>Select</strong> or <strong>Suggest</strong> to see alternatives.
                     </p>
                   ) : (
                     <>
@@ -1866,7 +1866,7 @@ export default function SchedulerDetailPage() {
                           disabled={loadingEditor}
                           className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                         >
-                          {loadingEditor ? "Laden…" : "Vernieuw suggesties"}
+                          {loadingEditor ? "Loading…" : "Refresh suggestions"}
                         </button>
                         <button
                           type="button"
@@ -1885,7 +1885,7 @@ export default function SchedulerDetailPage() {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") void searchAll(activePosition);
                           }}
-                          placeholder="Zoek alle bronnen…"
+                          placeholder="Search all sources…"
                           className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                         />
                         <button
@@ -1894,13 +1894,13 @@ export default function SchedulerDetailPage() {
                           disabled={loadingEditor}
                           className="shrink-0 rounded-lg bg-[#1DB954] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
                         >
-                          Zoek
+                          Search
                         </button>
                       </div>
 
                       {suggestions.length === 0 && !loadingEditor && (
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Nog geen resultaten. Kies <strong>Vernieuw suggesties</strong> of gebruik zoeken.
+                          No results yet. Choose <strong>Refresh suggestions</strong> or use search.
                         </p>
                       )}
 
@@ -1910,7 +1910,7 @@ export default function SchedulerDetailPage() {
                             const trackId = s.track?.spotifyTrackId ?? s.spotifyTrackId ?? "";
                             const title = s.track?.title ?? s.title ?? "";
                             const artists = s.track?.artists?.join(", ") ?? s.artists ?? "";
-                            const sourceName = s.sourceName ?? "Bron";
+                            const sourceName = s.sourceName ?? "Source";
                             const ruleImpact = s.ruleImpact ?? "ok";
                             const sourceKey = s.sourceKey;
                             const activeRow =

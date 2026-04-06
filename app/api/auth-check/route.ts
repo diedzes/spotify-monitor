@@ -17,18 +17,18 @@ export async function GET() {
   const isLocalhost =
     baseNormalized?.includes("localhost") ?? false;
   const redirectUriWarning = isLocalhost
-    ? "Spotify staat 'localhost' niet toe als redirect URI. Gebruik voor lokaal testen http://127.0.0.1:PORT en voeg die exacte URL + /api/auth/spotify/callback toe in het Spotify-dashboard."
+    ? "Spotify does not allow 'localhost' as a redirect URI. For local testing use http://127.0.0.1:PORT and add that exact URL + /api/auth/spotify/callback in the Spotify dashboard."
     : null;
 
   const vars = {
     CALLBACK_URL_VOOR_SPOTIFY_REDIRECT_URIS: callbackUrl,
     REDIRECT_URI_WARNING: redirectUriWarning,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "niet gezet",
-    VERCEL_URL: process.env.VERCEL_URL ?? "niet gezet",
-    AUTH_SECRET: process.env.AUTH_SECRET ? "set" : "niet gezet",
-    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? "set" : "niet gezet",
-    AUTH_SPOTIFY_ID: process.env.AUTH_SPOTIFY_ID ? "set" : "niet gezet",
-    AUTH_SPOTIFY_SECRET: process.env.AUTH_SPOTIFY_SECRET ? "set" : "niet gezet",
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "not set",
+    VERCEL_URL: process.env.VERCEL_URL ?? "not set",
+    AUTH_SECRET: process.env.AUTH_SECRET ? "set" : "not set",
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? "set" : "not set",
+    AUTH_SPOTIFY_ID: process.env.AUTH_SPOTIFY_ID ? "set" : "not set",
+    AUTH_SPOTIFY_SECRET: process.env.AUTH_SPOTIFY_SECRET ? "set" : "not set",
   };
 
   return NextResponse.json(vars, { status: 200 });

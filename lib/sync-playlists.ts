@@ -78,13 +78,13 @@ export async function syncTrackedPlaylist(
     where: { id: trackedPlaylistId },
     include: { snapshots: { orderBy: { syncedAt: "desc" }, take: 1 } },
   });
-  if (!tracked) return { ok: false, error: "Playlist niet gevonden" };
+  if (!tracked) return { ok: false, error: "Playlist not found" };
 
   let meta: Awaited<ReturnType<typeof fetchPlaylistMetadata>>;
   try {
     meta = await fetchPlaylistMetadata(accessToken, tracked.spotifyPlaylistId);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Kon playlist niet ophalen";
+    const message = e instanceof Error ? e.message : "Could not fetch playlist";
     return { ok: false, error: message };
   }
 
@@ -138,7 +138,7 @@ export async function syncTrackedPlaylist(
   try {
     tracks = await getPlaylistTracksWithPagination(accessToken, tracked.spotifyPlaylistId);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Kon tracks niet ophalen";
+    const message = e instanceof Error ? e.message : "Could not fetch tracks";
     return { ok: false, error: message };
   }
 

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/playlists", label: "Playlists" },
-  { href: "/groups", label: "Groepen" },
+  { href: "/groups", label: "Groups" },
   { href: "/reports", label: "Reports" },
   { href: "/scheduler", label: "Scheduler" },
 ];
@@ -17,7 +17,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <nav className="flex flex-wrap items-center gap-1 sm:gap-2" aria-label="Hoofdnavigatie">
+        <nav className="flex flex-wrap items-center gap-1 sm:gap-2" aria-label="Main navigation">
           {navItems.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -40,7 +40,7 @@ export function AppHeader() {
           href="/api/auth/spotify/logout"
           className="shrink-0 rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
-          Uitloggen
+          Sign out
         </a>
       </div>
     </header>

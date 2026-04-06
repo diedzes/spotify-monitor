@@ -33,16 +33,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; slotId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId, slotId } = await params;
   const slot = await getOwnedSlot(session.user.id, schedulerId, slotId);
-  if (!slot) return NextResponse.json({ error: "Slot niet gevonden" }, { status: 404 });
+  if (!slot) return NextResponse.json({ error: "Slot not found" }, { status: 404 });
 
   let body: { position?: number; trackedPlaylistId?: string; playlistGroupId?: string; spotifyTrackId?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const position =
@@ -64,17 +64,17 @@ export async function PUT(
     const finalTrack = spotifyTrackId !== undefined ? spotifyTrackId : slot.spotifyTrackId;
     const chosen = [finalTracked, finalGroup, finalTrack].filter(Boolean).length;
     if (chosen !== 1) {
-      return NextResponse.json({ error: "Geef playlist, groep of Spotify track-id op (exact 1)" }, { status: 400 });
+      return NextResponse.json({ error: "Provide playlist, group, or Spotify track ID (exactly one)" }, { status: 400 });
     }
   }
 
   if (trackedPlaylistId) {
     const p = await prisma.trackedPlaylist.findFirst({ where: { id: trackedPlaylistId, userId: session.user.id } });
-    if (!p) return NextResponse.json({ error: "Playlist niet gevonden of geen toegang" }, { status: 404 });
+    if (!p) return NextResponse.json({ error: "Playlist not found or no access" }, { status: 404 });
   }
   if (playlistGroupId) {
     const g = await prisma.playlistGroup.findFirst({ where: { id: playlistGroupId, userId: session.user.id } });
-    if (!g) return NextResponse.json({ error: "Groep niet gevonden of geen toegang" }, { status: 404 });
+    if (!g) return NextResponse.json({ error: "Group not found or no access" }, { status: 404 });
   }
 
   const updated = await prisma.schedulerClockSlot.update({
@@ -104,10 +104,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; slotId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id: schedulerId, slotId } = await params;
   const slot = await getOwnedSlot(session.user.id, schedulerId, slotId);
-  if (!slot) return NextResponse.json({ error: "Slot niet gevonden" }, { status: 404 });
+  if (!slot) return NextResponse.json({ error: "Slot not found" }, { status: 404 });
   await prisma.schedulerClockSlot.delete({ where: { id: slotId } });
   return NextResponse.json({ ok: true });
 }

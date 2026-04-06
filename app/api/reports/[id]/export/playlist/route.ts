@@ -99,7 +99,7 @@ export async function POST(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id } = await params;
 
@@ -120,11 +120,11 @@ export async function POST(
       },
     });
     if (!report) {
-      return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
     const latestResult = report.results[0] ?? null;
     if (!latestResult) {
-      return NextResponse.json({ error: "Geen resultaat om te exporteren. Genereer eerst een chart." }, { status: 400 });
+      return NextResponse.json({ error: "No result to export. Generate a chart first." }, { status: 400 });
     }
 
     const rawJson = latestResult.editedRowsJson ?? latestResult.rowsJson;
@@ -134,21 +134,21 @@ export async function POST(
         typeof rawJson === "string" ? rawJson : JSON.stringify(rawJson);
       rows = JSON.parse(rowsJson) as ChartRow[];
     } catch {
-      return NextResponse.json({ error: "Kon chart-data niet lezen." }, { status: 500 });
+      return NextResponse.json({ error: "Could not read chart data." }, { status: 500 });
     }
     if (!rows.length) {
-      return NextResponse.json({ error: "Geen tracks in dit resultaat om te exporteren." }, { status: 400 });
+      return NextResponse.json({ error: "No tracks in this result to export." }, { status: 400 });
     }
 
     const uris = rowsToTrackUris(rows);
     if (!uris.length) {
-      return NextResponse.json({ error: "Geen geldige Spotify-tracks in deze chart." }, { status: 400 });
+      return NextResponse.json({ error: "No valid Spotify tracks in this chart." }, { status: 400 });
     }
 
     const playlistName =
       (body.name && body.name.trim()) || `Report: ${report.name}`;
     const playlistDescription =
-      body.description?.trim() || `Gegenereerd met Spotify Monitor op ${new Date().toLocaleString("nl-NL")}`;
+      body.description?.trim() || `Gegenereerd met Spotify Monitor op ${new Date().toLocaleString("en-GB")}`;
 
     const created = await createSpotifyPlaylist(
       session.access_token,
@@ -164,7 +164,7 @@ export async function POST(
       spotifyPlaylistUrl: created.url,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Onbekende fout";
+    const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[POST /api/reports/[id]/export/playlist]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }

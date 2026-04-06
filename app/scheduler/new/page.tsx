@@ -41,11 +41,11 @@ function NewSchedulerPageContent() {
     setError(null);
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Naam is verplicht");
+      setError("Name is required");
       return;
     }
     if (!Number.isInteger(targetTrackCount) || targetTrackCount < 1) {
-      setError("Target track count moet een positief geheel getal zijn");
+      setError("Target track count must be a positive integer");
       return;
     }
     setLoading(true);
@@ -64,13 +64,13 @@ function NewSchedulerPageContent() {
       });
       const data = (await res.json()) as { ok?: boolean; scheduler?: { id: string }; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon scheduler niet aanmaken");
+        setError(data.error ?? "Could not create scheduler");
         return;
       }
       if (data.scheduler?.id) router.push(`/scheduler/${data.scheduler.id}`);
       else router.push("/scheduler");
     } catch {
-      setError("Kon scheduler niet aanmaken");
+      setError("Could not create scheduler");
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,7 @@ function NewSchedulerPageContent() {
               <span>
                 Gelijkmatig verspreiden over de hele playlist
                 <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-                  Houdt gewichten aan, maar spreidt nummers uit dezelfde bron zoveel mogelijk over alle posities.
+                  Keeps weights but spreads tracks from the same source across positions as much as possible.
                 </span>
               </span>
             </label>
@@ -165,7 +165,7 @@ function NewSchedulerPageContent() {
               href="/scheduler"
               className="rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              Annuleren
+              Cancel
             </Link>
           </div>
         </form>
@@ -181,7 +181,7 @@ export default function NewSchedulerPage() {
       <Suspense
         fallback={
           <div className="flex min-h-[60vh] items-center justify-center">
-            <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+            <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
           </div>
         }
       >

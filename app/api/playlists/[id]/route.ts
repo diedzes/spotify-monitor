@@ -13,7 +13,7 @@ export async function GET(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   const { id } = await params;
@@ -33,7 +33,7 @@ export async function GET(
   });
 
   if (!playlist) {
-    return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
   const mainIds = await getMainSourcePlaylistIds(session.user.id);
@@ -101,20 +101,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { id } = await params;
   let body: { inHitlistMainGroup?: boolean; excludeFromHitlist?: boolean };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const hasMain = typeof body.inHitlistMainGroup === "boolean";
   const hasExclude = typeof body.excludeFromHitlist === "boolean";
   if (!hasMain && !hasExclude) {
     return NextResponse.json(
-      { error: "Geef minstens één van: inHitlistMainGroup (boolean), excludeFromHitlist (boolean)" },
+      { error: "Provide at least one of: inHitlistMainGroup (boolean), excludeFromHitlist (boolean)" },
       { status: 400 }
     );
   }
@@ -124,7 +124,7 @@ export async function PATCH(
     select: { id: true },
   });
   if (!playlist) {
-    return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
   let mainGroupId: string | undefined;

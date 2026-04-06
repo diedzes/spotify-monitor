@@ -66,14 +66,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string; runId: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { id, runId } = await params;
   const scheduler = await prisma.scheduler.findFirst({
     where: { id, userId: session.user.id },
     select: { id: true, name: true },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: { name?: string; description?: string } = {};
   try {
@@ -86,9 +86,9 @@ export async function POST(
     where: { id: runId, schedulerId: id },
     select: { id: true, resultJson: true, editedResultJson: true, status: true, createdAt: true },
   });
-  if (!run) return NextResponse.json({ error: "Run niet gevonden" }, { status: 404 });
+  if (!run) return NextResponse.json({ error: "Run not found" }, { status: 404 });
   if (run.status !== "success") {
-    return NextResponse.json({ error: "Deze run is nog niet succesvol afgerond." }, { status: 400 });
+    return NextResponse.json({ error: "This run has not completed successfully yet." }, { status: 400 });
   }
 
   const raw = run.editedResultJson ?? run.resultJson;
@@ -104,7 +104,7 @@ export async function POST(
 
   const playlistName = body.name?.trim() || `Scheduler: ${scheduler.name}`;
   const playlistDescription =
-    body.description?.trim() || `Run export ${new Date(run.createdAt).toLocaleString("nl-NL")} via Spotify Monitor`;
+    body.description?.trim() || `Run export ${new Date(run.createdAt).toLocaleString("en-GB")} via Spotify Monitor`;
 
   const created = await createSpotifyPlaylist(session.access_token, session.user.id, playlistName, playlistDescription);
   await addTracksToPlaylist(session.access_token, created.id, uniqueUris);

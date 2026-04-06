@@ -54,7 +54,7 @@ export default function NewPlaylistPage() {
     setError(null);
     const trimmed = input.trim();
     if (!trimmed) {
-      setError("Vul een Spotify playlist URL of ID in.");
+      setError("Enter a Spotify playlist URL or ID.");
       return;
     }
     setLoading(true);
@@ -71,14 +71,14 @@ export default function NewPlaylistPage() {
         return;
       }
       if (!res.ok || !data?.ok) {
-        setError(data?.error ?? "Kon playlist niet toevoegen.");
+        setError(data?.error ?? "Could not add playlist.");
         setLoading(false);
         return;
       }
       router.push("/playlists");
       router.refresh();
     } catch {
-      setError("Er ging iets mis. Probeer het opnieuw.");
+      setError("Something went wrong. Try again.");
       setLoading(false);
     }
   }
@@ -91,7 +91,7 @@ export default function NewPlaylistPage() {
       .map((s) => s.trim())
       .filter(Boolean);
     if (lines.length === 0) {
-      setError("Plak minimaal één playlist-URL (één per regel).");
+      setError("Paste at least one playlist URL (one per line).");
       return;
     }
     setError(null);
@@ -109,7 +109,7 @@ export default function NewPlaylistPage() {
         return;
       }
       if (!res.ok || "error" in data) {
-        setError("error" in data && typeof data.error === "string" ? data.error : "Kon playlists niet toevoegen.");
+        setError("error" in data && typeof data.error === "string" ? data.error : "Could not add playlists.");
         setBulkLoading(false);
         return;
       }
@@ -119,7 +119,7 @@ export default function NewPlaylistPage() {
         router.refresh();
       }
     } catch {
-      setError("Er ging iets mis. Probeer het opnieuw.");
+      setError("Something went wrong. Try again.");
     } finally {
       setBulkLoading(false);
     }
@@ -130,7 +130,7 @@ export default function NewPlaylistPage() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -141,7 +141,7 @@ export default function NewPlaylistPage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-8">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Playlist(s) toevoegen
+          Add playlist(s)
         </h1>
 
         <section className="mb-10">
@@ -169,13 +169,13 @@ export default function NewPlaylistPage() {
                 disabled={loading}
                 className="rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
               >
-                {loading ? "Bezig…" : "Toevoegen"}
+                {loading ? "Working…" : "Toevoegen"}
               </button>
               <Link
                 href="/playlists"
                 className="rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
               >
-                Annuleren
+                Cancel
               </Link>
             </div>
           </form>
@@ -183,10 +183,10 @@ export default function NewPlaylistPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Meerdere playlists in één keer
+            Multiple playlists at once
           </h2>
           <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-            Plak een lijst met Spotify playlist-URLs (één per regel). Duplicaten en playlists die je al volgt worden overgeslagen.
+            Paste a list of Spotify playlist URLs (one per line). Duplicates and playlists you already follow are skipped.
           </p>
           <form onSubmit={handleBulkSubmit} className="space-y-4">
             <div>
@@ -213,9 +213,9 @@ https://open.spotify.com/playlist/...`}
             {bulkResult && (
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                  {bulkResult.added} toegevoegd
+                  {bulkResult.added} added
                   {bulkResult.skipped > 0 && `, ${bulkResult.skipped} al aanwezig overgeslagen`}
-                  {bulkResult.errors.length > 0 && `, ${bulkResult.errors.length} fout(en)`}
+                  {bulkResult.errors.length > 0 && `, ${bulkResult.errors.length} error(s)`}
                 </p>
                 {bulkResult.errors.length > 0 && (
                   <ul className="mt-2 list-inside space-y-0.5 text-zinc-600 dark:text-zinc-400">
@@ -237,13 +237,13 @@ https://open.spotify.com/playlist/...`}
                 disabled={bulkLoading || !bulkInput.trim()}
                 className="rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
               >
-                {bulkLoading ? "Bezig…" : "Allemaal toevoegen"}
+                {bulkLoading ? "Working…" : "Add all"}
               </button>
               <Link
                 href="/playlists"
                 className="rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
               >
-                Naar playlists
+                To playlists
               </Link>
             </div>
           </form>

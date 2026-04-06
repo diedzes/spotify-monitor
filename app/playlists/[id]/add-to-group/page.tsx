@@ -92,9 +92,9 @@ export default function AddPlaylistToGroupPage() {
       })
       .catch((err) => {
         if (err?.name === "AbortError") {
-          setError("Verzoek duurde te lang. Probeer opnieuw.");
+          setError("Request timed out. Try again.");
         } else {
-          setError("Kon data niet laden. Log in op de startpagina en probeer het opnieuw.");
+          setError("Could not load data. Sign in on the home page and try again.");
         }
       })
       .finally(() => setLoading(false));
@@ -112,14 +112,14 @@ export default function AddPlaylistToGroupPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon niet toevoegen aan groep.");
+        setError(data.error ?? "Could not add to group.");
         setAddingId(null);
         return;
       }
       setPlaylistGroupIds((prev) => new Set([...prev, groupId]));
       setAddingId(null);
     } catch {
-      setError("Kon niet toevoegen aan groep.");
+      setError("Could not add to group.");
       setAddingId(null);
     }
   };
@@ -127,7 +127,7 @@ export default function AddPlaylistToGroupPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
       </div>
     );
   }
@@ -136,12 +136,12 @@ export default function AddPlaylistToGroupPage() {
     return (
       <div className="min-h-screen bg-zinc-50 p-6 dark:bg-zinc-950">
         <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="font-medium text-amber-800 dark:text-amber-200">Niet ingelogd</p>
+          <p className="font-medium text-amber-800 dark:text-amber-200">Not signed in</p>
           <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-            Log in op de startpagina en ga dan via Dashboard → Playlists naar deze pagina.
+            Sign in on the home page, then go to Dashboard → Playlists to open this page.
           </p>
           <Link href="/" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 underline">
-            Naar startpagina
+            To home page
           </Link>
         </div>
       </div>
@@ -167,23 +167,23 @@ export default function AddPlaylistToGroupPage() {
           Add to group
         </h1>
         <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-          Kies een groep om &quot;{playlistName || "deze playlist"}&quot; aan toe te voegen.
+          Choose a group to add &quot;{playlistName || "this playlist"}&quot; to.
         </p>
         {error && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <p>{error}</p>
             <Link href="/" className="mt-2 inline-block text-amber-700 dark:text-amber-300 underline">
-              Naar startpagina om in te loggen
+              To home page to sign in
             </Link>
           </div>
         )}
         {availableGroups.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-zinc-500 dark:text-zinc-400">
-              Deze playlist zit al in al je groepen, of je hebt nog geen groepen. Maak eerst een groep aan.
+              This playlist is already in all your groups, or you have no groups yet. Create a group first.
             </p>
             <Link href="/groups/new" className="mt-4 inline-block text-sm text-[#1DB954] hover:underline">
-              Nieuwe groep
+              New group
             </Link>
           </div>
         ) : (
@@ -199,7 +199,7 @@ export default function AddPlaylistToGroupPage() {
                     {g.name}
                     {g.isMainGroup ? (
                       <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-400">
-                        (Hitlist-bron)
+                        (Hitlist source)
                       </span>
                     ) : null}
                   </p>

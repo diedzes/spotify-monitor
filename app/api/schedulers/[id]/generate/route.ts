@@ -10,14 +10,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
 
   const scheduler = await prisma.scheduler.findFirst({
     where: { id, userId: session.user.id },
     select: { id: true },
   });
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   try {
     const result = await generateSchedulerRun(id);
@@ -32,7 +32,7 @@ export async function POST(
       quality: result.quality,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Genereren mislukt";
+    const message = e instanceof Error ? e.message : "Generation failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

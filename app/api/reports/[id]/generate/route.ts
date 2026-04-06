@@ -11,14 +11,14 @@ export async function POST(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id: reportId } = await params;
   const report = await prisma.report.findFirst({
     where: { id: reportId, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   let body: { scoringMode?: string };
   try {

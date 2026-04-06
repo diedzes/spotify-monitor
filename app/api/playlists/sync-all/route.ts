@@ -19,7 +19,7 @@ export type SyncAllResponse = {
 export async function POST(request: Request): Promise<NextResponse<SyncAllResponse | { error: string }>> {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   const playlists = await prisma.trackedPlaylist.findMany({

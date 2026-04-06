@@ -63,7 +63,7 @@ export default function AddPlaylistToGroupPage() {
           setPlaylists(playlistsRes.playlists.filter((p: PlaylistOption) => !inGroup.has(p.id)));
         }
       })
-      .catch(() => setError("Kon data niet laden"))
+      .catch(() => setError("Could not load data"))
       .finally(() => setLoading(false));
   }, [groupId]);
 
@@ -79,14 +79,14 @@ export default function AddPlaylistToGroupPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon playlist niet toevoegen.");
+        setError(data.error ?? "Could not add playlist.");
         setAddingId(null);
         return;
       }
       router.push(`/groups/${groupId}`);
       router.refresh();
     } catch {
-      setError("Kon playlist niet toevoegen.");
+      setError("Could not add playlist.");
       setAddingId(null);
     }
   };
@@ -94,7 +94,7 @@ export default function AddPlaylistToGroupPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
       </div>
     );
   }
@@ -107,7 +107,7 @@ export default function AddPlaylistToGroupPage() {
             href={`/groups/${groupId}`}
             className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
-            ← {group?.name ?? "Groep"}
+            ← {group?.name ?? "Group"}
           </Link>
         </div>
       </header>
@@ -120,7 +120,7 @@ export default function AddPlaylistToGroupPage() {
               : undefined
           }
         >
-          Playlist toevoegen aan {group?.name ?? "groep"}
+          Add playlist to {group?.name ?? "group"}
         </h1>
         {error && (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
@@ -130,10 +130,10 @@ export default function AddPlaylistToGroupPage() {
         {playlists.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-zinc-500 dark:text-zinc-400">
-              Geen playlists om toe te voegen. Alle playlists zitten al in deze groep, of je hebt nog geen tracked playlists.
+              No playlists to add. Either every playlist is already in this group, or you have no tracked playlists yet.
             </p>
             <Link href="/playlists" className="mt-4 inline-block text-sm text-[#1DB954] hover:underline">
-              Ga naar playlists
+              To playlists
             </Link>
           </div>
         ) : (

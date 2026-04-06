@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const schedulers = await prisma.scheduler.findMany({
     where: { userId: session.user.id },
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   let body: {
     name?: string;
@@ -46,19 +46,19 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) return NextResponse.json({ error: "Naam is verplicht" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
   const mode = body.mode === "clock" ? "clock" : body.mode === "ratio" ? "ratio" : null;
-  if (!mode) return NextResponse.json({ error: "Mode moet clock of ratio zijn" }, { status: 400 });
+  if (!mode) return NextResponse.json({ error: "Mode must be clock or ratio" }, { status: 400 });
   const targetTrackCount =
     typeof body.targetTrackCount === "number" && Number.isInteger(body.targetTrackCount) && body.targetTrackCount > 0
       ? body.targetTrackCount
       : null;
   if (!targetTrackCount) {
-    return NextResponse.json({ error: "targetTrackCount moet een positief geheel getal zijn" }, { status: 400 });
+    return NextResponse.json({ error: "targetTrackCount must be a positive integer" }, { status: 400 });
   }
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const ratioEvenDistribution = typeof body.ratioEvenDistribution === "boolean" ? body.ratioEvenDistribution : true;

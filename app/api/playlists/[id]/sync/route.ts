@@ -12,7 +12,7 @@ export async function POST(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   const deferHitlist = new URL(request.url).searchParams.get("deferHitlist") === "1";
@@ -23,7 +23,7 @@ export async function POST(
   });
 
   if (!playlist) {
-    return NextResponse.json({ error: "Playlist niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
   const result = await syncTrackedPlaylist(id, session.access_token);

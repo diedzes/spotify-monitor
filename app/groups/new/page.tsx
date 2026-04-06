@@ -37,7 +37,7 @@ export default function NewGroupPage() {
     setError(null);
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Naam is verplicht.");
+      setError("Name is required.");
       return;
     }
     setLoading(true);
@@ -54,7 +54,7 @@ export default function NewGroupPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; group?: { id: string } };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon groep niet aanmaken.");
+        setError(data.error ?? "Could not create group.");
         setLoading(false);
         return;
       }
@@ -71,7 +71,7 @@ export default function NewGroupPage() {
       <AppHeader />
       <main className="mx-auto max-w-md px-4 py-8">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Nieuwe groep
+          New group
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -107,14 +107,14 @@ export default function NewGroupPage() {
             />
           </div>
           <div>
-            <span className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Kleur</span>
+            <span className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Color</span>
             <div className="flex flex-wrap items-center gap-3">
               <input
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 className="h-10 w-14 cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600"
-                aria-label="Groepskleur"
+                aria-label="Group color"
               />
               <div className="flex flex-wrap gap-2">
                 {GROUP_COLOR_PRESETS.map((preset) => (
@@ -131,7 +131,7 @@ export default function NewGroupPage() {
                 ))}
               </div>
             </div>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Deze kleur zie je bij playlists, reports en scheduler.</p>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">You will see this color on playlists, reports and scheduler.</p>
           </div>
           <div className="flex gap-3 pt-2">
             <button
@@ -145,7 +145,7 @@ export default function NewGroupPage() {
               href="/groups"
               className="rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              Annuleren
+              Cancel
             </Link>
           </div>
         </form>

@@ -6,13 +6,13 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   try {
     const result = await rebuildOrUpdateHitlistForUser(session.user.id);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Hitlist rebuild mislukt";
+    const message = e instanceof Error ? e.message : "Hitlist rebuild failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -98,11 +98,11 @@ export default function ReportDetailPage() {
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) router.replace("/reports");
-        else if (res.status === 404) setError("Report niet gevonden");
-        else if (!res.ok) setError((data as { error?: string }).error ?? "Kon report niet laden");
+        else if (res.status === 404) setError("Report not found");
+        else if (!res.ok) setError((data as { error?: string }).error ?? "Could not load report");
         else setReport(data);
       })
-      .catch(() => setError("Kon report niet laden (netwerk- of serverfout)"))
+      .catch(() => setError("Could not load report (netwerk- of serverfout)"))
       .finally(() => setLoading(false));
   };
 
@@ -144,7 +144,7 @@ export default function ReportDetailPage() {
         : { playlistGroupId: addGroupId || undefined, weight: addWeight, include: addInclude };
     const hasId = addSourceKind === "playlist" ? addPlaylistId : addGroupId;
     if (!hasId) {
-      setError("Selecteer een playlist of groep");
+      setError("Select a playlist or group");
       return;
     }
     setAdding(true);
@@ -157,15 +157,15 @@ export default function ReportDetailPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon bron niet toevoegen");
+        setError(data.error ?? "Could not add source");
         return;
       }
-      setSuccess("Bron toegevoegd.");
+      setSuccess("Source added.");
       setAddPlaylistId("");
       setAddGroupId("");
       loadReport();
     } catch {
-      setError("Kon bron niet toevoegen");
+      setError("Could not add source");
     } finally {
       setAdding(false);
     }
@@ -178,7 +178,7 @@ export default function ReportDetailPage() {
 
     if (!id || !report) return;
     if (!addGroupId) {
-      setError("Selecteer eerst een groep");
+      setError("Select a group first");
       return;
     }
 
@@ -193,7 +193,7 @@ export default function ReportDetailPage() {
         playlists?: Array<{ trackedPlaylistId: string | null }>;
       };
       if (!res.ok || !data.playlists) {
-        setError(data.error ?? "Kon groep niet laden");
+        setError(data.error ?? "Could not load group");
         return;
       }
 
@@ -208,7 +208,7 @@ export default function ReportDetailPage() {
         .filter((pid): pid is string => !!pid && !existingPlaylistIds.has(pid));
 
       if (toAdd.length === 0) {
-        setError("Alle playlists uit deze groep staan al als bron in dit report.");
+        setError("All playlists from this group are already sources in this report.");
         return;
       }
 
@@ -225,17 +225,17 @@ export default function ReportDetailPage() {
         });
         const body = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
         if (!r.ok || !body.ok) {
-          throw new Error(body.error ?? "Kon bron niet toevoegen");
+          throw new Error(body.error ?? "Could not add source");
         }
       }
 
-      setSuccess(`Toegevoegd: ${toAdd.length} playlists uit deze groep als losse bron.`);
+      setSuccess(`Added: ${toAdd.length} playlists from this group as individual sources.`);
       setAddPlaylistId("");
       setAddGroupId("");
       loadReport();
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Kon playlists uit deze groep niet als bron toevoegen"
+        e instanceof Error ? e.message : "Could not add playlists from this group as sources"
       );
     } finally {
       setAdding(false);
@@ -271,11 +271,11 @@ export default function ReportDetailPage() {
         error?: string;
       };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon gewicht niet opslaan");
+        setError(data.error ?? "Could not save weight");
         return;
       }
     } catch {
-      setError("Kon gewicht niet opslaan");
+      setError("Could not save weight");
     } finally {
       setUpdatingSourceId(null);
     }
@@ -292,13 +292,13 @@ export default function ReportDetailPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon bron niet verwijderen");
+        setError(data.error ?? "Could not remove source");
         return;
       }
-      setSuccess("Bron verwijderd.");
+      setSuccess("Source removed.");
       loadReport();
     } catch {
-      setError("Kon bron niet verwijderen");
+      setError("Could not remove source");
     }
   };
 
@@ -320,13 +320,13 @@ export default function ReportDetailPage() {
         rows?: ChartRow[];
       };
       if (!res.ok) {
-        setGenerateError(data.error ?? "Genereren mislukt");
+        setGenerateError(data.error ?? "Generation failed");
         return;
       }
       if (data.result?.errors?.length) setGenerateWarnings(data.result.errors);
       if (data.ok) loadReport();
     } catch {
-      setGenerateError("Genereren mislukt");
+      setGenerateError("Generation failed");
     } finally {
       setGenerating(false);
     }
@@ -373,14 +373,14 @@ export default function ReportDetailPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Kon bewerking niet opslaan");
+        setError(data.error ?? "Could not save edit");
         return;
       }
       setSuccess("Bewerkte chart opgeslagen.");
       setEditMode(false);
       loadReport();
     } catch {
-      setError("Kon bewerking niet opslaan");
+      setError("Could not save edit");
     } finally {
       setSavingEdit(false);
     }
@@ -388,7 +388,7 @@ export default function ReportDetailPage() {
 
   const handleExportPlaylist = async () => {
     if (!report?.latestResult) {
-      setError("Geen resultaat om te exporteren. Genereer eerst een chart.");
+      setError("No result to export. Generate a chart first.");
       return;
     }
     setExportingPlaylist(true);
@@ -403,14 +403,14 @@ export default function ReportDetailPage() {
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; spotifyPlaylistUrl?: string };
       if (!res.ok || !data.ok || !data.spotifyPlaylistUrl) {
-        setError(data.error ?? "Kon Spotify playlist niet aanmaken.");
+        setError(data.error ?? "Could not create Spotify playlist.");
         return;
       }
       setSuccess("Spotify playlist aangemaakt.");
       // Open in nieuw tabblad voor directe toegang
       window.open(data.spotifyPlaylistUrl, "_blank", "noopener,noreferrer");
     } catch {
-      setError("Kon Spotify playlist niet aanmaken.");
+      setError("Could not create Spotify playlist.");
     } finally {
       setExportingPlaylist(false);
     }
@@ -418,7 +418,7 @@ export default function ReportDetailPage() {
 
   const handleExportCsv = () => {
     if (!report?.latestResult) {
-      setError("Geen resultaat om te exporteren. Genereer eerst een chart.");
+      setError("No result to export. Generate a chart first.");
       return;
     }
     setExportingCsv(true);
@@ -439,7 +439,7 @@ export default function ReportDetailPage() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -453,7 +453,7 @@ export default function ReportDetailPage() {
           <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
             <p className="text-amber-800 dark:text-amber-200">{error}</p>
             <Link href="/reports" className="mt-4 inline-block text-sm text-amber-700 dark:text-amber-300 hover:underline">
-              ← Terug naar reports
+              ← Back to reports
             </Link>
           </div>
         </div>
@@ -501,12 +501,12 @@ export default function ReportDetailPage() {
         )}
 
         <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Bronnen</h2>
+          <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">Sources</h2>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-            Kies tracked playlists en/of playlistgroepen. Bij een groep geldt het gewicht voor alle playlists in die groep. Als dezelfde playlist expliciet én via een groep wordt toegevoegd, telt alleen de expliciete bron.
+            Choose tracked playlists and/or playlist groups. For a group, the weight applies to all playlists in that group. If the same playlist is added both explicitly and via a group, only the explicit source counts.
           </p>
           {report.sources.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nog geen bronnen. Voeg hieronder een playlist of groep toe.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">No sources yet. Add a playlist or group below.</p>
           ) : (
             <ul className="mb-4 space-y-2">
               {report.sources.map((s) => (
@@ -517,7 +517,7 @@ export default function ReportDetailPage() {
                   <div className="flex-1">
                     <div>
                       <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                        {s.type === "playlist" ? "Playlist" : "Groep"}
+                        {s.type === "playlist" ? "Playlist" : "Group"}
                       </span>
                       {s.type === "group" && s.playlistGroupId ? (
                         <span className="ml-2 inline-flex align-middle">
@@ -568,9 +568,9 @@ export default function ReportDetailPage() {
                             const followerCount = s.followerCount;
                             const trackCount = s.trackCount;
                             const followersText =
-                              followerCount != null ? followerCount.toLocaleString("nl-NL") : "—";
+                              followerCount != null ? followerCount.toLocaleString("en-GB") : "—";
                             const tracksText =
-                              trackCount != null ? trackCount.toLocaleString("nl-NL") : "—";
+                              trackCount != null ? trackCount.toLocaleString("en-GB") : "—";
                             return (
                               <>
                                 · {followersText} volgers · {tracksText} nummers
@@ -582,7 +582,7 @@ export default function ReportDetailPage() {
                     )}
                     {s.type === "group" && (
                       <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        Gewicht (groep): {s.weight.toFixed(1)}
+                        Weight (group): {s.weight.toFixed(1)}
                       </div>
                     )}
                   </div>
@@ -591,7 +591,7 @@ export default function ReportDetailPage() {
                     onClick={() => handleRemoveSource(s.id)}
                     className="text-sm text-red-600 hover:underline dark:text-red-400"
                   >
-                    Verwijderen
+                    Remove
                   </button>
                 </li>
               ))}
@@ -607,7 +607,7 @@ export default function ReportDetailPage() {
                 className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               >
                 <option value="playlist">Playlist</option>
-                <option value="group">Groep</option>
+                <option value="group">Group</option>
               </select>
             </div>
             {addSourceKind === "playlist" ? (
@@ -618,7 +618,7 @@ export default function ReportDetailPage() {
                   onChange={(e) => setAddPlaylistId(e.target.value)}
                   className="min-w-[200px] rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
-                  <option value="">— Kies —</option>
+                  <option value="">— Choose —</option>
                   {playlists.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -626,13 +626,13 @@ export default function ReportDetailPage() {
               </div>
             ) : (
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Groep</label>
+                <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Group</label>
                 <select
                   value={addGroupId}
                   onChange={(e) => setAddGroupId(e.target.value)}
                   className="min-w-[200px] rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
-                  <option value="">— Kies —</option>
+                  <option value="">— Choose —</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.name} ({g.playlistCount})</option>
                   ))}
@@ -640,7 +640,7 @@ export default function ReportDetailPage() {
               </div>
             )}
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Gewicht</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Weight</label>
               <input
                 type="number"
                 min={0}
@@ -668,7 +668,7 @@ export default function ReportDetailPage() {
                 disabled={adding}
                 className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
               >
-                {adding ? "Toevoegen…" : "Bron toevoegen"}
+                {adding ? "Adding…" : "Add source"}
               </button>
               {addSourceKind === "group" && (
                 <button
@@ -677,7 +677,7 @@ export default function ReportDetailPage() {
                   onClick={handleAddGroupPlaylistsAsSources}
                   className="rounded-full border border-[#1DB954] px-4 py-2 text-sm font-medium text-[#1DB954] hover:bg-[#1DB954]/10 disabled:opacity-60"
                 >
-                  Alle playlists uit groep
+                  All playlists from group
                 </button>
               )}
             </div>
@@ -714,7 +714,7 @@ export default function ReportDetailPage() {
             disabled={generating || report.sources.length === 0}
             className="rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
           >
-            {generating ? "Bezig…" : "Generate chart"}
+            {generating ? "Working…" : "Generate chart"}
           </button>
           {generateError && (
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">{generateError}</p>
@@ -731,13 +731,13 @@ export default function ReportDetailPage() {
         {report.latestResult && (
           <section className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 font-medium text-zinc-900 dark:text-zinc-100">
-              Resultaat (gegenereerd {new Date(report.latestResult.generatedAt).toLocaleString("nl-NL")})
+              Result (generated {new Date(report.latestResult.generatedAt).toLocaleString("en-GB")})
             </h2>
 
             {groupSources.length > 0 && (
               <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
                 <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  Playlists indirect meegenomen via groepen
+                  Playlists included indirectly via groups
                 </p>
                 <ul className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
                   {groupSources.map((s) => (
@@ -796,7 +796,7 @@ export default function ReportDetailPage() {
                     disabled={exportingPlaylist || displayRows.length === 0}
                     className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   >
-                    {exportingPlaylist ? "Exporteren…" : "Export to Spotify playlist"}
+                    {exportingPlaylist ? "Exporting…" : "Export to Spotify playlist"}
                   </button>
                   <button
                     type="button"
@@ -804,7 +804,7 @@ export default function ReportDetailPage() {
                     disabled={exportingCsv || displayRows.length === 0}
                     className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   >
-                    {exportingCsv ? "Exporteren…" : "Download CSV"}
+                    {exportingCsv ? "Exporting…" : "Download CSV"}
                   </button>
                 </>
               ) : (
@@ -814,7 +814,7 @@ export default function ReportDetailPage() {
                     onClick={() => setEditMode(false)}
                     className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
                   >
-                    Annuleren
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -822,7 +822,7 @@ export default function ReportDetailPage() {
                     disabled={savingEdit || editingRows.length === 0}
                     className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-60"
                   >
-                    {savingEdit ? "Opslaan…" : "Save edited chart"}
+                    {savingEdit ? "Saving…" : "Save edited chart"}
                   </button>
                 </>
               )}
@@ -830,7 +830,7 @@ export default function ReportDetailPage() {
 
             {displayRows.length === 0 ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {editMode ? "Geen tracks meer in bewerkte versie. Sla op of annuleer." : "Geen tracks in dit resultaat."}
+                {editMode ? "No tracks left in the edited version. Save or cancel." : "No tracks in this result."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -839,7 +839,7 @@ export default function ReportDetailPage() {
                     <tr className="border-b border-zinc-200 text-left text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                       <th className="pb-2 pr-2">#</th>
                       {editMode && <th className="pb-2 pr-2 w-24">Acties</th>}
-                      <th className="pb-2 pr-2">Artiest</th>
+                      <th className="pb-2 pr-2">Artist</th>
                       <th className="pb-2 pr-2">Titel</th>
                       <th className="pb-2 pr-2">Score</th>
                       <th className="pb-2 pr-2">Occurrences</th>
@@ -858,7 +858,7 @@ export default function ReportDetailPage() {
                                 onClick={() => moveRowUp(idx)}
                                 disabled={idx === 0}
                                 className="rounded border border-zinc-300 px-1.5 py-0.5 text-xs disabled:opacity-40 dark:border-zinc-600"
-                                title="Omhoog"
+                                title="Move up"
                               >
                                 ↑
                               </button>
@@ -867,7 +867,7 @@ export default function ReportDetailPage() {
                                 onClick={() => moveRowDown(idx)}
                                 disabled={idx === displayRows.length - 1}
                                 className="rounded border border-zinc-300 px-1.5 py-0.5 text-xs disabled:opacity-40 dark:border-zinc-600"
-                                title="Omlaag"
+                                title="Move down"
                               >
                                 ↓
                               </button>
@@ -875,7 +875,7 @@ export default function ReportDetailPage() {
                                 type="button"
                                 onClick={() => removeRow(idx)}
                                 className="rounded border border-red-300 px-1.5 py-0.5 text-xs text-red-600 dark:border-red-700 dark:text-red-400"
-                                title="Verwijderen"
+                                title="Remove"
                               >
                                 Remove
                               </button>

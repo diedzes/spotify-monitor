@@ -20,7 +20,7 @@ function getSessionHeaderValue(sidFromUrl: string | null): string | null {
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("nl-NL", {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(iso));
@@ -98,9 +98,9 @@ function filterAndSort(
   const sorted = [...list].sort((a, b) => {
     switch (sortBy) {
       case "name_asc":
-        return a.name.localeCompare(b.name, "nl");
+        return a.name.localeCompare(b.name, "en");
       case "name_desc":
-        return b.name.localeCompare(a.name, "nl");
+        return b.name.localeCompare(a.name, "en");
       case "lastSync_new": {
         const ta = a.lastSyncedAt ? new Date(a.lastSyncedAt).getTime() : 0;
         const tb = b.lastSyncedAt ? new Date(b.lastSyncedAt).getTime() : 0;
@@ -311,7 +311,7 @@ function PlaylistsPageContent() {
       };
       if (res.status === 401) return;
       if (!res.ok) {
-        setSyncError(typeof data.error === "string" ? data.error : "Sync all mislukt");
+        setSyncError(typeof data.error === "string" ? data.error : "Sync all failed");
         setSyncAllLoading(false);
         return;
       }
@@ -328,7 +328,7 @@ function PlaylistsPageContent() {
       setHitlistNotice(hl);
       await refreshPlaylists();
     } catch {
-      setSyncError("Sync all mislukt");
+      setSyncError("Sync all failed");
     } finally {
       setSyncAllLoading(false);
     }
@@ -357,7 +357,7 @@ function PlaylistsPageContent() {
           setBulkAddResult({
             added: 0,
             skipped: 0,
-            errors: [typeof createData.error === "string" ? createData.error : "Kon groep niet aanmaken"],
+            errors: [typeof createData.error === "string" ? createData.error : "Could not create group"],
           });
           setBulkAddLoading(false);
           return;
@@ -372,7 +372,7 @@ function PlaylistsPageContent() {
           },
         ]);
       } catch {
-        setBulkAddResult({ added: 0, skipped: 0, errors: ["Kon groep niet aanmaken"] });
+        setBulkAddResult({ added: 0, skipped: 0, errors: ["Could not create group"] });
         setBulkAddLoading(false);
         return;
       }
@@ -427,9 +427,9 @@ function PlaylistsPageContent() {
         const data = (await res.json()) as { ok?: boolean; error?: string; changed?: boolean };
         if (res.ok && data.ok) {
           synced += 1;
-        } else errors.push(data.error ?? "Sync mislukt");
+        } else errors.push(data.error ?? "Sync failed");
       } catch {
-        errors.push("Sync mislukt");
+        errors.push("Sync failed");
       }
     }
     setBulkSyncResult({ synced, failed: ids.length - synced, errors });
@@ -478,7 +478,7 @@ function PlaylistsPageContent() {
           hitlistMainGroupId?: string;
         };
         if (!res.ok || !data.ok) {
-          setSyncError(data.error ?? "Hitlist-hoofdgroep bijwerken mislukt");
+          setSyncError(data.error ?? "Failed to update Hitlist main group");
           return;
         }
         await refreshPlaylists();
@@ -489,7 +489,7 @@ function PlaylistsPageContent() {
         );
         setHitlistNotice(hl);
       } catch {
-        setSyncError("Hitlist-hoofdgroep bijwerken mislukt");
+        setSyncError("Failed to update Hitlist main group");
       } finally {
         setMainToggleLoading(null);
       }
@@ -516,7 +516,7 @@ function PlaylistsPageContent() {
           hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
         };
         if (!res.ok || !data.ok) {
-          setSyncError(data.error ?? "Hitlist-voorkeur bijwerken mislukt");
+          setSyncError(data.error ?? "Failed to update Hitlist preference");
           return;
         }
         await refreshPlaylists();
@@ -527,7 +527,7 @@ function PlaylistsPageContent() {
         );
         setHitlistNotice(hl);
       } catch {
-        setSyncError("Hitlist-voorkeur bijwerken mislukt");
+        setSyncError("Failed to update Hitlist preference");
       } finally {
         setExcludeToggleLoading(null);
       }
@@ -556,7 +556,7 @@ function PlaylistsPageContent() {
           hitlistMainGroupId?: string;
         };
         if (!res.ok || !data.ok) {
-          setSyncError(data.error ?? "Hitlist-hoofdgroep (bulk) mislukt");
+          setSyncError(data.error ?? "Failed to update Hitlist main group (bulk)");
           return;
         }
         await refreshPlaylists();
@@ -568,7 +568,7 @@ function PlaylistsPageContent() {
         setHitlistNotice(hl);
         clearSelection();
       } catch {
-        setSyncError("Hitlist-hoofdgroep (bulk) mislukt");
+        setSyncError("Failed to update Hitlist main group (bulk)");
       } finally {
         setBulkMainLoading(false);
       }
@@ -600,7 +600,7 @@ function PlaylistsPageContent() {
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
         <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       </div>
     );
@@ -616,25 +616,25 @@ function PlaylistsPageContent() {
         <div className="p-6">
         <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
           <h1 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
-            {sessionNotInDb ? "Sessie hoort bij andere omgeving" : "API gaf 401"}
+            {sessionNotInDb ? "Session belongs to another environment" : "API returned 401"}
           </h1>
           {sessionNotInDb ? (
             <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
-              Je sessie staat niet in de database van <strong>deze</strong> site.
+              Your session is not in the database for <strong>this</strong> site.
             </p>
           ) : null}
           {d && (
             <ul className="mt-3 list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
-              <li>Cookie bij API: {d.hasCookie ? "ja" : "nee"}</li>
-              <li>X-Spotify-Session header: {d.hasHeader ? "ja" : "nee"}</li>
-              <li>Sessie in DB: {d.sessionFoundInDb ? "ja" : "nee"}</li>
+              <li>Cookie at API: {d.hasCookie ? "yes" : "no"}</li>
+              <li>X-Spotify-Session header: {d.hasHeader ? "yes" : "no"}</li>
+              <li>Session in DB: {d.sessionFoundInDb ? "yes" : "no"}</li>
             </ul>
           )}
           <p className="mt-4 text-sm font-medium text-amber-800 dark:text-amber-200">
-            Ga naar de startpagina en log opnieuw in met Spotify.
+            Go to the home page and sign in again with Spotify.
           </p>
           <Link href="/" className="mt-4 inline-block rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500">
-            Naar startpagina
+            To home page
           </Link>
         </div>
         </div>
@@ -654,19 +654,19 @@ function PlaylistsPageContent() {
               Tracked playlists
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-              De hitlist vergelijkt playlists in de{" "}
+              The hitlist compares playlists in the{" "}
               {hitlistMainGroup ? (
                 <Link
                   href={sidFromUrl ? `/groups/${hitlistMainGroup.id}?sid=${encodeURIComponent(sidFromUrl)}` : `/groups/${hitlistMainGroup.id}`}
                   className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
                 >
-                  Hitlist-hoofdgroep ({hitlistMainGroup.name})
+                  Hitlist main group ({hitlistMainGroup.name})
                 </Link>
               ) : (
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">Hitlist-hoofdgroep</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">Hitlist main group</span>
               )}{" "}
-              met je overige tracked playlists. Kolom <strong>Meetelt</strong>: uit = playlist doet nergens mee in de
-              hitlist. Voeg bron-playlists toe via <strong>Hitlist-bron</strong>, Groepen of bulkacties.
+              with your other tracked playlists. <strong>Counts</strong> column: off = playlist does not count anywhere
+              in the hitlist. Add source playlists via <strong>Hitlist source</strong>, Groups, or bulk actions.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -696,14 +696,14 @@ function PlaylistsPageContent() {
         {syncAllResult && (
           <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
             <p className="font-medium text-zinc-900 dark:text-zinc-100">
-              Sync all: {syncAllResult.synced} gesynchroniseerd{syncAllResult.failed > 0 ? `, ${syncAllResult.failed} mislukt` : ""}
+              Sync all: {syncAllResult.synced} synced{syncAllResult.failed > 0 ? `, ${syncAllResult.failed} failed` : ""}
             </p>
             {syncAllResult.errors.length > 0 && (
               <ul className="mt-1 list-inside text-zinc-600 dark:text-zinc-400">
                 {syncAllResult.errors.slice(0, 5).map((e, i) => (
                   <li key={i}>{playlists.find((x) => x.id === e.playlistId)?.name ?? e.playlistId}: {e.error}</li>
                 ))}
-                {syncAllResult.errors.length > 5 && <li>… en {syncAllResult.errors.length - 5} meer</li>}
+                {syncAllResult.errors.length > 5 && <li>… and {syncAllResult.errors.length - 5} more</li>}
               </ul>
             )}
           </div>
@@ -713,7 +713,7 @@ function PlaylistsPageContent() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <input
             type="search"
-            placeholder="Zoek op naam of owner…"
+            placeholder="Search by name or owner…"
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
             className="min-w-[180px] rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -723,7 +723,7 @@ function PlaylistsPageContent() {
             onChange={(e) => setFilterOwner(e.target.value)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="">Alle owners</option>
+            <option value="">All owners</option>
             {uniqueOwners.map((o) => (
               <option key={o} value={o}>{o}</option>
             ))}
@@ -733,7 +733,7 @@ function PlaylistsPageContent() {
             onChange={(e) => setFilterGroup(e.target.value)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="">Alle groepen</option>
+            <option value="">All groups</option>
             {uniqueGroups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -745,39 +745,39 @@ function PlaylistsPageContent() {
             onChange={(e) => setFilterSyncStatus(e.target.value as SyncStatusFilter)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="all">Sync: alle</option>
-            <option value="never">Nooit gesynchroniseerd</option>
-            <option value="synced">Ooit gesynchroniseerd</option>
+            <option value="all">Sync: all</option>
+            <option value="never">Never synced</option>
+            <option value="synced">Ever synced</option>
           </select>
           <select
             value={filterIsPublic}
             onChange={(e) => setFilterIsPublic(e.target.value as IsPublicFilter)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="all">Zichtbaarheid: alle</option>
-            <option value="public">Openbaar</option>
-            <option value="private">Privé</option>
+            <option value="all">Visibility: all</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
           </select>
           <select
             value={filterHitlistMain}
             onChange={(e) => setFilterHitlistMain(e.target.value as HitlistMainFilter)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="all">Hitlist-bron: alle playlists</option>
-            <option value="inMain">In Hitlist-hoofdgroep</option>
-            <option value="notInMain">Niet in Hitlist-hoofdgroep</option>
+            <option value="all">Hitlist source: all playlists</option>
+            <option value="inMain">In Hitlist main group</option>
+            <option value="notInMain">Not in Hitlist main group</option>
           </select>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="name_asc">Sorteer: naam A–Z</option>
-            <option value="name_desc">Sorteer: naam Z–A</option>
-            <option value="lastSync_new">Sorteer: laatste sync nieuw→oud</option>
-            <option value="lastSync_old">Sorteer: laatste sync oud→nieuw</option>
-            <option value="tracks_high">Sorteer: tracks hoog→laag</option>
-            <option value="tracks_low">Sorteer: tracks laag→hoog</option>
+            <option value="name_asc">Sort: name A–Z</option>
+            <option value="name_desc">Sort: name Z–A</option>
+            <option value="lastSync_new">Sort: last sync new→old</option>
+            <option value="lastSync_old">Sort: last sync old→new</option>
+            <option value="tracks_high">Sort: tracks high→low</option>
+            <option value="tracks_low">Sort: tracks low→high</option>
           </select>
         </div>
 
@@ -785,7 +785,7 @@ function PlaylistsPageContent() {
         {selectedIds.size > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#1DB954]/40 bg-[#1DB954]/5 px-4 py-3 dark:bg-[#1DB954]/10">
             <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              {selectedIds.size} playlist{selectedIds.size !== 1 ? "s" : ""} geselecteerd
+              {selectedIds.size} playlist{selectedIds.size !== 1 ? "s" : ""} selected
             </span>
             <button
               type="button"
@@ -808,7 +808,7 @@ function PlaylistsPageContent() {
               onClick={() => void handleBulkHitlistMain(true)}
               className="rounded-full border border-emerald-500/60 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/60"
             >
-              {bulkMainLoading ? "…" : "Add to Hitlist-hoofdgroep"}
+              {bulkMainLoading ? "…" : "Add to Hitlist main group"}
             </button>
             <button
               type="button"
@@ -816,14 +816,14 @@ function PlaylistsPageContent() {
               onClick={() => void handleBulkHitlistMain(false)}
               className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              Remove from Hitlist-hoofdgroep
+              Remove from Hitlist main group
             </button>
             <button
               type="button"
               onClick={clearSelection}
               className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              Selectie wissen
+              Clear selection
             </button>
           </div>
         )}
@@ -831,12 +831,12 @@ function PlaylistsPageContent() {
         {bulkSyncResult && (
           <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
             <p className="font-medium text-zinc-900 dark:text-zinc-100">
-              Sync selected: {bulkSyncResult.synced} gesynchroniseerd, {bulkSyncResult.failed} mislukt
+              Sync selected: {bulkSyncResult.synced} synced, {bulkSyncResult.failed} failed
             </p>
             {bulkSyncResult.errors.length > 0 && (
               <ul className="mt-1 list-inside text-zinc-600 dark:text-zinc-400">
                 {bulkSyncResult.errors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
-                {bulkSyncResult.errors.length > 5 && <li>… en {bulkSyncResult.errors.length - 5} meer</li>}
+                {bulkSyncResult.errors.length > 5 && <li>… and {bulkSyncResult.errors.length - 5} more</li>}
               </ul>
             )}
           </div>
@@ -857,14 +857,14 @@ function PlaylistsPageContent() {
                     />
                   ) : null}
                 </th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Naam</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Name</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Owner</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groepen</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groups</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Laatste sync</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Acties</th>
-                <th className="px-3 py-3 text-center font-medium text-zinc-900 dark:text-zinc-100">Meetelt</th>
-                <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Hitlist-bron</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Last sync</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Actions</th>
+                <th className="px-3 py-3 text-center font-medium text-zinc-900 dark:text-zinc-100">Counts</th>
+                <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Hitlist source</th>
               </tr>
             </thead>
             <tbody>
@@ -872,8 +872,8 @@ function PlaylistsPageContent() {
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     {playlists.length === 0
-                      ? "Nog geen playlists. Klik op \"Add playlist\" om een Spotify playlist toe te voegen."
-                      : "Geen playlists voldoen aan de filters."}
+                      ? "No playlists yet. Click \"Add playlist\" to add a Spotify playlist."
+                      : "No playlists match the filters."}
                   </td>
                 </tr>
               ) : (
@@ -884,7 +884,7 @@ function PlaylistsPageContent() {
                         type="checkbox"
                         checked={selectedIds.has(p.id)}
                         onChange={() => toggleSelect(p.id)}
-                        aria-label={`Selecteer ${p.name}`}
+                        aria-label={`Select ${p.name}`}
                         className="h-4 w-4 rounded border-zinc-300 text-[#1DB954] focus:ring-[#1DB954]"
                       />
                     </td>
@@ -941,7 +941,7 @@ function PlaylistsPageContent() {
                                 hitlistRemovedMatches?: number;
                                 hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
                               };
-                              if (!res.ok || !data.ok) setSyncError(data.error ?? "Sync mislukt");
+                              if (!res.ok || !data.ok) setSyncError(data.error ?? "Sync failed");
                               else {
                                 const hl = formatHitlistSummary(
                                   data.hitlistNewMatches ?? 0,
@@ -952,7 +952,7 @@ function PlaylistsPageContent() {
                                 await refreshPlaylists();
                               }
                             } catch {
-                              setSyncError("Sync mislukt");
+                              setSyncError("Sync failed");
                             } finally {
                               setSyncingId(null);
                             }
@@ -979,10 +979,10 @@ function PlaylistsPageContent() {
                           disabled={excludeToggleLoading === p.id}
                           onChange={(e) => void toggleExcludeFromHitlist(p.id, !e.target.checked)}
                           className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
-                          title="Uit = playlist telt nergens mee voor de hitlist (geen bron, geen match)"
+                          title="Off = playlist does not count toward the hitlist (no source, no match)"
                         />
                         <span className="max-w-[5rem] text-[10px] leading-tight text-zinc-500 dark:text-zinc-400">
-                          {p.excludeFromHitlist ? "Nee" : "Ja"}
+                          {p.excludeFromHitlist ? "No" : "Yes"}
                         </span>
                       </label>
                     </td>
@@ -994,11 +994,11 @@ function PlaylistsPageContent() {
                           disabled={mainToggleLoading === p.id}
                           onChange={(e) => void toggleHitlistMainGroup(p.id, e.target.checked)}
                           className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                          title="Zit in Hitlist-hoofdgroep (zelfde als groep met Hitlist-label)"
+                          title="In Hitlist main group (same as group with Hitlist label)"
                         />
                         {p.inHitlistMainGroup && (
                           <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
-                            Bron
+                            Source
                           </span>
                         )}
                       </label>
@@ -1019,11 +1019,11 @@ function PlaylistsPageContent() {
               Add selected to group
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Kies een bestaande groep of voer een naam in voor een nieuwe groep. Playlists die al in de groep zitten worden overgeslagen.
+              Pick an existing group or enter a name for a new group. Playlists already in the group are skipped.
             </p>
             {groups.length > 0 && (
               <>
-                <label className="mt-4 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Bestaande groep</label>
+                <label className="mt-4 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Existing group</label>
                 <select
                   value={bulkAddGroupId}
                   onChange={(e) => {
@@ -1032,18 +1032,18 @@ function PlaylistsPageContent() {
                   }}
                   className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
-                  <option value="">Kies een groep…</option>
+                  <option value="">Choose a group…</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
-                      {g.isMainGroup ? " — Hitlist-bron" : ""}
+                      {g.isMainGroup ? " — Hitlist source" : ""}
                     </option>
                   ))}
                 </select>
               </>
             )}
             <label className="mt-4 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              {groups.length > 0 ? "Of nieuwe groep" : "Nieuwe groep"}
+              {groups.length > 0 ? "Or new group" : "New group"}
             </label>
             <input
               type="text"
@@ -1052,14 +1052,14 @@ function PlaylistsPageContent() {
                 setBulkAddNewGroupName(e.target.value);
                 if (e.target.value.trim()) setBulkAddGroupId("");
               }}
-              placeholder="Naam van de nieuwe groep"
+              placeholder="Name of the new group"
               className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {bulkAddResult && (
               <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
                 <p className="text-zinc-900 dark:text-zinc-100">
-                  {bulkAddResult.added} toegevoegd, {bulkAddResult.skipped} al in groep
-                  {bulkAddResult.errors.length > 0 && `, ${bulkAddResult.errors.length} fout(en)`}
+                  {bulkAddResult.added} added, {bulkAddResult.skipped} already in group
+                  {bulkAddResult.errors.length > 0 && `, ${bulkAddResult.errors.length} error(s)`}
                 </p>
                 {bulkAddResult.errors.length > 0 && (
                   <ul className="mt-1 list-inside text-zinc-600 dark:text-zinc-400">
@@ -1075,14 +1075,14 @@ function PlaylistsPageContent() {
                 onClick={handleBulkAddToGroup}
                 className="rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ed760] disabled:opacity-50"
               >
-                {bulkAddLoading ? "Bezig…" : "Toevoegen"}
+                {bulkAddLoading ? "Working…" : "Add"}
               </button>
               <button
                 type="button"
                 onClick={() => { setBulkAddOpen(false); setBulkAddResult(null); clearSelection(); }}
                 className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
               >
-                Sluiten
+                Close
               </button>
             </div>
           </div>
@@ -1097,7 +1097,7 @@ export default function PlaylistsPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-          <p className="text-zinc-500 dark:text-zinc-400">Laden…</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
         </div>
       }
     >

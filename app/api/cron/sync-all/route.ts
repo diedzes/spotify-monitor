@@ -89,7 +89,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     const session = await getValidSessionFromRow(row);
     if (!session) {
       usersSkipped++;
-      perUser.push({ userId: row.userId, synced: 0, failed: 0, error: "Geen geldige sessie (refresh mislukt?)" });
+      perUser.push({ userId: row.userId, synced: 0, failed: 0, error: "No valid session (refresh failed?)" });
       continue;
     }
 

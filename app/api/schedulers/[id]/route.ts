@@ -41,11 +41,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
 
   const scheduler = await getOwnedScheduler(id, session.user.id);
-  if (!scheduler) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!scheduler) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   return NextResponse.json({
     scheduler: {
@@ -122,10 +122,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
   const exists = await prisma.scheduler.findFirst({ where: { id, userId: session.user.id } });
-  if (!exists) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!exists) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
 
   let body: {
     name?: string;
@@ -137,7 +137,7 @@ export async function PUT(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
@@ -155,9 +155,9 @@ export async function PUT(
     typeof body.ratioEvenDistribution === "boolean" ? body.ratioEvenDistribution : undefined;
 
   if (targetTrackCount === null) {
-    return NextResponse.json({ error: "targetTrackCount moet een positief geheel getal zijn" }, { status: 400 });
+    return NextResponse.json({ error: "targetTrackCount must be a positive integer" }, { status: 400 });
   }
-  if (name !== undefined && !name) return NextResponse.json({ error: "Naam is verplicht" }, { status: 400 });
+  if (name !== undefined && !name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
   const updated = await prisma.scheduler.update({
     where: { id },
@@ -190,10 +190,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSpotifySessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
   const exists = await prisma.scheduler.findFirst({ where: { id, userId: session.user.id } });
-  if (!exists) return NextResponse.json({ error: "Scheduler niet gevonden" }, { status: 404 });
+  if (!exists) return NextResponse.json({ error: "Scheduler not found" }, { status: 404 });
   await prisma.scheduler.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

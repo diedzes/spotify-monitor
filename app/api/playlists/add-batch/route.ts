@@ -19,14 +19,14 @@ export type AddBatchResult = {
 export async function POST(request: Request): Promise<NextResponse<AddBatchResult | { error: string }>> {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
   let body: { playlistUrlOrIds?: string[] | string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const raw = body.playlistUrlOrIds;
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<NextResponse<AddBatchResul
       : [];
   if (lines.length === 0) {
     return NextResponse.json(
-      { error: "Geef minimaal één playlist-URL of ID op (één per regel of als array)." },
+      { error: "Provide at least one playlist URL or ID (one per line or as an array)." },
       { status: 400 }
     );
   }
@@ -47,7 +47,7 @@ export async function POST(request: Request): Promise<NextResponse<AddBatchResul
   for (const line of lines) {
     const id = parsePlaylistIdFromInput(line);
     if (id) parsed.push({ input: line, playlistId: id });
-    else invalid.push({ input: line, error: "Ongeldige URL of ID" });
+    else invalid.push({ input: line, error: "Invalid URL or ID" });
   }
 
   const uniqueIds = [...new Set(parsed.map((p) => p.playlistId))];
@@ -75,7 +75,7 @@ export async function POST(request: Request): Promise<NextResponse<AddBatchResul
           results.errors.push({
             input: parsed.find((p) => p.playlistId === playlistId)?.input ?? playlistId,
             playlistId,
-            error: "Playlist niet gevonden of niet openbaar",
+            error: "Playlist not found or not public",
           });
           continue;
         }
@@ -89,7 +89,7 @@ export async function POST(request: Request): Promise<NextResponse<AddBatchResul
       results.errors.push({
         input: parsed.find((p) => p.playlistId === playlistId)?.input ?? playlistId,
         playlistId,
-        error: err instanceof Error ? err.message : "Kon niet toevoegen",
+        error: err instanceof Error ? err.message : "Could not add",
       });
     }
   }

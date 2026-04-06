@@ -14,14 +14,14 @@ export async function POST(
 ) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const { id: reportId } = await params;
   const report = await prisma.report.findFirst({
     where: { id: reportId, userId: session.user.id },
   });
   if (!report) {
-    return NextResponse.json({ error: "Report niet gevonden" }, { status: 404 });
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
   let body: {
     trackedPlaylistId?: string;
@@ -32,7 +32,7 @@ export async function POST(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const trackedPlaylistId =
     typeof body.trackedPlaylistId === "string" ? body.trackedPlaylistId.trim() || null : null;
@@ -43,13 +43,13 @@ export async function POST(
 
   if (trackedPlaylistId && playlistGroupId) {
     return NextResponse.json(
-      { error: "Geef óf trackedPlaylistId óf playlistGroupId op, niet beide" },
+      { error: "Provide either trackedPlaylistId or playlistGroupId, not both" },
       { status: 400 }
     );
   }
   if (!trackedPlaylistId && !playlistGroupId) {
     return NextResponse.json(
-      { error: "Geef trackedPlaylistId of playlistGroupId op" },
+      { error: "Provide trackedPlaylistId or playlistGroupId" },
       { status: 400 }
     );
   }
@@ -59,14 +59,14 @@ export async function POST(
       where: { id: trackedPlaylistId, userId: session.user.id },
     });
     if (!playlist) {
-      return NextResponse.json({ error: "Playlist niet gevonden of geen toegang" }, { status: 404 });
+      return NextResponse.json({ error: "Playlist not found or no access" }, { status: 404 });
     }
   } else if (playlistGroupId) {
     const group = await prisma.playlistGroup.findFirst({
       where: { id: playlistGroupId, userId: session.user.id },
     });
     if (!group) {
-      return NextResponse.json({ error: "Groep niet gevonden of geen toegang" }, { status: 404 });
+      return NextResponse.json({ error: "Group not found or no access" }, { status: 404 });
     }
   }
 
