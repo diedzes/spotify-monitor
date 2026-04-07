@@ -952,7 +952,7 @@ export default function SchedulerDetailPage() {
         <section className="mb-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Naam</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Name</label>
               <input
                 type="text"
                 value={editingName}
@@ -961,7 +961,7 @@ export default function SchedulerDetailPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Beschrijving</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Description</label>
               <input
                 type="text"
                 value={editingDescription}

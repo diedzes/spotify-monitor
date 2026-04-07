@@ -73,7 +73,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           Dashboard
         </h1>
         <p className="mb-8 text-zinc-600 dark:text-zinc-400">
-          Je bent ingelogd met Spotify (OAuth volgens het officiële voorbeeld).
+          You are signed in with Spotify (OAuth based on the official example).
         </p>
 
         {recentProjects.length > 0 && (
