@@ -16,7 +16,24 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-center gap-6">
+          <img
+            src="https://sport-sounds.com/wp-content/uploads/2026/02/Sport-sounds-Logo-zwart-scaled.png"
+            alt="Sport Sounds logo"
+            className="h-[80px] w-auto object-contain"
+            loading="eager"
+            decoding="async"
+          />
+          <img
+            src="https://sport-sounds.com/wp-content/uploads/2026/02/Shoot-Logo-ORIGINAL-scaled-1.jpg"
+            alt="Shoot logo"
+            className="h-[80px] w-auto object-contain"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap items-center gap-1 sm:gap-2" aria-label="Main navigation">
           {navItems.map((item) => {
             const active =
@@ -42,6 +59,7 @@ export function AppHeader() {
         >
           Sign out
         </a>
+        </div>
       </div>
     </header>
   );
