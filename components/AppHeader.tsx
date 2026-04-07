@@ -21,14 +21,14 @@ export function AppHeader() {
           <img
             src="https://sport-sounds.com/wp-content/uploads/2026/02/Sport-sounds-Logo-zwart-scaled.png"
             alt="Sport Sounds logo"
-            className="h-[80px] w-auto object-contain"
+            className="h-[64px] w-auto object-contain"
             loading="eager"
             decoding="async"
           />
           <img
             src="https://sport-sounds.com/wp-content/uploads/2026/02/Shoot-Logo-ORIGINAL-scaled-1.jpg"
             alt="Shoot logo"
-            className="h-[80px] w-auto object-contain"
+            className="h-[72px] w-auto object-contain"
             loading="eager"
             decoding="async"
           />
