@@ -66,6 +66,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     select: {
       id: true,
       name: true,
+      isPublic: true,
       excludeFromHitlist: true,
       snapshots: {
         orderBy: { syncedAt: "desc" },
@@ -117,7 +118,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     canonByPlaylist.set(plId, canonicalSetForPlaylist(tm));
   }
 
-  const mains = playlists.filter((p) => mainIdSet.has(p.id) && !p.excludeFromHitlist);
+  const mains = playlists.filter((p) => mainIdSet.has(p.id) && !p.excludeFromHitlist && p.isPublic);
   for (const main of mains) {
     const mainMap = playlistTracks.get(main.id);
     if (!mainMap) continue;
@@ -125,6 +126,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
       if (other.id === main.id) continue;
       if (mainIdSet.has(other.id)) continue;
       if (other.excludeFromHitlist) continue;
+      if (!other.isPublic) continue;
       const otherMap = playlistTracks.get(other.id);
       if (!otherMap) continue;
       const otherCanons = canonByPlaylist.get(other.id);
@@ -240,6 +242,7 @@ export async function getActiveHitlist(userId: string) {
       userId,
       isActive: true,
       mainPlaylist: {
+        isPublic: true,
         excludeFromHitlist: false,
         groupPlaylists: {
           some: {
@@ -251,6 +254,7 @@ export async function getActiveHitlist(userId: string) {
         },
       },
       matchedPlaylist: {
+        isPublic: true,
         excludeFromHitlist: false,
         groupPlaylists: {
           none: {
@@ -278,6 +282,12 @@ export async function getRecentlyRemovedHitlist(userId: string, days = 14) {
       userId,
       isActive: false,
       removedAt: { gte: since },
+      mainPlaylist: {
+        isPublic: true,
+      },
+      matchedPlaylist: {
+        isPublic: true,
+      },
     },
     orderBy: { removedAt: "desc" },
     include: {
@@ -285,4 +295,108 @@ export async function getRecentlyRemovedHitlist(userId: string, days = 14) {
       matchedPlaylist: { select: { id: true, name: true } },
     },
   });
+}
+
+export type HitlistPlaylistPresence = {
+  playlistId: string;
+  playlistName: string;
+  addedAt: Date;
+  removedAt: Date | null;
+  isActive: boolean;
+};
+
+export type HitlistTitleRow = {
+  key: string;
+  title: string;
+  artistsJson: string;
+  spotifyTrackId: string;
+  firstDetectedAt: Date;
+  lastSeenAt: Date;
+  activePlaylistCount: number;
+  playlistPresences: HitlistPlaylistPresence[];
+};
+
+function titleKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export async function getHitlistTitleRows(
+  userId: string,
+  opts?: { limit?: number; activeOnly?: boolean }
+): Promise<HitlistTitleRow[]> {
+  const rows = await prisma.hitlistMatch.findMany({
+    where: {
+      userId,
+      ...(opts?.activeOnly ? { isActive: true } : {}),
+      mainPlaylist: {
+        isPublic: true,
+        excludeFromHitlist: false,
+      },
+      matchedPlaylist: {
+        isPublic: true,
+        excludeFromHitlist: false,
+      },
+    },
+    orderBy: { firstDetectedAt: "desc" },
+    include: {
+      matchedPlaylist: { select: { id: true, name: true } },
+    },
+  });
+
+  const grouped = new Map<string, HitlistTitleRow>();
+  for (const r of rows) {
+    const key = titleKey(r.title);
+    let g = grouped.get(key);
+    if (!g) {
+      g = {
+        key,
+        title: r.title,
+        artistsJson: r.artistsJson,
+        spotifyTrackId: r.spotifyTrackId,
+        firstDetectedAt: r.firstDetectedAt,
+        lastSeenAt: r.lastSeenAt,
+        activePlaylistCount: 0,
+        playlistPresences: [],
+      };
+      grouped.set(key, g);
+    } else {
+      if (r.firstDetectedAt < g.firstDetectedAt) g.firstDetectedAt = r.firstDetectedAt;
+      if (r.lastSeenAt > g.lastSeenAt) g.lastSeenAt = r.lastSeenAt;
+      if (g.spotifyTrackId.startsWith("local-") && !r.spotifyTrackId.startsWith("local-")) {
+        g.spotifyTrackId = r.spotifyTrackId;
+      }
+    }
+  }
+
+  for (const g of grouped.values()) {
+    const sourceRows = rows.filter((r) => titleKey(r.title) === g.key);
+    const byPlaylist = new Map<string, HitlistPlaylistPresence>();
+    for (const r of sourceRows) {
+      const existing = byPlaylist.get(r.matchedPlaylist.id);
+      if (!existing) {
+        byPlaylist.set(r.matchedPlaylist.id, {
+          playlistId: r.matchedPlaylist.id,
+          playlistName: r.matchedPlaylist.name,
+          addedAt: r.firstDetectedAt,
+          removedAt: r.removedAt,
+          isActive: r.isActive,
+        });
+        continue;
+      }
+      if (r.firstDetectedAt < existing.addedAt) existing.addedAt = r.firstDetectedAt;
+      if (existing.removedAt == null || r.removedAt == null) {
+        existing.removedAt = null;
+      } else if (r.removedAt > existing.removedAt) {
+        existing.removedAt = r.removedAt;
+      }
+      existing.isActive = existing.isActive || r.isActive;
+    }
+    g.playlistPresences = Array.from(byPlaylist.values()).sort((a, b) => a.playlistName.localeCompare(b.playlistName, "en"));
+    g.activePlaylistCount = g.playlistPresences.filter((p) => p.isActive).length;
+  }
+
+  let out = Array.from(grouped.values()).sort((a, b) => b.firstDetectedAt.getTime() - a.firstDetectedAt.getTime());
+  if (opts?.activeOnly) out = out.filter((r) => r.activePlaylistCount > 0);
+  if (opts?.limit && opts.limit > 0) out = out.slice(0, opts.limit);
+  return out;
 }

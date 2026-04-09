@@ -4,7 +4,7 @@ import { getSpotifySession, getSessionFromSignedValue, getSessionSignedIdFromCoo
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
-import { formatArtistsLabel, getActiveHitlist, getRecentlyRemovedHitlist, spotifyTrackHref } from "@/lib/hitlist";
+import { formatArtistsLabel, getHitlistTitleRows } from "@/lib/hitlist";
 import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     redirect("/");
   }
 
-  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlist, removedHitlist] =
+  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlistTitles] =
     await Promise.all([
       prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
       prisma.groupPlaylist.count({
@@ -44,8 +44,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         where: { userId: session.user.id },
         select: { id: true, name: true, updatedAt: true },
       }),
-      getActiveHitlist(session.user.id),
-      getRecentlyRemovedHitlist(session.user.id, 14),
+      getHitlistTitleRows(session.user.id, { activeOnly: true, limit: 10 }),
     ]);
 
   type RecentItem =
@@ -120,9 +119,15 @@ export default async function DashboardPage({ searchParams }: Props) {
         <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
             <h2 className="font-medium text-zinc-900 dark:text-zinc-100">Hitlist</h2>
-            {mainPlaylistCount > 0 ? (
-              <HitlistRefreshButton signedId={signedId} />
-            ) : null}
+            <div className="flex items-center gap-2">
+              <Link
+                href={signedId ? `/hitlist?sid=${encodeURIComponent(signedId)}` : "/hitlist"}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+              >
+                Open full hitlist
+              </Link>
+              {mainPlaylistCount > 0 ? <HitlistRefreshButton signedId={signedId} /> : null}
+            </div>
           </div>
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Tracks that appear in the Hitlist main group and (via the same Spotify track ID or artist+title) also on a
@@ -142,8 +147,8 @@ export default async function DashboardPage({ searchParams }: Props) {
             </p>
           ) : (
             <>
-              <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Active Hitlist</h3>
-              {activeHitlist.length === 0 ? (
+              <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Newest 10 titles</h3>
+              {activeHitlistTitles.length === 0 ? (
                 <p className="mb-6 rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                   No active matches. Sync playlists in the Hitlist main group and other tracked playlists, or use{" "}
                   <strong>Refresh</strong> to check against the latest snapshots.
@@ -155,124 +160,47 @@ export default async function DashboardPage({ searchParams }: Props) {
                       <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artists</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Main playlist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Also playlisted at</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Playlisted at</th>
                         <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Date added</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {activeHitlist.map((row) => {
-                        const mainHref = signedId
-                          ? `/playlists/${row.mainPlaylist.id}?sid=${encodeURIComponent(signedId)}`
-                          : `/playlists/${row.mainPlaylist.id}`;
-                        const plHref = signedId
-                          ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
-                          : `/playlists/${row.matchedPlaylist.id}`;
-                        const trackHref = spotifyTrackHref(row.spotifyTrackId);
+                      {activeHitlistTitles.map((row) => {
+                        const activePlaylists = row.playlistPresences.filter((p) => p.isActive);
+                        const show = activePlaylists.slice(0, 3);
+                        const more = activePlaylists.length - show.length;
+                        const hitlistHref = signedId
+                          ? `/hitlist?sid=${encodeURIComponent(signedId)}&open=${encodeURIComponent(row.key)}`
+                          : `/hitlist?open=${encodeURIComponent(row.key)}`;
                         return (
-                          <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                          <tr key={row.key} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
                             <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
                               {formatArtistsLabel(row.artistsJson)}
                             </td>
-                            <td className="max-w-[220px] px-3 py-2">
-                              {trackHref ? (
-                                <a
-                                  href={trackHref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-medium text-[#1DB954] hover:underline"
-                                >
-                                  {row.title}
-                                </a>
-                              ) : (
-                                <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
-                              )}
-                              <span className="mt-0.5 block break-all font-mono text-[10px] leading-tight text-zinc-400 dark:text-zinc-500">
-                                {row.spotifyTrackId}
-                              </span>
-                            </td>
                             <td className="px-3 py-2">
-                              <Link href={mainHref} className="text-[#1DB954] hover:underline">
-                                {row.mainPlaylist.name}
+                              <Link href={hitlistHref} className="font-medium text-[#1DB954] hover:underline">
+                                {row.title}
                               </Link>
                             </td>
-                            <td className="px-3 py-2">
-                              <Link href={plHref} className="text-[#1DB954] hover:underline">
-                                {row.matchedPlaylist.name}
-                              </Link>
+                            <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                              {show.map((p, idx) => {
+                                const href = signedId
+                                  ? `/playlists/${p.playlistId}?sid=${encodeURIComponent(signedId)}`
+                                  : `/playlists/${p.playlistId}`;
+                                return (
+                                  <span key={p.playlistId}>
+                                    {idx > 0 ? ", " : ""}
+                                    <Link href={href} className="text-[#1DB954] hover:underline">{p.playlistName}</Link>
+                                  </span>
+                                );
+                              })}
+                              {more > 0 ? ` +${more}` : ""}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
                               {row.firstDetectedAt.toLocaleString("en-GB", {
                                 dateStyle: "medium",
                                 timeStyle: "short",
                               })}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <h3 className="mb-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">Removed in last 14 days</h3>
-              {removedHitlist.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  No recently removed matches.
-                </p>
-              ) : (
-                <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <table className="w-full min-w-[800px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Artist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Title</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Main playlist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed from playlist</th>
-                        <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Removed at</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {removedHitlist.map((row) => {
-                        const mainHref = signedId
-                          ? `/playlists/${row.mainPlaylist.id}?sid=${encodeURIComponent(signedId)}`
-                          : `/playlists/${row.mainPlaylist.id}`;
-                        const plHref = signedId
-                          ? `/playlists/${row.matchedPlaylist.id}?sid=${encodeURIComponent(signedId)}`
-                          : `/playlists/${row.matchedPlaylist.id}`;
-                        const trackHref = spotifyTrackHref(row.spotifyTrackId);
-                        const removedAt = row.removedAt;
-                        return (
-                          <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
-                            <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                              {formatArtistsLabel(row.artistsJson)}
-                            </td>
-                            <td className="px-3 py-2">
-                              {trackHref ? (
-                                <a
-                                  href={trackHref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-medium text-[#1DB954] hover:underline"
-                                >
-                                  {row.title}
-                                </a>
-                              ) : (
-                                <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <Link href={mainHref} className="text-[#1DB954] hover:underline">
-                                {row.mainPlaylist.name}
-                              </Link>
-                            </td>
-                            <td className="px-3 py-2">
-                              <Link href={plHref} className="text-[#1DB954] hover:underline">
-                                {row.matchedPlaylist.name}
-                              </Link>
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                              {removedAt ? removedAt.toLocaleString("en-GB") : "—"}
                             </td>
                           </tr>
                         );
