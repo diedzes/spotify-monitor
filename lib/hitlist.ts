@@ -331,10 +331,26 @@ export async function getHitlistTitleRows(
       mainPlaylist: {
         isPublic: true,
         excludeFromHitlist: false,
+        groupPlaylists: {
+          some: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
       },
       matchedPlaylist: {
         isPublic: true,
         excludeFromHitlist: false,
+        groupPlaylists: {
+          none: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
       },
     },
     orderBy: { firstDetectedAt: "desc" },

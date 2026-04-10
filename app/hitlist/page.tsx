@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { HitlistTable } from "@/components/HitlistTable";
 import { getHitlistTitleRows } from "@/lib/hitlist";
@@ -34,7 +35,10 @@ export default async function HitlistPage({ searchParams }: Props) {
       <StoreSessionFromUrl />
       <AppHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Hitlist</h1>
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Hitlist</h1>
+          <HitlistRefreshButton signedId={signedId} />
+        </div>
         <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
           Full hitlist overview. Click a title to see per-playlist history (added and removed times).
         </p>
