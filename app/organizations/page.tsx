@@ -25,6 +25,7 @@ function getSessionHeaders(): HeadersInit {
 type OrganizationRow = {
   id: string;
   name: string;
+  type: string | null;
   notes: string | null;
   contactCount: number;
   updatedAt: string;
@@ -38,6 +39,7 @@ export default function OrganizationsPage() {
   const [rows, setRows] = useState<OrganizationRow[]>([]);
   const [query, setQuery] = useState("");
   const [name, setName] = useState("");
+  const [type, setType] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +81,7 @@ export default function OrganizationsPage() {
         method: "POST",
         credentials: "include",
         headers: getSessionHeaders(),
-        body: JSON.stringify({ name, notes }),
+        body: JSON.stringify({ name, type: type || null, notes }),
       });
       const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !d.ok) {
@@ -88,6 +90,7 @@ export default function OrganizationsPage() {
         return;
       }
       setName("");
+      setType("");
       setNotes("");
       load();
     } catch {
@@ -111,11 +114,17 @@ export default function OrganizationsPage() {
           </Link>
         </div>
 
-        <form onSubmit={createOrg} className="mb-4 grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-[1fr_1fr_auto]">
+        <form onSubmit={createOrg} className="mb-4 grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <input
             placeholder="New organization name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+          />
+          <input
+            placeholder="Type (e.g. Clubmedia)"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
           />
           <input
@@ -150,6 +159,7 @@ export default function OrganizationsPage() {
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-700">
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Name</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Type</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Contacts</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Notes</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Updated</th>
@@ -157,13 +167,14 @@ export default function OrganizationsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">Loading…</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No organizations yet.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No organizations yet.</td></tr>
               ) : (
                 rows.map((o) => (
                   <tr key={o.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
                     <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{o.name}</td>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{o.type ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{o.contactCount}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{o.notes ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{fmt(o.updatedAt)}</td>

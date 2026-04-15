@@ -2,11 +2,13 @@ import { prisma } from "@/lib/db";
 
 type OrganizationInput = {
   name: string;
+  type?: string | null;
   notes?: string | null;
 };
 
 type OrganizationUpdateInput = {
   name?: string;
+  type?: string | null;
   notes?: string | null;
 };
 
@@ -62,6 +64,7 @@ export async function createOrganization(userId: string, data: OrganizationInput
     data: {
       userId,
       name,
+      type: cleanString(data.type),
       notes: cleanString(data.notes),
     },
   });
@@ -71,12 +74,13 @@ export async function updateOrganization(userId: string, organizationId: string,
   const existing = await prisma.organization.findFirst({ where: { id: organizationId, userId } });
   if (!existing) throw new Error("Organization not found");
 
-  const patch: { name?: string; notes?: string | null } = {};
+  const patch: { name?: string; type?: string | null; notes?: string | null } = {};
   if (data.name !== undefined) {
     const name = cleanString(data.name);
     if (!name) throw new Error("Organization name cannot be empty");
     patch.name = name;
   }
+  if (data.type !== undefined) patch.type = cleanString(data.type);
   if (data.notes !== undefined) patch.notes = cleanString(data.notes);
   if (Object.keys(patch).length === 0) return existing;
 

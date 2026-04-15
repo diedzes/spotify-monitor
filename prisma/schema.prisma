@@ -27,12 +27,14 @@ model Organization {
   id        String    @id @default(cuid())
   userId    String
   name      String
+  type      String?
   notes     String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   contacts  Contact[]
 
   @@index([userId, name])
+  @@index([userId, type])
   @@map("organizations")
 }
 

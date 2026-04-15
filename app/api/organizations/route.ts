@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     organizations: organizations.map((o) => ({
       id: o.id,
       name: o.name,
+      type: o.type,
       notes: o.notes,
       createdAt: o.createdAt.toISOString(),
       updatedAt: o.updatedAt.toISOString(),
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  let body: { name?: string; notes?: string };
+  let body: { name?: string; type?: string; notes?: string };
   try {
     body = await request.json();
   } catch {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
   try {
     const organization = await createOrganization(session.user.id, {
       name: body.name ?? "",
+      type: body.type,
       notes: body.notes,
     });
     return NextResponse.json({
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
       organization: {
         id: organization.id,
         name: organization.name,
+        type: organization.type,
         notes: organization.notes,
         createdAt: organization.createdAt.toISOString(),
         updatedAt: organization.updatedAt.toISOString(),

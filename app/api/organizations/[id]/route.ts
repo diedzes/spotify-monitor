@@ -18,6 +18,7 @@ export async function GET(request: Request, { params }: Params) {
     organization: {
       id: org.id,
       name: org.name,
+      type: org.type,
       notes: org.notes,
       createdAt: org.createdAt.toISOString(),
       updatedAt: org.updatedAt.toISOString(),
@@ -39,7 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { id } = await params;
-  let body: { name?: string; notes?: string | null };
+  let body: { name?: string; type?: string | null; notes?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -53,6 +54,7 @@ export async function PATCH(request: Request, { params }: Params) {
       organization: {
         id: org.id,
         name: org.name,
+        type: org.type,
         notes: org.notes,
         createdAt: org.createdAt.toISOString(),
         updatedAt: org.updatedAt.toISOString(),
