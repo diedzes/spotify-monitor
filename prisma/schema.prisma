@@ -23,6 +23,41 @@ model Session {
   @@map("sessions")
 }
 
+model Organization {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  contacts  Contact[]
+
+  @@index([userId, name])
+  @@map("organizations")
+}
+
+model Contact {
+  id                       String        @id @default(cuid())
+  userId                   String
+  fullName                 String
+  organizationId           String?
+  organizationNameSnapshot String?
+  email                    String?
+  phone                    String?
+  role                     String?
+  notes                    String?
+  source                   String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  organization             Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, fullName])
+  @@index([userId, email])
+  @@index([userId, organizationNameSnapshot])
+  @@index([organizationId])
+  @@map("contacts")
+}
+
 model TrackedPlaylist {
   id                String             @id @default(cuid())
   userId            String             // Spotify user id uit sessie
