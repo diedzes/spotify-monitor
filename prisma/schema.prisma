@@ -52,12 +52,77 @@ model Contact {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
   organization             Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  feedbackEntries          FeedbackEntry[]
 
   @@index([userId, fullName])
   @@index([userId, email])
   @@index([userId, organizationNameSnapshot])
   @@index([organizationId])
   @@map("contacts")
+}
+
+model FeedbackBatch {
+  id          String              @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  tracks      FeedbackBatchTrack[]
+  entries     FeedbackEntry[]
+
+  @@index([userId, name])
+  @@map("feedback_batches")
+}
+
+model FeedbackBatchTrack {
+  id              String        @id @default(cuid())
+  feedbackBatchId String
+  spotifyTrackId  String
+  title           String
+  artistsJson     String
+  spotifyUrl      String?
+  orderIndex      Int
+  createdAt       DateTime      @default(now())
+  feedbackBatch   FeedbackBatch @relation(fields: [feedbackBatchId], references: [id], onDelete: Cascade)
+
+  @@index([feedbackBatchId, orderIndex])
+  @@index([spotifyTrackId])
+  @@map("feedback_batch_tracks")
+}
+
+model FeedbackEntry {
+  id              String              @id @default(cuid())
+  userId          String
+  contactId       String?
+  feedbackText    String
+  feedbackAt      DateTime
+  feedbackBatchId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  contact         Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  feedbackBatch   FeedbackBatch?      @relation(fields: [feedbackBatchId], references: [id], onDelete: SetNull)
+  tracks          FeedbackEntryTrack[]
+
+  @@index([userId, feedbackAt])
+  @@index([contactId])
+  @@index([feedbackBatchId])
+  @@map("feedback_entries")
+}
+
+model FeedbackEntryTrack {
+  id              String        @id @default(cuid())
+  feedbackEntryId String
+  spotifyTrackId  String
+  title           String
+  artistsJson     String
+  spotifyUrl      String?
+  createdAt       DateTime      @default(now())
+  feedbackEntry   FeedbackEntry @relation(fields: [feedbackEntryId], references: [id], onDelete: Cascade)
+
+  @@index([feedbackEntryId])
+  @@index([spotifyTrackId])
+  @@map("feedback_entry_tracks")
 }
 
 model TrackedPlaylist {

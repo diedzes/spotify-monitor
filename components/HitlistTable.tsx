@@ -81,6 +81,7 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
               <button type="button" onClick={() => setSort("lastSeen")} className="hover:underline">Last seen</button>
             </th>
+            <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Feedback</th>
           </tr>
         </thead>
         <tbody>
@@ -122,10 +123,18 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.firstDetectedAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.lastSeenAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <Link
+                      href={`/feedback/new?trackId=${encodeURIComponent(row.spotifyTrackId)}${signedId ? `&sid=${encodeURIComponent(signedId)}` : ""}`}
+                      className="text-xs text-[#1DB954] hover:underline"
+                    >
+                      Add feedback
+                    </Link>
+                  </td>
                 </tr>
                 {isOpen ? (
                   <tr className="border-b border-zinc-100 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-900/50">
-                    <td colSpan={5} className="px-3 py-3">
+                    <td colSpan={6} className="px-3 py-3">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Playlist history for this title
                       </div>
