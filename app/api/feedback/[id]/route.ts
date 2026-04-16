@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFeedbackEntryDetail } from "@/lib/feedback";
+import { deleteFeedbackEntry, getFeedbackEntryDetail, updateFeedbackEntry } from "@/lib/feedback";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -12,4 +12,40 @@ export async function GET(request: Request, { params }: Params) {
   const entry = await getFeedbackEntryDetail(session.user.id, id);
   if (!entry) return NextResponse.json({ error: "Feedback entry not found" }, { status: 404 });
   return NextResponse.json({ entry });
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  const session = await getSpotifySessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const { id } = await params;
+  let body: { contactId?: string | null; feedbackText?: string; feedbackAt?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+  try {
+    const entry = await updateFeedbackEntry(session.user.id, id, {
+      contactId: body.contactId,
+      feedbackText: body.feedbackText,
+      feedbackAt: body.feedbackAt ? new Date(body.feedbackAt) : undefined,
+    });
+    return NextResponse.json({ ok: true, entry });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not update feedback";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: Params) {
+  const session = await getSpotifySessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const { id } = await params;
+  try {
+    await deleteFeedbackEntry(session.user.id, id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not delete feedback";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

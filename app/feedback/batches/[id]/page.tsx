@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { FeedbackBatchEditor } from "@/components/FeedbackBatchEditor";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { getFeedbackBatchById } from "@/lib/feedback-batches";
 import { getSessionFromSignedValue, getSpotifySession } from "@/lib/spotify-auth";
@@ -30,6 +31,7 @@ export default async function FeedbackBatchDetailPage({ params, searchParams }: 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{batch.name}</h1>
         {batch.description ? <p className="mb-4 mt-1 text-sm text-zinc-500">{batch.description}</p> : null}
+        <FeedbackBatchEditor batchId={batch.id} initialName={batch.name} initialDescription={batch.description} />
         <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
           <table className="w-full text-sm">
             <thead>

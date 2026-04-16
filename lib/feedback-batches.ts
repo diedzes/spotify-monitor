@@ -112,3 +112,70 @@ export async function getFeedbackBatchById(userId: string, id: string) {
     },
   });
 }
+
+export async function updateFeedbackBatch(
+  userId: string,
+  id: string,
+  input: { name?: string; description?: string | null; tracks?: BatchTrackInput[] }
+) {
+  const existing = await prisma.feedbackBatch.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Batch not found");
+
+  const data: { name?: string; description?: string | null } = {};
+  if (typeof input.name === "string") {
+    const name = input.name.trim();
+    if (!name) throw new Error("Batch name is required");
+    data.name = name;
+  }
+  if (input.description !== undefined) {
+    data.description = input.description?.trim() || null;
+  }
+
+  if (input.tracks) {
+    if (!Array.isArray(input.tracks) || input.tracks.length === 0) throw new Error("Select at least one track");
+    const allowed = new Set((await getMainPlaylistTracks(userId)).map((t) => t.spotifyTrackId));
+    for (const t of input.tracks) {
+      if (!allowed.has(t.spotifyTrackId)) throw new Error(`Track not allowed: ${t.spotifyTrackId}`);
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (input.tracks) {
+      await tx.feedbackBatchTrack.deleteMany({ where: { feedbackBatchId: id } });
+      await tx.feedbackBatchTrack.createMany({
+        data: input.tracks
+          .slice()
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((t, idx) => ({
+            feedbackBatchId: id,
+            spotifyTrackId: t.spotifyTrackId,
+            title: t.title,
+            artistsJson: t.artistsJson,
+            spotifyUrl: t.spotifyUrl ?? null,
+            orderIndex: idx,
+          })),
+      });
+    }
+
+    return tx.feedbackBatch.update({
+      where: { id },
+      data,
+      include: {
+        tracks: { orderBy: { orderIndex: "asc" } },
+        _count: { select: { entries: true } },
+      },
+    });
+  });
+}
+
+export async function deleteFeedbackBatch(userId: string, id: string) {
+  const row = await prisma.feedbackBatch.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!row) throw new Error("Batch not found");
+  await prisma.feedbackBatch.delete({ where: { id } });
+}

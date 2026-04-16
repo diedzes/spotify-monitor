@@ -138,3 +138,51 @@ export async function getFeedbackEntryDetail(userId: string, id: string) {
     },
   });
 }
+
+export async function updateFeedbackEntry(
+  userId: string,
+  id: string,
+  input: { contactId?: string | null; feedbackText?: string; feedbackAt?: Date }
+) {
+  const row = await prisma.feedbackEntry.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!row) throw new Error("Feedback entry not found");
+
+  if (input.contactId) {
+    const contact = await prisma.contact.findFirst({
+      where: { id: input.contactId, userId },
+      select: { id: true },
+    });
+    if (!contact) throw new Error("Contact not found");
+  }
+
+  const data: { contactId?: string | null; feedbackText?: string; feedbackAt?: Date } = {};
+  if (input.contactId !== undefined) data.contactId = input.contactId;
+  if (input.feedbackAt) data.feedbackAt = input.feedbackAt;
+  if (typeof input.feedbackText === "string") {
+    const text = input.feedbackText.trim();
+    if (!text) throw new Error("Feedback text is required");
+    data.feedbackText = text;
+  }
+
+  return prisma.feedbackEntry.update({
+    where: { id },
+    data,
+    include: {
+      contact: { include: { organization: true } },
+      feedbackBatch: { include: { tracks: { orderBy: { orderIndex: "asc" } } } },
+      tracks: true,
+    },
+  });
+}
+
+export async function deleteFeedbackEntry(userId: string, id: string) {
+  const row = await prisma.feedbackEntry.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!row) throw new Error("Feedback entry not found");
+  await prisma.feedbackEntry.delete({ where: { id } });
+}
