@@ -220,6 +220,32 @@ export async function searchContacts(userId: string, query: string) {
   return getContacts(userId, { query, limit: 50 });
 }
 
+export async function getRecentContacts(userId: string, limit = 6) {
+  const recent = await prisma.feedbackEntry.findMany({
+    where: { userId, contactId: { not: null } },
+    orderBy: { feedbackAt: "desc" },
+    select: {
+      contactId: true,
+      feedbackAt: true,
+      contact: {
+        include: { organization: true },
+      },
+    },
+    take: Math.min(limit * 4, 40),
+  });
+
+  const seen = new Set<string>();
+  const out: NonNullable<(typeof recent)[number]["contact"]>[] = [];
+  for (const row of recent) {
+    const contact = row.contact;
+    if (!contact || !row.contactId || seen.has(row.contactId)) continue;
+    seen.add(row.contactId);
+    out.push(contact);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 export async function deleteContact(userId: string, contactId: string) {
   const existing = await prisma.contact.findFirst({ where: { id: contactId, userId }, select: { id: true } });
   if (!existing) throw new Error("Contact not found");

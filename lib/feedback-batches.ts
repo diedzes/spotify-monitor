@@ -12,13 +12,23 @@ export type BatchTrackInput = {
 export async function getMainPlaylistTracks(
   userId: string,
   query?: string
-): Promise<Array<{ spotifyTrackId: string; title: string; artistsJson: string; spotifyUrl: string }>> {
+): Promise<
+  Array<{
+    spotifyTrackId: string;
+    title: string;
+    artistsJson: string;
+    spotifyUrl: string;
+    playlistNames: string[];
+    isHitlistTrack: boolean;
+  }>
+> {
   const mainIds = await getMainSourcePlaylistIds(userId);
   if (mainIds.size === 0) return [];
   const playlistIds = Array.from(mainIds);
   const playlists = await prisma.trackedPlaylist.findMany({
     where: { id: { in: playlistIds }, userId },
     select: {
+      name: true,
       snapshots: {
         orderBy: { syncedAt: "desc" },
         take: 1,
@@ -28,6 +38,19 @@ export async function getMainPlaylistTracks(
   });
   const snapshotIds = playlists.map((p) => p.snapshots[0]?.id).filter(Boolean) as string[];
   if (snapshotIds.length === 0) return [];
+  const snapshotPlaylistName = new Map<string, string>();
+  for (const playlist of playlists) {
+    const snapshotId = playlist.snapshots[0]?.id;
+    if (snapshotId) snapshotPlaylistName.set(snapshotId, playlist.name);
+  }
+  const hitlistTrackIds = new Set(
+    (
+      await prisma.hitlistMatch.findMany({
+        where: { userId, isActive: true },
+        select: { spotifyTrackId: true },
+      })
+    ).map((row) => row.spotifyTrackId)
+  );
   const tracks = await prisma.snapshotTrack.findMany({
     where: {
       snapshotId: { in: snapshotIds },
@@ -40,20 +63,44 @@ export async function getMainPlaylistTracks(
           }
         : {}),
     },
-    select: { spotifyTrackId: true, title: true, artistsJson: true, spotifyUrl: true },
+    select: { snapshotId: true, spotifyTrackId: true, title: true, artistsJson: true, spotifyUrl: true },
     orderBy: { title: "asc" },
   });
-  const map = new Map<string, { spotifyTrackId: string; title: string; artistsJson: string; spotifyUrl: string }>();
+  const map = new Map<
+    string,
+    {
+      spotifyTrackId: string;
+      title: string;
+      artistsJson: string;
+      spotifyUrl: string;
+      playlistNames: Set<string>;
+      isHitlistTrack: boolean;
+    }
+  >();
   for (const t of tracks) {
-    if (map.has(t.spotifyTrackId)) continue;
+    const playlistName = snapshotPlaylistName.get(t.snapshotId);
+    const existing = map.get(t.spotifyTrackId);
+    if (existing) {
+      if (playlistName) existing.playlistNames.add(playlistName);
+      continue;
+    }
     map.set(t.spotifyTrackId, {
       spotifyTrackId: t.spotifyTrackId,
       title: t.title,
       artistsJson: t.artistsJson,
       spotifyUrl: t.spotifyUrl,
+      playlistNames: new Set(playlistName ? [playlistName] : []),
+      isHitlistTrack: hitlistTrackIds.has(t.spotifyTrackId),
     });
   }
-  return Array.from(map.values());
+  return Array.from(map.values()).map((track) => ({
+    spotifyTrackId: track.spotifyTrackId,
+    title: track.title,
+    artistsJson: track.artistsJson,
+    spotifyUrl: track.spotifyUrl,
+    playlistNames: Array.from(track.playlistNames).sort((a, b) => a.localeCompare(b, "en")),
+    isHitlistTrack: track.isHitlistTrack,
+  }));
 }
 
 export async function createFeedbackBatch(
@@ -90,14 +137,28 @@ export async function createFeedbackBatch(
 }
 
 export async function getFeedbackBatches(userId: string) {
-  return prisma.feedbackBatch.findMany({
+  const batches = await prisma.feedbackBatch.findMany({
     where: { userId },
-    orderBy: { updatedAt: "desc" },
     include: {
       tracks: { orderBy: { orderIndex: "asc" } },
       _count: { select: { entries: true } },
+      entries: {
+        orderBy: { feedbackAt: "desc" },
+        take: 1,
+        select: { feedbackAt: true },
+      },
     },
   });
+  return batches
+    .map((batch) => ({
+      ...batch,
+      lastUsedAt: batch.entries[0]?.feedbackAt ?? null,
+    }))
+    .sort((a, b) => {
+      const aTime = a.lastUsedAt?.getTime() ?? a.updatedAt.getTime();
+      const bTime = b.lastUsedAt?.getTime() ?? b.updatedAt.getTime();
+      return bTime - aTime;
+    });
 }
 
 export async function getFeedbackBatchById(userId: string, id: string) {

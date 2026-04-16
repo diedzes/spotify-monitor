@@ -17,7 +17,7 @@ export default async function NewFeedbackPage({ searchParams }: Props) {
       <AppHeader />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-4 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Add feedback</h1>
-        <FeedbackEntryForm preselectedTrackId={params.trackId ?? null} />
+        <FeedbackEntryForm preselectedTrackId={params.trackId ?? null} preselectedBatchId={params.batchId ?? null} />
       </main>
     </div>
   );

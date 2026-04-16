@@ -75,6 +75,19 @@ export async function getFeedbackFeed(userId: string) {
   });
 }
 
+export async function getRecentFeedbackItems(userId: string, limit = 4) {
+  return prisma.feedbackEntry.findMany({
+    where: { userId },
+    orderBy: { feedbackAt: "desc" },
+    take: limit,
+    include: {
+      feedbackBatch: { select: { id: true, name: true } },
+      tracks: { select: { spotifyTrackId: true, title: true, artistsJson: true } },
+      contact: { select: { fullName: true, organization: { select: { name: true } } } },
+    },
+  });
+}
+
 export async function getTrackFeedback(userId: string, spotifyTrackId: string) {
   const entries = await prisma.feedbackEntry.findMany({
     where: {

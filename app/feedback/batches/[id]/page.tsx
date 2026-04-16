@@ -29,8 +29,15 @@ export default async function FeedbackBatchDetailPage({ params, searchParams }: 
       <StoreSessionFromUrl />
       <AppHeader />
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{batch.name}</h1>
-        {batch.description ? <p className="mb-4 mt-1 text-sm text-zinc-500">{batch.description}</p> : null}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{batch.name}</h1>
+            {batch.description ? <p className="mt-1 text-sm text-zinc-500">{batch.description}</p> : null}
+          </div>
+          <a href={`/feedback/new?batchId=${encodeURIComponent(batch.id)}`} className="rounded bg-[#1DB954] px-3 py-2 text-sm font-medium text-white">
+            Add feedback to this batch
+          </a>
+        </div>
         <FeedbackBatchEditor batchId={batch.id} initialName={batch.name} initialDescription={batch.description} />
         <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
           <table className="w-full text-sm">

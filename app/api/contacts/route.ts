@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createContact, getContacts } from "@/lib/contacts";
+import { createContact, getContacts, getRecentContacts } from "@/lib/contacts";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get("query") ?? undefined;
   const organizationId = url.searchParams.get("organizationId") ?? undefined;
-  const contacts = await getContacts(session.user.id, { query, organizationId });
+  const recent = url.searchParams.get("recent") === "1";
+  const contacts = recent
+    ? await getRecentContacts(session.user.id)
+    : await getContacts(session.user.id, { query, organizationId });
 
   return NextResponse.json({
     contacts: contacts.map((c) => ({

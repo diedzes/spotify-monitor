@@ -22,7 +22,10 @@ export default async function FeedbackPage({ searchParams }: Props) {
       <AppHeader />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Feedback feed</h1>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Feedback feed</h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Scan recent notes fast, open detail with less scrolling, and jump straight into the next follow-up.</p>
+          </div>
           <div className="flex gap-2">
             <Link href="/feedback/new" className="rounded bg-[#1DB954] px-3 py-2 text-sm font-medium text-white">Add feedback</Link>
             <Link href="/feedback/batches" className="rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700">Batches</Link>

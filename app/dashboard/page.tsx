@@ -6,6 +6,7 @@ import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { formatArtistsLabel, getHitlistTitleRows } from "@/lib/hitlist";
 import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
+import { getRecentFeedbackItems } from "@/lib/feedback";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,7 +30,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     redirect("/");
   }
 
-  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlistTitles] =
+  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlistTitles, recentFeedback] =
     await Promise.all([
       prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
       prisma.groupPlaylist.count({
@@ -45,6 +46,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         select: { id: true, name: true, updatedAt: true },
       }),
       getHitlistTitleRows(session.user.id, { activeOnly: true, limit: 10 }),
+      getRecentFeedbackItems(session.user.id, 4),
     ]);
 
   type RecentItem =
@@ -75,11 +77,11 @@ export default async function DashboardPage({ searchParams }: Props) {
           You are signed in with Spotify (OAuth based on the official example).
         </p>
 
-        {recentProjects.length > 0 && (
+        {(recentProjects.length > 0 || recentFeedback.length > 0) && (
           <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Recent projects</h2>
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-              Recently updated reports and schedulers — continue where you left off.
+              Recently updated reports, schedulers, and feedback work.
             </p>
             <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {recentProjects.map((p) => (
@@ -108,6 +110,26 @@ export default async function DashboardPage({ searchParams }: Props) {
                     </div>
                     <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                       {p.updatedAt.toLocaleString("en-GB")}
+                    </span>
+                  </a>
+                </li>
+              ))}
+              {recentFeedback.map((entry) => (
+                <li key={`feedback-${entry.id}`}>
+                  <a
+                    href={signedId ? `/feedback?sid=${encodeURIComponent(signedId)}` : "/feedback"}
+                    className="flex flex-wrap items-center justify-between gap-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">
+                        Feedback
+                      </span>
+                      <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">
+                        {entry.feedbackBatch?.name ?? entry.tracks[0]?.title ?? "Feedback note"}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                      {entry.feedbackAt.toLocaleString("en-GB")}
                     </span>
                   </a>
                 </li>
@@ -237,6 +259,17 @@ export default async function DashboardPage({ searchParams }: Props) {
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               Organize playlists into groups
+            </p>
+          </a>
+          <a
+            href={signedId ? `/feedback?sid=${encodeURIComponent(signedId)}` : "/feedback"}
+            className="block rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+          >
+            <h2 className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">
+              Feedback
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Notes, batches, and recent context for track follow-up
             </p>
           </a>
           <a

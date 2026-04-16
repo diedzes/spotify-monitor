@@ -14,6 +14,19 @@ function artistsLabel(artistsJson: string): string {
   }
 }
 
+function highlight(text: string, query: string) {
+  if (!query.trim()) return text;
+  const index = text.toLowerCase().indexOf(query.trim().toLowerCase());
+  if (index === -1) return text;
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="rounded bg-emerald-100 px-0.5 text-inherit">{text.slice(index, index + query.length)}</mark>
+      {text.slice(index + query.length)}
+    </>
+  );
+}
+
 export function FeedbackBatchForm() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -60,7 +73,7 @@ export function FeedbackBatchForm() {
         {tracks.map((t) => {
           const checked = Boolean(selected[t.spotifyTrackId]);
           return (
-            <label key={t.spotifyTrackId} className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 text-sm last:border-0">
+            <label key={t.spotifyTrackId} className="flex cursor-pointer items-start gap-2 border-b px-3 py-2 text-sm last:border-0">
               <input
                 type="checkbox"
                 checked={checked}
@@ -73,12 +86,15 @@ export function FeedbackBatchForm() {
                   });
                 }}
               />
-              <span>{t.title} - {artistsLabel(t.artistsJson)}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{highlight(t.title, query)}</span>
+                <span className="block truncate text-xs text-zinc-500">{highlight(artistsLabel(t.artistsJson), query)}</span>
+              </span>
             </label>
           );
         })}
       </div>
-      <p className="text-xs text-zinc-500">{Object.keys(selected).length} tracks selected</p>
+      <p className="text-xs text-zinc-500">{Object.keys(selected).length} tracks selected. Keep this list reusable for future feedback rounds.</p>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button type="submit" className="rounded bg-[#1DB954] px-4 py-2 text-sm font-medium text-white">Create batch</button>
     </form>

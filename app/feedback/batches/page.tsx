@@ -27,11 +27,25 @@ export default async function FeedbackBatchesPage({ searchParams }: Props) {
         <div className="space-y-3">
           {batches.map((b) => (
             <Link key={b.id} href={`/feedback/batches/${b.id}`} className="block rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900">
-              <p className="font-medium">{b.name}</p>
-              <p className="text-sm text-zinc-500">{b.tracks.length} tracks - {b._count.entries} feedback entries</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{b.name}</p>
+                  <p className="text-sm text-zinc-500">{b.tracks.length} tracks - {b._count.entries} feedback entries</p>
+                </div>
+                <span className="shrink-0 text-xs text-zinc-500">
+                  {b.lastUsedAt ? `Used ${new Date(b.lastUsedAt).toLocaleDateString("en-GB")}` : `Updated ${new Date(b.updatedAt).toLocaleDateString("en-GB")}`}
+                </span>
+              </div>
             </Link>
           ))}
-          {batches.length === 0 ? <p className="text-sm text-zinc-500">No feedback batches yet.</p> : null}
+          {batches.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+              No batches yet. Create your first reusable track set for faster feedback rounds.
+              <div className="mt-3">
+                <Link href="/feedback/batches/new" className="text-[#1DB954] hover:underline">Create your first batch</Link>
+              </div>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>
