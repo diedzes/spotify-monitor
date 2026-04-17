@@ -210,6 +210,11 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                 <button onClick={() => openEntry(item.id)} className="text-zinc-600 hover:underline dark:text-zinc-300">Open detail</button>
                 {firstTrack?.spotifyTrackId ? <button onClick={() => openTrack(firstTrack.spotifyTrackId)} className="text-zinc-600 hover:underline dark:text-zinc-300">Track detail</button> : null}
                 <Link href={`/feedback/new${firstTrack?.spotifyTrackId ? `?trackId=${encodeURIComponent(firstTrack.spotifyTrackId)}` : ""}`} className="text-[#1DB954] hover:underline">Add feedback</Link>
+                {firstTrack?.spotifyTrackId ? (
+                  <Link href={`/feedback/track/${encodeURIComponent(firstTrack.spotifyTrackId)}/report`} className="text-zinc-600 hover:underline dark:text-zinc-300">
+                    Client report
+                  </Link>
+                ) : null}
               </div>
             </article>
           );
@@ -231,7 +236,17 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                   <h3 className="text-lg font-semibold">Track detail</h3>
                   <p className="text-sm">{trackDetail.track?.title ?? "Unknown"} - {artistsLabel(trackDetail.track?.artistsJson ?? "[]")}</p>
                 </div>
-                <Link href={`/feedback/new${trackDetail.track?.spotifyTrackId ? `?trackId=${encodeURIComponent(trackDetail.track.spotifyTrackId)}` : ""}`} className="rounded bg-[#1DB954] px-3 py-1.5 text-xs font-medium text-white">Add feedback</Link>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <Link href={`/feedback/new${trackDetail.track?.spotifyTrackId ? `?trackId=${encodeURIComponent(trackDetail.track.spotifyTrackId)}` : ""}`} className="rounded bg-[#1DB954] px-3 py-1.5 text-xs font-medium text-white">Add feedback</Link>
+                  {trackDetail.track?.spotifyTrackId ? (
+                    <Link
+                      href={`/feedback/track/${encodeURIComponent(trackDetail.track.spotifyTrackId)}/report`}
+                      className="text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:underline dark:text-zinc-300 dark:hover:text-white"
+                    >
+                      Client report (print/PDF)
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </div>
             <section className="mb-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">

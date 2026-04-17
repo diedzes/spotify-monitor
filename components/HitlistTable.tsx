@@ -124,12 +124,20 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
                   <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.firstDetectedAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.lastSeenAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <Link
-                      href={`/feedback/new?trackId=${encodeURIComponent(row.spotifyTrackId)}${signedId ? `&sid=${encodeURIComponent(signedId)}` : ""}`}
-                      className="text-xs text-[#1DB954] hover:underline"
-                    >
-                      Add feedback
-                    </Link>
+                    <div className="flex flex-col gap-1">
+                      <Link
+                        href={`/feedback/new?trackId=${encodeURIComponent(row.spotifyTrackId)}${signedId ? `&sid=${encodeURIComponent(signedId)}` : ""}`}
+                        className="text-xs text-[#1DB954] hover:underline"
+                      >
+                        Add feedback
+                      </Link>
+                      <Link
+                        href={`/feedback/track/${encodeURIComponent(row.spotifyTrackId)}/report${signedId ? `?sid=${encodeURIComponent(signedId)}` : ""}`}
+                        className="text-xs text-zinc-600 hover:underline dark:text-zinc-400"
+                      >
+                        Client report
+                      </Link>
+                    </div>
                   </td>
                 </tr>
                 {isOpen ? (

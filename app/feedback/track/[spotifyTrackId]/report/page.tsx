@@ -1,0 +1,168 @@
+import { notFound, redirect } from "next/navigation";
+import { AppHeader } from "@/components/AppHeader";
+import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
+import { TrackClientReportToolbar } from "@/components/TrackClientReportToolbar";
+import { getTrackClientReportData, spotifyPlaylistHref } from "@/lib/track-client-report";
+import { getSessionFromSignedValue, getSpotifySession } from "@/lib/spotify-auth";
+
+type Props = {
+  params: Promise<{ spotifyTrackId: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+};
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function fmt(d: Date) {
+  return d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+}
+
+export default async function TrackClientReportPage({ params, searchParams }: Props) {
+  let session = await getSpotifySession();
+  const qp = await searchParams;
+  if (!session && qp.sid) session = await getSessionFromSignedValue(qp.sid);
+  if (!session) redirect("/");
+
+  const { spotifyTrackId: rawId } = await params;
+  const spotifyTrackId = decodeURIComponent(rawId);
+
+  const data = await getTrackClientReportData(session.user.id, spotifyTrackId);
+  if (!data) notFound();
+
+  const backHref = qp.sid ? `/feedback?sid=${encodeURIComponent(qp.sid)}` : "/feedback";
+
+  return (
+    <div className="min-h-screen bg-zinc-100 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      <StoreSessionFromUrl />
+      <AppHeader />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <TrackClientReportToolbar backHref={backHref} />
+
+        <article className="report-sheet rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none">
+          <header className="mb-8 border-b border-zinc-200 pb-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Track report</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">{data.title}</h1>
+            <p className="mt-1 text-lg text-zinc-600">{data.artistsLabel}</p>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              {data.spotifyUrl ? (
+                <a href={data.spotifyUrl} className="text-[#1DB954] hover:underline" target="_blank" rel="noopener noreferrer">
+                  Open on Spotify
+                </a>
+              ) : null}
+              <span className="text-zinc-400">Generated {fmt(data.generatedAt)}</span>
+            </div>
+          </header>
+
+          <section className="mb-10">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Playlists</h2>
+            {data.playlists.length === 0 ? (
+              <p className="text-sm text-zinc-600">
+                No playlist sync history for this track yet. After playlists are synced, appearances show here with cover art and dates.
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {data.playlists.map((p) => (
+                  <li
+                    key={p.playlistId}
+                    className="flex gap-4 rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid"
+                  >
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-200 shadow-inner">
+                      {p.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">No art</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        href={spotifyPlaylistHref(p.spotifyPlaylistId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-zinc-900 hover:text-[#1DB954] hover:underline"
+                      >
+                        {p.playlistName}
+                      </a>
+                      <p className="text-xs text-zinc-500">Curator: {p.ownerName}</p>
+                      <dl className="mt-2 grid gap-1 text-xs text-zinc-600 sm:grid-cols-2">
+                        <div>
+                          <dt className="font-medium text-zinc-500">On playlist since (earliest sync)</dt>
+                          <dd>{fmt(p.firstSeenAt)}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-zinc-500">Last seen in sync</dt>
+                          <dd>{fmt(p.lastSeenAt)}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-zinc-500">Status</dt>
+                          <dd>{p.currentlyInPlaylist ? "Currently in latest playlist snapshot" : "Not in latest snapshot (may have been removed)"}</dd>
+                        </div>
+                        {p.latestSnapshotSyncedAt ? (
+                          <div>
+                            <dt className="font-medium text-zinc-500">Latest snapshot</dt>
+                            <dd>{fmt(p.latestSnapshotSyncedAt)}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Feedback</h2>
+            {data.feedback.length === 0 ? (
+              <p className="text-sm text-zinc-600">No feedback recorded for this track yet.</p>
+            ) : (
+              <ul className="space-y-4">
+                {data.feedback.map((f) => (
+                  <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                      <div>
+                        {f.contact ? (
+                          <>
+                            <p className="font-semibold text-zinc-900">{f.contact.fullName ?? "Unknown"}</p>
+                            <p className="text-sm text-zinc-600">
+                              {[f.contact.role, f.contact.organizationName].filter(Boolean).join(" · ") || "—"}
+                            </p>
+                            {f.contact.email ? <p className="text-xs text-zinc-500">{f.contact.email}</p> : null}
+                          </>
+                        ) : (
+                          <p className="font-medium text-zinc-600">No contact linked</p>
+                        )}
+                      </div>
+                      <time className="shrink-0 text-xs text-zinc-500">{fmt(f.feedbackAt)}</time>
+                    </div>
+                    {f.isBatch && f.batchName ? (
+                      <p className="mb-2 rounded-md bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">Batch: {f.batchName}</p>
+                    ) : (
+                      <p className="mb-2 text-xs font-medium text-emerald-700">Single track feedback</p>
+                    )}
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{f.feedbackText}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <footer className="mt-10 border-t border-zinc-200 pt-4 text-center text-xs text-zinc-400">
+            Sport Sounds / Shoot — internal track overview. Playlist dates reflect synced snapshots in this app.
+          </footer>
+        </article>
+
+        <p className="no-print mt-4 text-center text-xs text-zinc-500">
+          Tip: use <strong>Print / Save as PDF</strong> to share a clean PDF with clients.
+        </p>
+      </div>
+
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
