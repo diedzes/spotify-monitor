@@ -684,6 +684,12 @@ function PlaylistsPageContent() {
             >
               Add playlist
             </Link>
+            <Link
+              href="/playlists/from-user"
+              className="rounded-full border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+            >
+              From account
+            </Link>
           </div>
         </div>
 

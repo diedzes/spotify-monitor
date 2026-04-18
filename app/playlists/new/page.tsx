@@ -144,6 +144,21 @@ export default function NewPlaylistPage() {
           Add playlist(s)
         </h1>
 
+        <section className="mb-10 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
+          <h2 className="mb-2 text-sm font-medium text-emerald-900 dark:text-emerald-100">
+            Van een Spotify-account (bulk)
+          </h2>
+          <p className="mb-3 text-sm text-emerald-900/90 dark:text-emerald-200/90">
+            Voer een profiel-link of user-id in, selecteer publieke playlists en voeg ze in één keer toe.
+          </p>
+          <Link
+            href="/playlists/from-user"
+            className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            Playlists van account kiezen
+          </Link>
+        </section>
+
         <section className="mb-10">
           <h2 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Eén playlist

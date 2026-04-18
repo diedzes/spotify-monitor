@@ -2,6 +2,8 @@
  * Veilige helpers voor Spotify Web API-calls met Bearer token uit sessie.
  */
 
+import { getSpotifyClientCredentialsToken } from "@/lib/spotify-client-credentials";
+
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 const DEFAULT_RETRY_AFTER_MS = 1000;
@@ -84,9 +86,37 @@ export async function fetchPlaylistMetadata(
   );
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Spotify API ${res.status}: ${text || res.statusText}`);
+    const err = new Error(`Spotify API ${res.status}: ${text || res.statusText}`) as Error & { status: number };
+    err.status = res.status;
+    throw err;
   }
   return res.json() as Promise<SpotifyPlaylistMetadata>;
+}
+
+/**
+ * Playlist-metadata ophalen: probeert Client Credentials, daarna OAuth van de gebruiker.
+ */
+export async function fetchPlaylistMetadataPreferringClientCredentials(
+  playlistId: string,
+  userOAuthToken: string
+): Promise<SpotifyPlaylistMetadata> {
+  let cc: string | undefined;
+  try {
+    cc = await getSpotifyClientCredentialsToken();
+  } catch {
+    cc = undefined;
+  }
+
+  if (cc) {
+    try {
+      return await fetchPlaylistMetadata(cc, playlistId);
+    } catch (e) {
+      const status = typeof e === "object" && e !== null && "status" in e ? (e as { status: number }).status : 0;
+      if (status !== 401 && status !== 403) throw e;
+    }
+  }
+
+  return fetchPlaylistMetadata(userOAuthToken, playlistId);
 }
 
 export interface SpotifyPlaylistTrackItem {
