@@ -91,22 +91,34 @@ model FeedbackBatchTrack {
   @@map("feedback_batch_tracks")
 }
 
+enum FeedbackEntryKind {
+  comment
+  sync
+  play
+}
+
 model FeedbackEntry {
-  id              String              @id @default(cuid())
-  userId          String
-  contactId       String?
-  feedbackText    String
-  feedbackAt      DateTime
-  feedbackBatchId String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  contact         Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  feedbackBatch   FeedbackBatch?      @relation(fields: [feedbackBatchId], references: [id], onDelete: SetNull)
-  tracks          FeedbackEntryTrack[]
+  id                      String              @id @default(cuid())
+  userId                  String
+  contactId               String?
+  feedbackText            String
+  feedbackAt              DateTime
+  feedbackBatchId         String?
+  entryKind               FeedbackEntryKind   @default(comment)
+  evidenceUrl             String?
+  evidencePreviewTitle    String?
+  evidencePreviewImage    String?
+  evidencePreviewSiteName String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  contact                 Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  feedbackBatch           FeedbackBatch?      @relation(fields: [feedbackBatchId], references: [id], onDelete: SetNull)
+  tracks                  FeedbackEntryTrack[]
 
   @@index([userId, feedbackAt])
   @@index([contactId])
   @@index([feedbackBatchId])
+  @@index([userId, entryKind])
   @@map("feedback_entries")
 }
 

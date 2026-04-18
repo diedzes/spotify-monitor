@@ -18,7 +18,13 @@ export async function PATCH(request: Request, { params }: Params) {
   const session = await getSpotifySessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { id } = await params;
-  let body: { contactId?: string | null; feedbackText?: string; feedbackAt?: string };
+  let body: {
+    contactId?: string | null;
+    feedbackText?: string;
+    feedbackAt?: string;
+    entryKind?: string | null;
+    evidenceUrl?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -29,6 +35,8 @@ export async function PATCH(request: Request, { params }: Params) {
       contactId: body.contactId,
       feedbackText: body.feedbackText,
       feedbackAt: body.feedbackAt ? new Date(body.feedbackAt) : undefined,
+      entryKind: body.entryKind,
+      evidenceUrl: body.evidenceUrl,
     });
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

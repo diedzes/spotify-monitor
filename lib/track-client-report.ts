@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { formatArtistsLabel } from "@/lib/hitlist";
 import { getTrackFeedback } from "@/lib/feedback";
+import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
 
 export type TrackPlaylistPresenceRow = {
   playlistId: string;
@@ -24,6 +25,11 @@ export type TrackFeedbackReportRow = {
   feedbackAt: Date;
   isBatch: boolean;
   batchName: string | null;
+  entryKind: "comment" | "sync" | "play";
+  evidenceUrl: string | null;
+  evidencePreviewTitle: string | null;
+  evidencePreviewImage: string | null;
+  evidencePreviewSiteName: string | null;
   contact: {
     fullName: string | null;
     role: string | null;
@@ -56,6 +62,8 @@ function spotifyTrackUrl(trackId: string): string | null {
  * Customer-facing report: playlists (from sync history), cover art, and feedback with contact context.
  */
 export async function getTrackClientReportData(userId: string, spotifyTrackId: string): Promise<TrackClientReportData | null> {
+  const mainPlaylistIds = await getMainSourcePlaylistIds(userId);
+
   const snapshotRows = await prisma.snapshotTrack.findMany({
     where: {
       spotifyTrackId,
@@ -162,6 +170,8 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
 
   playlists.sort((a, b) => a.playlistName.localeCompare(b.playlistName, "en"));
 
+  const playlistsNoMain = playlists.filter((p) => !mainPlaylistIds.has(p.playlistId));
+
   const feedbackEntries = await getTrackFeedback(userId, spotifyTrackId);
   const feedback: TrackFeedbackReportRow[] = feedbackEntries.map((e) => ({
     id: e.id,
@@ -169,6 +179,11 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
     feedbackAt: e.feedbackAt,
     isBatch: Boolean(e.feedbackBatchId),
     batchName: e.feedbackBatch?.name ?? null,
+    entryKind: e.entryKind,
+    evidenceUrl: e.evidenceUrl,
+    evidencePreviewTitle: e.evidencePreviewTitle,
+    evidencePreviewImage: e.evidencePreviewImage,
+    evidencePreviewSiteName: e.evidencePreviewSiteName,
     contact: e.contact
       ? {
           fullName: e.contact.fullName,
@@ -220,7 +235,7 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
     artistsJson,
     artistsLabel: formatArtistsLabel(artistsJson),
     spotifyUrl,
-    playlists,
+    playlists: playlistsNoMain,
     feedback,
     generatedAt: new Date(),
   };

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EvidenceLinkPreview } from "@/components/EvidenceLinkPreview";
 
 type FeedItem = any;
 
@@ -30,6 +31,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
   const [entryCache, setEntryCache] = useState<Record<string, any>>({});
   const [editText, setEditText] = useState("");
   const [editAt, setEditAt] = useState("");
+  const [editEntryKind, setEditEntryKind] = useState<"comment" | "sync" | "play">("comment");
+  const [editEvidenceUrl, setEditEvidenceUrl] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +58,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEntryDetail(cached);
       setEditText(cached.feedbackText ?? "");
       setEditAt(new Date(cached.feedbackAt).toISOString().slice(0, 16));
+      setEditEntryKind(cached.feedbackBatch ? "comment" : cached.entryKind ?? "comment");
+      setEditEvidenceUrl(cached.evidenceUrl ?? "");
       return;
     }
     setEntryLoading(true);
@@ -66,6 +71,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEntryDetail(detail);
       setEditText(detail.feedbackText ?? "");
       setEditAt(new Date(detail.feedbackAt).toISOString().slice(0, 16));
+      setEditEntryKind(detail.feedbackBatch ? "comment" : detail.entryKind ?? "comment");
+      setEditEvidenceUrl(detail.evidenceUrl ?? "");
     }
     setEntryLoading(false);
   }
@@ -81,6 +88,12 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       body: JSON.stringify({
         feedbackText: editText,
         feedbackAt: new Date(editAt).toISOString(),
+        ...(entryDetail.feedbackBatch
+          ? {}
+          : {
+              entryKind: editEntryKind,
+              evidenceUrl: editEvidenceUrl.trim() || null,
+            }),
       }),
     });
     const data = await res.json();
@@ -128,6 +141,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
         item.contact?.fullName,
         item.contact?.organization?.name,
         item.feedbackText,
+        item.entryKind,
+        item.evidenceUrl,
       ]
         .filter(Boolean)
         .join(" ")
@@ -193,7 +208,13 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                 <div className="min-w-0">
                   <div className="mb-1 flex items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isBatch ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-200" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"}`}>
-                      {isBatch ? "Batch" : "Single"}
+                      {isBatch
+                        ? "Batch"
+                        : item.entryKind === "sync"
+                          ? "Media sync"
+                          : item.entryKind === "play"
+                            ? "Stadium play"
+                            : "Comment"}
                     </span>
                     <button onClick={() => openEntry(item.id)} className="truncate text-left text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100">
                       {isBatch ? item.feedbackBatch.name : `${artistsLabel(firstTrack?.artistsJson ?? "[]")} - ${firstTrack?.title ?? "Track"}`}
@@ -254,8 +275,27 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
               <div className="space-y-2">
               {(trackDetail.feedback ?? []).map((f: any) => (
                 <div key={f.id} className="rounded border p-2 text-sm">
-                  <p>{truncate(f.feedbackText, 220)}</p>
-                  {f.feedbackBatch ? <p className="text-xs text-emerald-600">Shared feedback: {f.feedbackBatch.name}</p> : null}
+                  {f.feedbackBatch ? (
+                    <p className="mb-1 text-xs font-medium text-violet-700 dark:text-violet-300">Batch: {f.feedbackBatch.name}</p>
+                  ) : f.entryKind && f.entryKind !== "comment" ? (
+                    <p className="mb-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      {f.entryKind === "sync" ? "Media sync" : "Stadium play"}
+                    </p>
+                  ) : (
+                    <p className="mb-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">Feedback</p>
+                  )}
+                  {f.feedbackText ? <p className="whitespace-pre-wrap">{truncate(f.feedbackText, 400)}</p> : null}
+                  {f.evidenceUrl ? (
+                    <div className="mt-2">
+                      <EvidenceLinkPreview
+                        url={f.evidenceUrl}
+                        title={f.evidencePreviewTitle}
+                        image={f.evidencePreviewImage}
+                        siteName={f.evidencePreviewSiteName}
+                        compact
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ))}
               </div>
@@ -297,7 +337,46 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
             </div>
             <section className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
               <h4 className="mb-2 text-sm font-semibold">Feedback</h4>
+              {!entryDetail.feedbackBatch ? (
+                <div className="mb-3 space-y-2">
+                  <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Type</p>
+                  <select
+                    value={editEntryKind}
+                    onChange={(e) => setEditEntryKind(e.target.value as "comment" | "sync" | "play")}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  >
+                    <option value="comment">Comment</option>
+                    <option value="sync">Media sync</option>
+                    <option value="play">Stadium play</option>
+                  </select>
+                </div>
+              ) : null}
               <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={6} className="w-full rounded border px-2 py-2 text-sm" />
+              {!entryDetail.feedbackBatch && (editEntryKind === "sync" || editEntryKind === "play") ? (
+                <div className="mt-2">
+                  <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">Evidence link</label>
+                  <input
+                    type="url"
+                    value={editEvidenceUrl}
+                    onChange={(e) => setEditEvidenceUrl(e.target.value)}
+                    placeholder="https://…"
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                  <p className="mt-1 text-[11px] text-zinc-500">Saving refetches the preview when the URL changes.</p>
+                </div>
+              ) : null}
+              {entryDetail.evidenceUrl && !entryDetail.feedbackBatch ? (
+                <div className="mt-3">
+                  <p className="mb-1 text-xs text-zinc-500">Current preview</p>
+                  <EvidenceLinkPreview
+                    url={entryDetail.evidenceUrl}
+                    title={entryDetail.evidencePreviewTitle}
+                    image={entryDetail.evidencePreviewImage}
+                    siteName={entryDetail.evidencePreviewSiteName}
+                    compact
+                  />
+                </div>
+              ) : null}
               <input type="datetime-local" value={editAt} onChange={(e) => setEditAt(e.target.value)} className="mt-2 w-full rounded border px-2 py-2 text-sm" />
             </section>
             {entryDetail.feedbackBatch ? (

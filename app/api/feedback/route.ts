@@ -19,6 +19,8 @@ export async function POST(request: Request) {
     feedbackText?: string;
     feedbackAt?: string;
     feedbackBatchId?: string | null;
+    entryKind?: string | null;
+    evidenceUrl?: string | null;
     tracks?: Array<{
       spotifyTrackId: string;
       title: string;
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
       feedbackAt: body.feedbackAt ? new Date(body.feedbackAt) : undefined,
       feedbackBatchId: body.feedbackBatchId ?? null,
       tracks: body.tracks ?? [],
+      entryKind: body.entryKind ?? null,
+      evidenceUrl: body.evidenceUrl ?? null,
     });
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

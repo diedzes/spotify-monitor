@@ -1,4 +1,6 @@
+import { FeedbackEntryKind } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { fetchOpenGraphPreview } from "@/lib/og-fetch";
 import { getRecentlyRemovedHitlist } from "@/lib/hitlist";
 
 type TrackInput = {
@@ -8,6 +10,24 @@ type TrackInput = {
   spotifyUrl?: string | null;
 };
 
+function cleanEvidenceUrl(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  try {
+    const u = new URL(t);
+    if (!/^https?:$/i.test(u.protocol)) return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+function parseEntryKind(raw: string | null | undefined): FeedbackEntryKind {
+  if (raw === "sync") return FeedbackEntryKind.sync;
+  if (raw === "play") return FeedbackEntryKind.play;
+  return FeedbackEntryKind.comment;
+}
+
 export async function createFeedbackEntry(
   userId: string,
   input: {
@@ -16,16 +36,35 @@ export async function createFeedbackEntry(
     feedbackAt?: Date;
     feedbackBatchId?: string | null;
     tracks?: TrackInput[];
+    entryKind?: string | null;
+    evidenceUrl?: string | null;
   }
 ) {
-  const feedbackText = input.feedbackText.trim();
-  if (!feedbackText) throw new Error("Feedback text is required");
+  const textTrimmed = input.feedbackText.trim();
+  const evidenceUrl = cleanEvidenceUrl(input.evidenceUrl);
+
+  let entryKind: FeedbackEntryKind = FeedbackEntryKind.comment;
+  if (input.feedbackBatchId) {
+    entryKind = FeedbackEntryKind.comment;
+  } else {
+    entryKind = parseEntryKind(input.entryKind);
+  }
+
   if (!input.feedbackBatchId && (!input.tracks || input.tracks.length !== 1)) {
     throw new Error("Single feedback must contain exactly one track");
   }
   if (input.feedbackBatchId && input.tracks && input.tracks.length > 0) {
     throw new Error("Batch feedback must not include direct tracks");
   }
+
+  if (input.feedbackBatchId) {
+    if (!textTrimmed) throw new Error("Feedback text is required");
+  } else if (entryKind === FeedbackEntryKind.comment) {
+    if (!textTrimmed) throw new Error("Feedback text is required");
+  } else if (!textTrimmed && !evidenceUrl) {
+    throw new Error("Add a note and/or an evidence link");
+  }
+
   if (input.contactId) {
     const contact = await prisma.contact.findFirst({ where: { id: input.contactId, userId }, select: { id: true } });
     if (!contact) throw new Error("Contact not found");
@@ -37,6 +76,19 @@ export async function createFeedbackEntry(
     });
     if (!batch) throw new Error("Batch not found");
   }
+
+  let evidencePreviewTitle: string | null = null;
+  let evidencePreviewImage: string | null = null;
+  let evidencePreviewSiteName: string | null = null;
+  if (evidenceUrl) {
+    const og = await fetchOpenGraphPreview(evidenceUrl);
+    evidencePreviewTitle = og.title;
+    evidencePreviewImage = og.image;
+    evidencePreviewSiteName = og.siteName;
+  }
+
+  const feedbackText = textTrimmed;
+
   return prisma.feedbackEntry.create({
     data: {
       userId,
@@ -44,6 +96,11 @@ export async function createFeedbackEntry(
       feedbackText,
       feedbackAt: input.feedbackAt ?? new Date(),
       feedbackBatchId: input.feedbackBatchId ?? null,
+      entryKind,
+      evidenceUrl,
+      evidencePreviewTitle,
+      evidencePreviewImage,
+      evidencePreviewSiteName,
       tracks: input.feedbackBatchId
         ? undefined
         : {
@@ -155,11 +212,17 @@ export async function getFeedbackEntryDetail(userId: string, id: string) {
 export async function updateFeedbackEntry(
   userId: string,
   id: string,
-  input: { contactId?: string | null; feedbackText?: string; feedbackAt?: Date }
+  input: {
+    contactId?: string | null;
+    feedbackText?: string;
+    feedbackAt?: Date;
+    entryKind?: string | null;
+    evidenceUrl?: string | null;
+  }
 ) {
   const row = await prisma.feedbackEntry.findFirst({
     where: { id, userId },
-    select: { id: true },
+    select: { id: true, entryKind: true, feedbackBatchId: true, evidenceUrl: true },
   });
   if (!row) throw new Error("Feedback entry not found");
 
@@ -171,13 +234,63 @@ export async function updateFeedbackEntry(
     if (!contact) throw new Error("Contact not found");
   }
 
-  const data: { contactId?: string | null; feedbackText?: string; feedbackAt?: Date } = {};
+  let nextEntryKind = row.entryKind;
+  if (input.entryKind !== undefined && !row.feedbackBatchId) {
+    nextEntryKind = parseEntryKind(input.entryKind);
+  }
+
+  const switchingToComment = !row.feedbackBatchId && input.entryKind !== undefined && nextEntryKind === FeedbackEntryKind.comment;
+
+  const data: {
+    contactId?: string | null;
+    feedbackText?: string;
+    feedbackAt?: Date;
+    entryKind?: FeedbackEntryKind;
+    evidenceUrl?: string | null;
+    evidencePreviewTitle?: string | null;
+    evidencePreviewImage?: string | null;
+    evidencePreviewSiteName?: string | null;
+  } = {};
   if (input.contactId !== undefined) data.contactId = input.contactId;
   if (input.feedbackAt) data.feedbackAt = input.feedbackAt;
+  if (input.entryKind !== undefined && !row.feedbackBatchId) data.entryKind = nextEntryKind;
+
+  let nextEvidenceUrl = row.evidenceUrl;
+  if (switchingToComment) {
+    nextEvidenceUrl = null;
+    data.evidenceUrl = null;
+    data.evidencePreviewTitle = null;
+    data.evidencePreviewImage = null;
+    data.evidencePreviewSiteName = null;
+  } else if (input.evidenceUrl !== undefined) {
+    nextEvidenceUrl = cleanEvidenceUrl(input.evidenceUrl);
+    data.evidenceUrl = nextEvidenceUrl;
+  }
+
   if (typeof input.feedbackText === "string") {
     const text = input.feedbackText.trim();
-    if (!text) throw new Error("Feedback text is required");
+    const kindForValidation = data.entryKind ?? nextEntryKind;
+    if (row.feedbackBatchId || kindForValidation === FeedbackEntryKind.comment) {
+      if (!text) throw new Error("Feedback text is required");
+    } else if (!text && !nextEvidenceUrl) {
+      throw new Error("Add a note and/or an evidence link");
+    }
     data.feedbackText = text;
+  }
+
+  const urlChanged =
+    !switchingToComment &&
+    input.evidenceUrl !== undefined &&
+    cleanEvidenceUrl(input.evidenceUrl) !== cleanEvidenceUrl(row.evidenceUrl);
+  if (urlChanged && nextEvidenceUrl) {
+    const og = await fetchOpenGraphPreview(nextEvidenceUrl);
+    data.evidencePreviewTitle = og.title;
+    data.evidencePreviewImage = og.image;
+    data.evidencePreviewSiteName = og.siteName;
+  } else if (!switchingToComment && input.evidenceUrl !== undefined && !nextEvidenceUrl) {
+    data.evidencePreviewTitle = null;
+    data.evidencePreviewImage = null;
+    data.evidencePreviewSiteName = null;
   }
 
   return prisma.feedbackEntry.update({

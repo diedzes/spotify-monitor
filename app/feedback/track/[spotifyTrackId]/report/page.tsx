@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { AppHeader } from "@/components/AppHeader";
+import { EvidenceLinkPreview } from "@/components/EvidenceLinkPreview";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { TrackClientReportToolbar } from "@/components/TrackClientReportToolbar";
 import { getTrackClientReportData, spotifyPlaylistHref } from "@/lib/track-client-report";
@@ -15,6 +15,12 @@ export const revalidate = 0;
 
 function fmt(d: Date) {
   return d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function feedbackKindLabel(kind: string) {
+  if (kind === "sync") return "Media sync";
+  if (kind === "play") return "Stadium play";
+  return "Feedback";
 }
 
 export default async function TrackClientReportPage({ params, searchParams }: Props) {
@@ -34,7 +40,6 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
   return (
     <div className="min-h-screen bg-zinc-100 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <StoreSessionFromUrl />
-      <AppHeader />
       <div className="mx-auto max-w-3xl px-4 py-8">
         <TrackClientReportToolbar backHref={backHref} />
 
@@ -138,9 +143,21 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                     {f.isBatch && f.batchName ? (
                       <p className="mb-2 rounded-md bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">Batch: {f.batchName}</p>
                     ) : (
-                      <p className="mb-2 text-xs font-medium text-emerald-700">Single track feedback</p>
+                      <p className="mb-2 text-xs font-medium text-emerald-700">{feedbackKindLabel(f.entryKind)}</p>
                     )}
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{f.feedbackText}</p>
+                    {f.feedbackText ? (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{f.feedbackText}</p>
+                    ) : null}
+                    {f.evidenceUrl ? (
+                      <div className="mt-3">
+                        <EvidenceLinkPreview
+                          url={f.evidenceUrl}
+                          title={f.evidencePreviewTitle}
+                          image={f.evidencePreviewImage}
+                          siteName={f.evidencePreviewSiteName}
+                        />
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

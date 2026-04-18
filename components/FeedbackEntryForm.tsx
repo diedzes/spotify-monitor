@@ -14,6 +14,7 @@ type Track = {
 };
 type Batch = { id: string; name: string; tracks: Track[]; lastUsedAt?: string | null; updatedAt?: string };
 type Step = 1 | 2 | 3 | 4;
+type EntryKind = "comment" | "sync" | "play";
 
 function artistsLabel(artistsJson: string): string {
   try {
@@ -42,6 +43,8 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
   const [selectedBatchId, setSelectedBatchId] = useState(preselectedBatchId ?? "");
   const [selectedContactId, setSelectedContactId] = useState("");
   const [feedbackText, setFeedbackText] = useState("");
+  const [entryKind, setEntryKind] = useState<EntryKind>("comment");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
   const [feedbackAt, setFeedbackAt] = useState(new Date().toISOString().slice(0, 16));
   const [inlineContactName, setInlineContactName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,13 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
 
   const selectedTrack = useMemo(() => tracks.find((t) => t.spotifyTrackId === selectedTrackId) ?? null, [tracks, selectedTrackId]);
   const canContinueStep2 = mode === "single" ? Boolean(selectedTrackId) : Boolean(selectedBatchId);
-  const canSubmit = Boolean(feedbackText.trim()) && canContinueStep2;
+  const canSubmit =
+    canContinueStep2 &&
+    (mode === "batch"
+      ? Boolean(feedbackText.trim())
+      : entryKind === "comment"
+        ? Boolean(feedbackText.trim())
+        : Boolean(feedbackText.trim()) || Boolean(evidenceUrl.trim()));
   const selectedBatch = useMemo(() => batches.find((batch) => batch.id === selectedBatchId) ?? null, [batches, selectedBatchId]);
   const selectedContact = useMemo(() => {
     return [...recentContacts, ...contacts].find((contact) => contact.id === selectedContactId) ?? null;
@@ -90,6 +99,17 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
     });
     return copy;
   }, [batches, lastChosenBatchId]);
+
+  useEffect(() => {
+    if (mode === "batch") {
+      setEntryKind("comment");
+      setEvidenceUrl("");
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (entryKind === "comment") setEvidenceUrl("");
+  }, [entryKind]);
 
   const steps: Array<{ id: Step; label: string }> = [
     { id: 1, label: "Type" },
@@ -136,6 +156,8 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
             feedbackText,
             feedbackAt: new Date(feedbackAt).toISOString(),
             tracks: selectedTrack ? [selectedTrack] : [],
+            entryKind,
+            evidenceUrl: entryKind !== "comment" && evidenceUrl.trim() ? evidenceUrl.trim() : null,
           }
         : {
             contactId: selectedContactId || null,
@@ -187,7 +209,7 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step, canContinueStep2, mode, selectedBatchId, selectedTrackId, feedbackText, feedbackAt, selectedContactId]);
+  }, [step, canContinueStep2, mode, selectedBatchId, selectedTrackId, feedbackText, feedbackAt, selectedContactId, entryKind, evidenceUrl]);
 
   function highlight(text: string, query: string) {
     if (!query.trim()) return text;
@@ -225,7 +247,10 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600 dark:text-zinc-300">
           <button type="button" onClick={() => goToStep(1)} className="rounded-full border border-zinc-300 px-2 py-1 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">
-            Type: <span className="font-medium">{mode === "batch" ? "Batch" : "Single"}</span>
+            Type:{" "}
+            <span className="font-medium">
+              {mode === "batch" ? "Batch" : entryKind === "sync" ? "Media sync" : entryKind === "play" ? "Stadium play" : "Comment"}
+            </span>
           </button>
           {selectedBatch ? (
             <button type="button" onClick={() => goToStep(2)} className="rounded-full border border-zinc-300 px-2 py-1 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">
@@ -258,6 +283,28 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
               Batch feedback
             </label>
           </div>
+          {mode === "single" ? (
+            <div className="mt-4 space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-700">
+              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">What are you logging?</p>
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-4">
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="entryKind" checked={entryKind === "comment"} onChange={() => setEntryKind("comment")} />
+                  Comment
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="entryKind" checked={entryKind === "sync"} onChange={() => setEntryKind("sync")} />
+                  Media sync
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="entryKind" checked={entryKind === "play"} onChange={() => setEntryKind("play")} />
+                  Stadium play
+                </label>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Use <strong>Media sync</strong> when the track appeared in external media; use <strong>Stadium play</strong> for a stadium spin. You can add an optional link as proof in the last step.
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -346,8 +393,36 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
 
       {step === 4 ? (
         <div className="space-y-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
-          <p className="text-sm font-medium">Step 4: Write feedback</p>
-          <textarea ref={feedbackRef} value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} rows={5} placeholder="Feedback text" className="w-full rounded border px-3 py-2 text-sm" />
+          <p className="text-sm font-medium">
+            Step 4: {mode === "batch" || entryKind === "comment" ? "Write feedback" : "Notes & evidence"}
+          </p>
+          <textarea
+            ref={feedbackRef}
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            rows={5}
+            placeholder={
+              mode === "batch" || entryKind === "comment"
+                ? "Feedback text"
+                : entryKind === "sync"
+                  ? "Where was it used? (optional if you add a link below)"
+                  : "Which match or venue? (optional if you add a link below)"
+            }
+            className="w-full rounded border px-3 py-2 text-sm"
+          />
+          {mode === "single" && (entryKind === "sync" || entryKind === "play") ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">Evidence link (optional)</label>
+              <input
+                type="url"
+                value={evidenceUrl}
+                onChange={(e) => setEvidenceUrl(e.target.value)}
+                placeholder="https://x.com/… or TikTok / YouTube…"
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-zinc-500">We fetch a preview (title, image) when possible.</p>
+            </div>
+          ) : null}
           <input type="datetime-local" value={feedbackAt} onChange={(e) => setFeedbackAt(e.target.value)} className="w-full rounded border px-3 py-2 text-sm" />
           <p className="text-xs text-zinc-500">Tip: press Cmd/Ctrl + Enter to save.</p>
         </div>
