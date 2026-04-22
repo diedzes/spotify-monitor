@@ -4,6 +4,7 @@ import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { TrackClientReportToolbar } from "@/components/TrackClientReportToolbar";
 import { getTrackClientReportData, spotifyPlaylistHref } from "@/lib/track-client-report";
 import { getSessionFromSignedValue, getSpotifySession } from "@/lib/spotify-auth";
+import type { Metadata } from "next";
 
 type Props = {
   params: Promise<{ spotifyTrackId: string }>;
@@ -12,6 +13,9 @@ type Props = {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const metadata: Metadata = {
+  title: "Track Report",
+};
 
 function fmt(d: Date) {
   return d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
@@ -41,7 +45,7 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
   const { spotifyTrackId: rawId } = await params;
   const spotifyTrackId = decodeURIComponent(rawId);
 
-  const data = await getTrackClientReportData(session.user.id, spotifyTrackId);
+  const data = await getTrackClientReportData(session.user.id, spotifyTrackId, session.access_token);
   if (!data) notFound();
 
   const backHref = qp.sid ? `/feedback?sid=${encodeURIComponent(qp.sid)}` : "/feedback";
@@ -57,15 +61,20 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
 
         <article className="report-sheet rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none">
           <header className="mb-8 border-b border-zinc-200 pb-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Track report</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">{data.title}</h1>
-            <p className="mt-1 text-lg text-zinc-600">{data.artistsLabel}</p>
+            <div className="flex items-start gap-4">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-200 shadow-inner">
+                {data.trackImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={data.trackImageUrl} alt={`${data.title} cover art`} className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">TRACK REPORT</p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">{data.title}</h1>
+                <p className="mt-1 text-lg text-zinc-600">{data.artistsLabel}</p>
+              </div>
+            </div>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">
-              {data.spotifyUrl ? (
-                <a href={data.spotifyUrl} className="text-[#1DB954] hover:underline" target="_blank" rel="noopener noreferrer">
-                  Open on Spotify
-                </a>
-              ) : null}
               <span className="text-zinc-400">Generated {fmt(data.generatedAt)}</span>
             </div>
           </header>

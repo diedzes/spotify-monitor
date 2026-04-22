@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const spotifyTrackId = url.searchParams.get("spotifyTrackId");
   if (!spotifyTrackId) return NextResponse.json({ error: "spotifyTrackId is required" }, { status: 400 });
 
-  const report = await getTrackClientReportData(session.user.id, spotifyTrackId);
+  const report = await getTrackClientReportData(session.user.id, spotifyTrackId, session.access_token);
   if (!report) return NextResponse.json({ error: "No data for this track" }, { status: 404 });
 
   return NextResponse.json({

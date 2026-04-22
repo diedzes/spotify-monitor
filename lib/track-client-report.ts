@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { formatArtistsLabel } from "@/lib/hitlist";
 import { getTrackFeedback } from "@/lib/feedback";
 import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
+import { fetchTrackMetadata } from "@/lib/spotify-api";
 
 export type TrackPlaylistPresenceRow = {
   playlistId: string;
@@ -48,6 +49,7 @@ export type TrackClientReportData = {
   artistsJson: string;
   artistsLabel: string;
   spotifyUrl: string | null;
+  trackImageUrl: string | null;
   playlists: TrackPlaylistPresenceRow[];
   feedback: TrackFeedbackReportRow[];
   generatedAt: Date;
@@ -65,7 +67,11 @@ function spotifyTrackUrl(trackId: string): string | null {
 /**
  * Customer-facing report: playlists (from sync history), cover art, and feedback with contact context.
  */
-export async function getTrackClientReportData(userId: string, spotifyTrackId: string): Promise<TrackClientReportData | null> {
+export async function getTrackClientReportData(
+  userId: string,
+  spotifyTrackId: string,
+  accessToken?: string
+): Promise<TrackClientReportData | null> {
   const mainPlaylistIds = await getMainSourcePlaylistIds(userId);
 
   const snapshotRows = await prisma.snapshotTrack.findMany({
@@ -185,6 +191,7 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
   let title = "Unknown track";
   let artistsJson = "[]";
   let spotifyUrl: string | null = spotifyTrackUrl(spotifyTrackId);
+  let trackImageUrl: string | null = null;
 
   const snapMeta = await prisma.snapshotTrack.findFirst({
     where: { spotifyTrackId, snapshot: { trackedPlaylist: { userId } } },
@@ -217,12 +224,22 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
     if (bt.spotifyUrl) spotifyUrl = bt.spotifyUrl;
   }
 
+  if (accessToken && spotifyTrackId && !spotifyTrackId.startsWith("local-")) {
+    try {
+      const meta = await fetchTrackMetadata(accessToken, spotifyTrackId);
+      trackImageUrl = meta.album?.images?.[0]?.url ?? null;
+    } catch {
+      // Best effort; report should still render without cover art.
+    }
+  }
+
   return {
     spotifyTrackId,
     title,
     artistsJson,
     artistsLabel: formatArtistsLabel(artistsJson),
     spotifyUrl,
+    trackImageUrl,
     playlists: playlistsNoMain,
     feedback,
     generatedAt: new Date(),

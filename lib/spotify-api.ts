@@ -72,6 +72,11 @@ export interface SpotifyPlaylistMetadata {
   collaborative: boolean;
 }
 
+export interface SpotifyTrackMetadata {
+  id: string;
+  album?: { images?: Array<{ url: string }> };
+}
+
 /**
  * Haal playlist metadata op via de Spotify Web API.
  * Gebruik access_token uit getSpotifySession().
@@ -173,4 +178,17 @@ export function playlistMetadataToTrackedFields(meta: SpotifyPlaylistMetadata) {
     isPublic: meta.public ?? true,
     isCollaborative: meta.collaborative ?? false,
   };
+}
+
+export async function fetchTrackMetadata(accessToken: string, trackId: string): Promise<SpotifyTrackMetadata> {
+  const res = await spotifyFetch(`${SPOTIFY_API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
+    accessToken,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const err = new Error(`Spotify API ${res.status}: ${text || res.statusText}`) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
+  return res.json() as Promise<SpotifyTrackMetadata>;
 }
