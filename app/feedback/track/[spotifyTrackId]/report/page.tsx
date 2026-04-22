@@ -208,7 +208,6 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                             <p className="text-sm text-zinc-600">
                               {[f.contact.role, f.contact.organizationName].filter(Boolean).join(" · ") || "—"}
                             </p>
-                            {f.contact.email ? <p className="text-xs text-zinc-500">{f.contact.email}</p> : null}
                           </>
                         ) : (
                           <p className="font-medium text-zinc-600">No contact linked</p>
