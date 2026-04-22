@@ -145,13 +145,57 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
           </section>
 
           <section className="mb-10">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Media sync</h2>
+            {data.feedback.filter((f) => !f.isBatch && f.entryKind === "sync").length === 0 ? (
+              <p className="text-sm text-zinc-600">No media sync items recorded for this track.</p>
+            ) : (
+              <ul className="space-y-4">
+                {data.feedback
+                  .filter((f) => !f.isBatch && f.entryKind === "sync")
+                  .map((f) => (
+                    <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
+                      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                        <div>
+                          {f.contact ? (
+                            <>
+                              <p className="font-semibold text-zinc-900">{f.contact.fullName ?? "Unknown"}</p>
+                              <p className="text-sm text-zinc-600">
+                                {[f.contact.role, f.contact.organizationName].filter(Boolean).join(" · ") || "—"}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="font-medium text-zinc-600">No contact linked</p>
+                          )}
+                        </div>
+                        <time className="shrink-0 text-xs text-zinc-500">{fmt(f.feedbackAt)}</time>
+                      </div>
+                      {f.feedbackText ? (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{f.feedbackText}</p>
+                      ) : null}
+                      {f.evidenceUrl ? (
+                        <div className="mt-3">
+                          <EvidenceLinkPreview
+                            url={f.evidenceUrl}
+                            title={f.evidencePreviewTitle}
+                            image={f.evidencePreviewImage}
+                            siteName={f.evidencePreviewSiteName}
+                          />
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Feedback</h2>
-            {data.feedback.filter((f) => f.entryKind !== "play").length === 0 ? (
+            {data.feedback.filter((f) => f.entryKind !== "play" && f.entryKind !== "sync").length === 0 ? (
               <p className="text-sm text-zinc-600">No feedback recorded for this track yet.</p>
             ) : (
               <ul className="space-y-4">
                 {data.feedback
-                  .filter((f) => f.entryKind !== "play")
+                  .filter((f) => f.entryKind !== "play" && f.entryKind !== "sync")
                   .map((f) => (
                   <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
                     <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
