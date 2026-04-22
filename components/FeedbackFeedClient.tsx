@@ -5,6 +5,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EvidenceLinkPreview } from "@/components/EvidenceLinkPreview";
 
 type FeedItem = any;
+type RecentMatch = {
+  id: number;
+  utcDate: string;
+  competitionName: string | null;
+  homeTeam: { name: string; crest: string | null };
+  awayTeam: { name: string; crest: string | null };
+  scoreHome: number | null;
+  scoreAway: number | null;
+  attendance: number | null;
+};
 
 function truncate(text: string, len = 160) {
   return text.length <= len ? text : `${text.slice(0, len)}...`;
@@ -33,8 +43,45 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
   const [editAt, setEditAt] = useState("");
   const [editEntryKind, setEditEntryKind] = useState<"comment" | "sync" | "play">("comment");
   const [editEvidenceUrl, setEditEvidenceUrl] = useState("");
+  const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [editSelectedMatchId, setEditSelectedMatchId] = useState("");
+  const [editCompetitionName, setEditCompetitionName] = useState("");
+  const [editMatchUtc, setEditMatchUtc] = useState("");
+  const [editHomeClub, setEditHomeClub] = useState("");
+  const [editAwayClub, setEditAwayClub] = useState("");
+  const [editHomeCrestUrl, setEditHomeCrestUrl] = useState("");
+  const [editAwayCrestUrl, setEditAwayCrestUrl] = useState("");
+  const [editHomeScore, setEditHomeScore] = useState("");
+  const [editAwayScore, setEditAwayScore] = useState("");
+  const [editAttendance, setEditAttendance] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const selectedRecentMatch = useMemo(
+    () => recentMatches.find((m) => String(m.id) === editSelectedMatchId) ?? null,
+    [recentMatches, editSelectedMatchId]
+  );
+
+  async function loadRecentMatchesForEdit() {
+    setMatchesError(null);
+    setMatchesLoading(true);
+    try {
+      const res = await fetch("/api/football/recent-matches?days=14", { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMatchesError(data.error ?? "Could not load matches");
+        setMatchesLoading(false);
+        return;
+      }
+      setRecentMatches(data.matches ?? []);
+    } catch {
+      setMatchesError("Could not load matches");
+    } finally {
+      setMatchesLoading(false);
+    }
+  }
 
   async function openTrack(trackId: string) {
     setModalError(null);
@@ -60,6 +107,16 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEditAt(new Date(cached.feedbackAt).toISOString().slice(0, 16));
       setEditEntryKind(cached.feedbackBatch ? "comment" : cached.entryKind ?? "comment");
       setEditEvidenceUrl(cached.evidenceUrl ?? "");
+      setEditSelectedMatchId(cached.stadiumMatchExternalId ?? "");
+      setEditCompetitionName(cached.stadiumCompetitionName ?? "");
+      setEditMatchUtc(cached.stadiumMatchUtc ? new Date(cached.stadiumMatchUtc).toISOString().slice(0, 16) : "");
+      setEditHomeClub(cached.stadiumHomeClub ?? "");
+      setEditAwayClub(cached.stadiumAwayClub ?? "");
+      setEditHomeCrestUrl(cached.stadiumHomeCrestUrl ?? "");
+      setEditAwayCrestUrl(cached.stadiumAwayCrestUrl ?? "");
+      setEditHomeScore(typeof cached.stadiumHomeScore === "number" ? String(cached.stadiumHomeScore) : "");
+      setEditAwayScore(typeof cached.stadiumAwayScore === "number" ? String(cached.stadiumAwayScore) : "");
+      setEditAttendance(typeof cached.stadiumAttendance === "number" ? String(cached.stadiumAttendance) : "");
       return;
     }
     setEntryLoading(true);
@@ -73,6 +130,16 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEditAt(new Date(detail.feedbackAt).toISOString().slice(0, 16));
       setEditEntryKind(detail.feedbackBatch ? "comment" : detail.entryKind ?? "comment");
       setEditEvidenceUrl(detail.evidenceUrl ?? "");
+      setEditSelectedMatchId(detail.stadiumMatchExternalId ?? "");
+      setEditCompetitionName(detail.stadiumCompetitionName ?? "");
+      setEditMatchUtc(detail.stadiumMatchUtc ? new Date(detail.stadiumMatchUtc).toISOString().slice(0, 16) : "");
+      setEditHomeClub(detail.stadiumHomeClub ?? "");
+      setEditAwayClub(detail.stadiumAwayClub ?? "");
+      setEditHomeCrestUrl(detail.stadiumHomeCrestUrl ?? "");
+      setEditAwayCrestUrl(detail.stadiumAwayCrestUrl ?? "");
+      setEditHomeScore(typeof detail.stadiumHomeScore === "number" ? String(detail.stadiumHomeScore) : "");
+      setEditAwayScore(typeof detail.stadiumAwayScore === "number" ? String(detail.stadiumAwayScore) : "");
+      setEditAttendance(typeof detail.stadiumAttendance === "number" ? String(detail.stadiumAttendance) : "");
     }
     setEntryLoading(false);
   }
@@ -93,6 +160,27 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
           : {
               entryKind: editEntryKind,
               evidenceUrl: editEvidenceUrl.trim() || null,
+              stadiumPlay:
+                editEntryKind === "play"
+                  ? {
+                      matchExternalId: selectedRecentMatch ? String(selectedRecentMatch.id) : editSelectedMatchId || null,
+                      competitionName: selectedRecentMatch?.competitionName ?? (editCompetitionName.trim() || null),
+                      matchUtc: selectedRecentMatch?.utcDate ?? (editMatchUtc ? new Date(editMatchUtc).toISOString() : null),
+                      homeClub: selectedRecentMatch?.homeTeam.name ?? (editHomeClub.trim() || null),
+                      awayClub: selectedRecentMatch?.awayTeam.name ?? (editAwayClub.trim() || null),
+                      homeCrestUrl: selectedRecentMatch?.homeTeam.crest ?? (editHomeCrestUrl.trim() || null),
+                      awayCrestUrl: selectedRecentMatch?.awayTeam.crest ?? (editAwayCrestUrl.trim() || null),
+                      homeScore:
+                        selectedRecentMatch?.scoreHome ??
+                        (editHomeScore.trim() ? Number.parseInt(editHomeScore.trim(), 10) : null),
+                      awayScore:
+                        selectedRecentMatch?.scoreAway ??
+                        (editAwayScore.trim() ? Number.parseInt(editAwayScore.trim(), 10) : null),
+                      attendance:
+                        selectedRecentMatch?.attendance ??
+                        (editAttendance.trim() ? Number.parseInt(editAttendance.trim(), 10) : null),
+                    }
+                  : null,
             }),
       }),
     });
@@ -399,6 +487,53 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                     className="w-full rounded border px-2 py-2 text-sm"
                   />
                   <p className="mt-1 text-[11px] text-zinc-500">Saving refetches the preview when the URL changes.</p>
+                </div>
+              ) : null}
+              {!entryDetail.feedbackBatch && editEntryKind === "play" ? (
+                <div className="mt-3 space-y-2 rounded border border-zinc-200 p-2 dark:border-zinc-700">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Match details</p>
+                    <button
+                      type="button"
+                      onClick={() => void loadRecentMatchesForEdit()}
+                      disabled={matchesLoading}
+                      className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                    >
+                      {matchesLoading ? "Loading..." : "Load recent matches"}
+                    </button>
+                  </div>
+                  {matchesError ? <p className="text-xs text-red-600">{matchesError}</p> : null}
+                  {recentMatches.length > 0 ? (
+                    <select
+                      value={editSelectedMatchId}
+                      onChange={(e) => setEditSelectedMatchId(e.target.value)}
+                      className="w-full rounded border px-2 py-2 text-sm"
+                    >
+                      <option value="">No recent match selected (manual below)</option>
+                      {recentMatches.map((m) => (
+                        <option key={m.id} value={String(m.id)}>
+                          {new Date(m.utcDate).toLocaleDateString("en-GB")} - {m.homeTeam.name} vs {m.awayTeam.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  {!selectedRecentMatch ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <input value={editHomeClub} onChange={(e) => setEditHomeClub(e.target.value)} placeholder="Home club" className="w-full rounded border px-2 py-2 text-sm" />
+                      <input value={editAwayClub} onChange={(e) => setEditAwayClub(e.target.value)} placeholder="Away club" className="w-full rounded border px-2 py-2 text-sm" />
+                      <input value={editCompetitionName} onChange={(e) => setEditCompetitionName(e.target.value)} placeholder="Competition (optional)" className="w-full rounded border px-2 py-2 text-sm sm:col-span-2" />
+                      <input type="datetime-local" value={editMatchUtc} onChange={(e) => setEditMatchUtc(e.target.value)} className="w-full rounded border px-2 py-2 text-sm sm:col-span-2" />
+                      <input type="number" value={editHomeScore} onChange={(e) => setEditHomeScore(e.target.value)} placeholder="Home score" className="w-full rounded border px-2 py-2 text-sm" />
+                      <input type="number" value={editAwayScore} onChange={(e) => setEditAwayScore(e.target.value)} placeholder="Away score" className="w-full rounded border px-2 py-2 text-sm" />
+                      <input type="number" value={editAttendance} onChange={(e) => setEditAttendance(e.target.value)} placeholder="Attendance" className="w-full rounded border px-2 py-2 text-sm sm:col-span-2" />
+                      <input type="url" value={editHomeCrestUrl} onChange={(e) => setEditHomeCrestUrl(e.target.value)} placeholder="Home crest URL (optional)" className="w-full rounded border px-2 py-2 text-sm" />
+                      <input type="url" value={editAwayCrestUrl} onChange={(e) => setEditAwayCrestUrl(e.target.value)} placeholder="Away crest URL (optional)" className="w-full rounded border px-2 py-2 text-sm" />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-500">
+                      Selected match provides clubs, crests, score and attendance (if available).
+                    </p>
+                  )}
                 </div>
               ) : null}
               {entryDetail.evidenceUrl && !entryDetail.feedbackBatch ? (
