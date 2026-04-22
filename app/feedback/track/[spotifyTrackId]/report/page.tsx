@@ -45,6 +45,9 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
   if (!data) notFound();
 
   const backHref = qp.sid ? `/feedback?sid=${encodeURIComponent(qp.sid)}` : "/feedback";
+  const stadiumPlays = data.feedback.filter((f) => !f.isBatch && f.entryKind === "play");
+  const mediaSyncItems = data.feedback.filter((f) => !f.isBatch && f.entryKind === "sync");
+  const regularFeedbackItems = data.feedback.filter((f) => f.entryKind !== "play" && f.entryKind !== "sync");
 
   return (
     <div className="min-h-screen bg-zinc-100 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -67,15 +70,11 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
             </div>
           </header>
 
+          {stadiumPlays.length > 0 ? (
           <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Stadium play</h2>
-            {data.feedback.filter((f) => !f.isBatch && f.entryKind === "play").length === 0 ? (
-              <p className="text-sm text-zinc-600">No stadium plays recorded for this track.</p>
-            ) : (
               <ul className="space-y-4">
-                {data.feedback
-                  .filter((f) => !f.isBatch && f.entryKind === "play")
-                  .map((f) => (
+                {stadiumPlays.map((f) => (
                     <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
                       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                         <div>
@@ -101,7 +100,7 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                             <div className="flex min-w-0 items-center gap-2">
                               {f.stadiumHomeCrestUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={f.stadiumHomeCrestUrl} alt="" className="h-6 w-6 object-contain" />
+                                <img src={f.stadiumHomeCrestUrl} alt={`${f.stadiumHomeClub} crest`} className="h-8 w-8 object-contain" />
                               ) : null}
                               <span className="truncate text-sm font-medium">{f.stadiumHomeClub}</span>
                             </div>
@@ -113,7 +112,7 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                             <div className="flex min-w-0 items-center gap-2">
                               {f.stadiumAwayCrestUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={f.stadiumAwayCrestUrl} alt="" className="h-6 w-6 object-contain" />
+                                <img src={f.stadiumAwayCrestUrl} alt={`${f.stadiumAwayClub} crest`} className="h-8 w-8 object-contain" />
                               ) : null}
                               <span className="truncate text-sm font-medium">{f.stadiumAwayClub}</span>
                             </div>
@@ -141,18 +140,16 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                     </li>
                   ))}
               </ul>
-            )}
           </section>
+          ) : null}
 
           <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Media sync</h2>
-            {data.feedback.filter((f) => !f.isBatch && f.entryKind === "sync").length === 0 ? (
+            {mediaSyncItems.length === 0 ? (
               <p className="text-sm text-zinc-600">No media sync items recorded for this track.</p>
             ) : (
               <ul className="space-y-4">
-                {data.feedback
-                  .filter((f) => !f.isBatch && f.entryKind === "sync")
-                  .map((f) => (
+                {mediaSyncItems.map((f) => (
                     <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
                       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                         <div>
@@ -190,13 +187,11 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
 
           <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Feedback</h2>
-            {data.feedback.filter((f) => f.entryKind !== "play" && f.entryKind !== "sync").length === 0 ? (
+            {regularFeedbackItems.length === 0 ? (
               <p className="text-sm text-zinc-600">No feedback recorded for this track yet.</p>
             ) : (
               <ul className="space-y-4">
-                {data.feedback
-                  .filter((f) => f.entryKind !== "play" && f.entryKind !== "sync")
-                  .map((f) => (
+                {regularFeedbackItems.map((f) => (
                   <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
                     <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                       <div>
