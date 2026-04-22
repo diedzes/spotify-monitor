@@ -143,11 +143,9 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
           </section>
           ) : null}
 
+          {mediaSyncItems.length > 0 ? (
           <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Media sync</h2>
-            {mediaSyncItems.length === 0 ? (
-              <p className="text-sm text-zinc-600">No media sync items recorded for this track.</p>
-            ) : (
               <ul className="space-y-4">
                 {mediaSyncItems.map((f) => (
                     <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
@@ -182,8 +180,8 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                     </li>
                   ))}
               </ul>
-            )}
           </section>
+          ) : null}
 
           <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Feedback</h2>
@@ -210,7 +208,7 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                       <time className="shrink-0 text-xs text-zinc-500">{fmt(f.feedbackAt)}</time>
                     </div>
                     {f.isBatch && f.batchName ? (
-                      <p className="mb-2 rounded-md bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">Batch: {f.batchName}</p>
+                      <p className="mb-2 rounded-md bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">Reply on a group of songs</p>
                     ) : (
                       <p className="mb-2 text-xs font-medium text-emerald-700">{feedbackKindLabel(f.entryKind)}</p>
                     )}
