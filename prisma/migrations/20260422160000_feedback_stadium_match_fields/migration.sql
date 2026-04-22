@@ -1,0 +1,10 @@
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumMatchExternalId" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumCompetitionName" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumMatchUtc" TIMESTAMP(3);
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumHomeClub" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumAwayClub" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumHomeCrestUrl" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumAwayCrestUrl" TEXT;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumHomeScore" INTEGER;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumAwayScore" INTEGER;
+ALTER TABLE "feedback_entries" ADD COLUMN "stadiumAttendance" INTEGER;

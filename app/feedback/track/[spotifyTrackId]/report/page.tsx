@@ -23,6 +23,15 @@ function feedbackKindLabel(kind: string) {
   return "Feedback";
 }
 
+function fmtDateOnly(d: Date) {
+  return d.toLocaleDateString("en-GB", { dateStyle: "medium" });
+}
+
+function formatAttendance(n: number | null) {
+  if (typeof n !== "number") return null;
+  return n.toLocaleString("en-GB");
+}
+
 export default async function TrackClientReportPage({ params, searchParams }: Props) {
   let session = await getSpotifySession();
   const qp = await searchParams;
@@ -59,70 +68,91 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
           </header>
 
           <section className="mb-10">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Playlists</h2>
-            {data.playlists.length === 0 ? (
-              <p className="text-sm text-zinc-600">
-                No playlist sync history for this track yet. After playlists are synced, appearances show here with cover art and dates.
-              </p>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Stadium play</h2>
+            {data.feedback.filter((f) => !f.isBatch && f.entryKind === "play").length === 0 ? (
+              <p className="text-sm text-zinc-600">No stadium plays recorded for this track.</p>
             ) : (
               <ul className="space-y-4">
-                {data.playlists.map((p) => (
-                  <li
-                    key={p.playlistId}
-                    className="flex gap-4 rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid"
-                  >
-                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-200 shadow-inner">
-                      {p.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">No art</div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <a
-                        href={spotifyPlaylistHref(p.spotifyPlaylistId)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-zinc-900 hover:text-[#1DB954] hover:underline"
-                      >
-                        {p.playlistName}
-                      </a>
-                      <p className="text-xs text-zinc-500">Curator: {p.ownerName}</p>
-                      <dl className="mt-2 grid gap-1 text-xs text-zinc-600 sm:grid-cols-2">
+                {data.feedback
+                  .filter((f) => !f.isBatch && f.entryKind === "play")
+                  .map((f) => (
+                    <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
+                      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                         <div>
-                          <dt className="font-medium text-zinc-500">On playlist since (earliest sync)</dt>
-                          <dd>{fmt(p.firstSeenAt)}</dd>
+                          {f.contact ? (
+                            <>
+                              <p className="font-semibold text-zinc-900">{f.contact.fullName ?? "Unknown"}</p>
+                              <p className="text-sm text-zinc-600">
+                                {[f.contact.role, f.contact.organizationName].filter(Boolean).join(" · ") || "—"}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="font-medium text-zinc-600">No contact linked</p>
+                          )}
                         </div>
-                        <div>
-                          <dt className="font-medium text-zinc-500">Last seen in sync</dt>
-                          <dd>{fmt(p.lastSeenAt)}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium text-zinc-500">Status</dt>
-                          <dd>{p.currentlyInPlaylist ? "Currently in latest playlist snapshot" : "Not in latest snapshot (may have been removed)"}</dd>
-                        </div>
-                        {p.latestSnapshotSyncedAt ? (
-                          <div>
-                            <dt className="font-medium text-zinc-500">Latest snapshot</dt>
-                            <dd>{fmt(p.latestSnapshotSyncedAt)}</dd>
+                        <time className="shrink-0 text-xs text-zinc-500">{fmt(f.feedbackAt)}</time>
+                      </div>
+                      {f.feedbackText ? (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{f.feedbackText}</p>
+                      ) : null}
+                      {f.stadiumHomeClub && f.stadiumAwayClub ? (
+                        <div className="mt-3 rounded-md border border-zinc-200 bg-white p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2">
+                              {f.stadiumHomeCrestUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={f.stadiumHomeCrestUrl} alt="" className="h-6 w-6 object-contain" />
+                              ) : null}
+                              <span className="truncate text-sm font-medium">{f.stadiumHomeClub}</span>
+                            </div>
+                            <div className="shrink-0 text-sm font-semibold">
+                              {typeof f.stadiumHomeScore === "number" && typeof f.stadiumAwayScore === "number"
+                                ? `${f.stadiumHomeScore} - ${f.stadiumAwayScore}`
+                                : "vs"}
+                            </div>
+                            <div className="flex min-w-0 items-center gap-2">
+                              {f.stadiumAwayCrestUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={f.stadiumAwayCrestUrl} alt="" className="h-6 w-6 object-contain" />
+                              ) : null}
+                              <span className="truncate text-sm font-medium">{f.stadiumAwayClub}</span>
+                            </div>
                           </div>
-                        ) : null}
-                      </dl>
-                    </div>
-                  </li>
-                ))}
+                          <p className="mt-2 text-xs text-zinc-600">
+                            {[f.stadiumCompetitionName, f.stadiumMatchUtc ? fmt(new Date(f.stadiumMatchUtc)) : null]
+                              .filter(Boolean)
+                              .join(" · ") || "Match details"}
+                          </p>
+                          {formatAttendance(f.stadiumAttendance) ? (
+                            <p className="text-xs text-zinc-600">Attendance: {formatAttendance(f.stadiumAttendance)}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {f.evidenceUrl ? (
+                        <div className="mt-3">
+                          <EvidenceLinkPreview
+                            url={f.evidenceUrl}
+                            title={f.evidencePreviewTitle}
+                            image={f.evidencePreviewImage}
+                            siteName={f.evidencePreviewSiteName}
+                          />
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
               </ul>
             )}
           </section>
 
-          <section>
+          <section className="mb-10">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Feedback</h2>
-            {data.feedback.length === 0 ? (
+            {data.feedback.filter((f) => f.entryKind !== "play").length === 0 ? (
               <p className="text-sm text-zinc-600">No feedback recorded for this track yet.</p>
             ) : (
               <ul className="space-y-4">
-                {data.feedback.map((f) => (
+                {data.feedback
+                  .filter((f) => f.entryKind !== "play")
+                  .map((f) => (
                   <li key={f.id} className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid">
                     <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                       <div>
@@ -158,6 +188,54 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
                         />
                       </div>
                     ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">Playlists</h2>
+            {data.playlists.length === 0 ? (
+              <p className="text-sm text-zinc-600">
+                No playlist sync history for this track yet.
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {data.playlists.map((p) => (
+                  <li
+                    key={p.playlistId}
+                    className="flex gap-4 rounded-xl border border-zinc-100 bg-zinc-50/80 p-4 print:break-inside-avoid"
+                  >
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-200 shadow-inner">
+                      {p.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">No art</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        href={spotifyPlaylistHref(p.spotifyPlaylistId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-zinc-900 hover:text-[#1DB954] hover:underline"
+                      >
+                        {p.playlistName}
+                      </a>
+                      <p className="text-xs text-zinc-500">Curator: {p.ownerName}</p>
+                      <dl className="mt-2 grid gap-1 text-xs text-zinc-600">
+                        <div>
+                          <dt className="font-medium text-zinc-500">First seen</dt>
+                          <dd>{fmtDateOnly(p.firstSeenAt)}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-zinc-500">Spotify description</dt>
+                          <dd className="whitespace-pre-wrap">{p.playlistDescription?.trim() || "—"}</dd>
+                        </div>
+                      </dl>
+                    </div>
                   </li>
                 ))}
               </ul>

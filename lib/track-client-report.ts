@@ -9,14 +9,9 @@ export type TrackPlaylistPresenceRow = {
   imageUrl: string | null;
   spotifyPlaylistId: string;
   ownerName: string;
+  playlistDescription: string | null;
   /** Earliest snapshot sync where this track appeared in this playlist (best proxy for “since when” in our data). */
   firstSeenAt: Date;
-  /** Latest snapshot sync where this track appeared in this playlist. */
-  lastSeenAt: Date;
-  /** Whether the track is in the latest snapshot for this playlist. */
-  currentlyInPlaylist: boolean;
-  /** When the latest snapshot was taken (for context). */
-  latestSnapshotSyncedAt: Date | null;
 };
 
 export type TrackFeedbackReportRow = {
@@ -30,6 +25,15 @@ export type TrackFeedbackReportRow = {
   evidencePreviewTitle: string | null;
   evidencePreviewImage: string | null;
   evidencePreviewSiteName: string | null;
+  stadiumCompetitionName: string | null;
+  stadiumMatchUtc: Date | null;
+  stadiumHomeClub: string | null;
+  stadiumAwayClub: string | null;
+  stadiumHomeCrestUrl: string | null;
+  stadiumAwayCrestUrl: string | null;
+  stadiumHomeScore: number | null;
+  stadiumAwayScore: number | null;
+  stadiumAttendance: number | null;
   contact: {
     fullName: string | null;
     role: string | null;
@@ -81,6 +85,7 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
               imageUrl: true,
               spotifyPlaylistId: true,
               ownerName: true,
+              description: true,
             },
           },
         },
@@ -122,49 +127,18 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
     if (!hasFeedback) return null;
   }
 
-  const latestSnapshots =
-    playlistIds.length > 0
-      ? await prisma.trackedPlaylist.findMany({
-          where: { userId, id: { in: playlistIds } },
-          select: {
-            id: true,
-            snapshots: {
-              orderBy: { syncedAt: "desc" },
-              take: 1,
-              select: { id: true, syncedAt: true },
-            },
-          },
-        })
-      : [];
-  const latestSnapshotIdByPlaylist = new Map<string, string>();
-  const latestSyncedByPlaylist = new Map<string, Date | null>();
-  for (const pl of latestSnapshots) {
-    const snap = pl.snapshots[0];
-    if (snap) {
-      latestSnapshotIdByPlaylist.set(pl.id, snap.id);
-      latestSyncedByPlaylist.set(pl.id, snap.syncedAt);
-    } else {
-      latestSyncedByPlaylist.set(pl.id, null);
-    }
-  }
-
   const playlists: TrackPlaylistPresenceRow[] = [];
   for (const [plId, g] of grouped) {
     const times = g.syncedAts.map((d) => d.getTime());
     const firstSeenAt = new Date(Math.min(...times));
-    const lastSeenAt = new Date(Math.max(...times));
-    const latestId = latestSnapshotIdByPlaylist.get(plId);
-    const currentlyInPlaylist = latestId ? g.snapshotIds.has(latestId) : false;
     playlists.push({
       playlistId: plId,
       playlistName: g.playlist.name,
       imageUrl: g.playlist.imageUrl,
       spotifyPlaylistId: g.playlist.spotifyPlaylistId,
       ownerName: g.playlist.ownerName,
+      playlistDescription: g.playlist.description ?? null,
       firstSeenAt,
-      lastSeenAt,
-      currentlyInPlaylist,
-      latestSnapshotSyncedAt: latestSyncedByPlaylist.get(plId) ?? null,
     });
   }
 
@@ -184,6 +158,15 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
     evidencePreviewTitle: e.evidencePreviewTitle,
     evidencePreviewImage: e.evidencePreviewImage,
     evidencePreviewSiteName: e.evidencePreviewSiteName,
+    stadiumCompetitionName: e.stadiumCompetitionName,
+    stadiumMatchUtc: e.stadiumMatchUtc,
+    stadiumHomeClub: e.stadiumHomeClub,
+    stadiumAwayClub: e.stadiumAwayClub,
+    stadiumHomeCrestUrl: e.stadiumHomeCrestUrl,
+    stadiumAwayCrestUrl: e.stadiumAwayCrestUrl,
+    stadiumHomeScore: e.stadiumHomeScore,
+    stadiumAwayScore: e.stadiumAwayScore,
+    stadiumAttendance: e.stadiumAttendance,
     contact: e.contact
       ? {
           fullName: e.contact.fullName,
@@ -193,6 +176,11 @@ export async function getTrackClientReportData(userId: string, spotifyTrackId: s
         }
       : null,
   }));
+  feedback.sort((a, b) => {
+    // Eerst song feedback (niet-batch), daarna batch feedback; binnen groepen meest recent eerst.
+    if (a.isBatch !== b.isBatch) return a.isBatch ? 1 : -1;
+    return b.feedbackAt.getTime() - a.feedbackAt.getTime();
+  });
 
   let title = "Unknown track";
   let artistsJson = "[]";

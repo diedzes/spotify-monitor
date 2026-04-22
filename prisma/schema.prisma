@@ -109,6 +109,16 @@ model FeedbackEntry {
   evidencePreviewTitle    String?
   evidencePreviewImage    String?
   evidencePreviewSiteName String?
+  stadiumMatchExternalId  String?
+  stadiumCompetitionName  String?
+  stadiumMatchUtc         DateTime?
+  stadiumHomeClub         String?
+  stadiumAwayClub         String?
+  stadiumHomeCrestUrl     String?
+  stadiumAwayCrestUrl     String?
+  stadiumHomeScore        Int?
+  stadiumAwayScore        Int?
+  stadiumAttendance       Int?
   createdAt               DateTime            @default(now())
   updatedAt               DateTime            @updatedAt
   contact                 Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)

@@ -10,6 +10,19 @@ type TrackInput = {
   spotifyUrl?: string | null;
 };
 
+type StadiumPlayInput = {
+  matchExternalId?: string | null;
+  competitionName?: string | null;
+  matchUtc?: Date | string | null;
+  homeClub?: string | null;
+  awayClub?: string | null;
+  homeCrestUrl?: string | null;
+  awayCrestUrl?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  attendance?: number | null;
+};
+
 function cleanEvidenceUrl(raw: string | null | undefined): string | null {
   const t = raw?.trim();
   if (!t) return null;
@@ -28,6 +41,43 @@ function parseEntryKind(raw: string | null | undefined): FeedbackEntryKind {
   return FeedbackEntryKind.comment;
 }
 
+function cleanText(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  return t ? t : null;
+}
+
+function toIntOrNull(raw: number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  if (!Number.isFinite(raw)) return null;
+  return Math.trunc(raw);
+}
+
+function toDateOrNull(raw: Date | string | null | undefined): Date | null {
+  if (!raw) return null;
+  const d = raw instanceof Date ? raw : new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function normalizeStadiumPlay(input: StadiumPlayInput | null | undefined) {
+  if (!input) return null;
+  const homeClub = cleanText(input.homeClub);
+  const awayClub = cleanText(input.awayClub);
+  const hasClubs = Boolean(homeClub && awayClub);
+  return {
+    matchExternalId: cleanText(input.matchExternalId),
+    competitionName: cleanText(input.competitionName),
+    matchUtc: toDateOrNull(input.matchUtc),
+    homeClub,
+    awayClub,
+    homeCrestUrl: cleanEvidenceUrl(input.homeCrestUrl),
+    awayCrestUrl: cleanEvidenceUrl(input.awayCrestUrl),
+    homeScore: toIntOrNull(input.homeScore),
+    awayScore: toIntOrNull(input.awayScore),
+    attendance: toIntOrNull(input.attendance),
+    hasClubs,
+  };
+}
+
 export async function createFeedbackEntry(
   userId: string,
   input: {
@@ -38,10 +88,12 @@ export async function createFeedbackEntry(
     tracks?: TrackInput[];
     entryKind?: string | null;
     evidenceUrl?: string | null;
+    stadiumPlay?: StadiumPlayInput | null;
   }
 ) {
   const textTrimmed = input.feedbackText.trim();
   const evidenceUrl = cleanEvidenceUrl(input.evidenceUrl);
+  const stadiumPlay = normalizeStadiumPlay(input.stadiumPlay);
 
   let entryKind: FeedbackEntryKind = FeedbackEntryKind.comment;
   if (input.feedbackBatchId) {
@@ -61,6 +113,10 @@ export async function createFeedbackEntry(
     if (!textTrimmed) throw new Error("Feedback text is required");
   } else if (entryKind === FeedbackEntryKind.comment) {
     if (!textTrimmed) throw new Error("Feedback text is required");
+  } else if (entryKind === FeedbackEntryKind.play) {
+    if (!textTrimmed && !evidenceUrl && !stadiumPlay?.hasClubs) {
+      throw new Error("Add notes, evidence link, or match details");
+    }
   } else if (!textTrimmed && !evidenceUrl) {
     throw new Error("Add a note and/or an evidence link");
   }
@@ -101,6 +157,16 @@ export async function createFeedbackEntry(
       evidencePreviewTitle,
       evidencePreviewImage,
       evidencePreviewSiteName,
+      stadiumMatchExternalId: entryKind === FeedbackEntryKind.play ? stadiumPlay?.matchExternalId ?? null : null,
+      stadiumCompetitionName: entryKind === FeedbackEntryKind.play ? stadiumPlay?.competitionName ?? null : null,
+      stadiumMatchUtc: entryKind === FeedbackEntryKind.play ? stadiumPlay?.matchUtc ?? null : null,
+      stadiumHomeClub: entryKind === FeedbackEntryKind.play ? stadiumPlay?.homeClub ?? null : null,
+      stadiumAwayClub: entryKind === FeedbackEntryKind.play ? stadiumPlay?.awayClub ?? null : null,
+      stadiumHomeCrestUrl: entryKind === FeedbackEntryKind.play ? stadiumPlay?.homeCrestUrl ?? null : null,
+      stadiumAwayCrestUrl: entryKind === FeedbackEntryKind.play ? stadiumPlay?.awayCrestUrl ?? null : null,
+      stadiumHomeScore: entryKind === FeedbackEntryKind.play ? stadiumPlay?.homeScore ?? null : null,
+      stadiumAwayScore: entryKind === FeedbackEntryKind.play ? stadiumPlay?.awayScore ?? null : null,
+      stadiumAttendance: entryKind === FeedbackEntryKind.play ? stadiumPlay?.attendance ?? null : null,
       tracks: input.feedbackBatchId
         ? undefined
         : {
@@ -218,6 +284,7 @@ export async function updateFeedbackEntry(
     feedbackAt?: Date;
     entryKind?: string | null;
     evidenceUrl?: string | null;
+    stadiumPlay?: StadiumPlayInput | null;
   }
 ) {
   const row = await prisma.feedbackEntry.findFirst({
@@ -240,6 +307,7 @@ export async function updateFeedbackEntry(
   }
 
   const switchingToComment = !row.feedbackBatchId && input.entryKind !== undefined && nextEntryKind === FeedbackEntryKind.comment;
+  const nextStadiumPlay = normalizeStadiumPlay(input.stadiumPlay);
 
   const data: {
     contactId?: string | null;
@@ -250,6 +318,16 @@ export async function updateFeedbackEntry(
     evidencePreviewTitle?: string | null;
     evidencePreviewImage?: string | null;
     evidencePreviewSiteName?: string | null;
+    stadiumMatchExternalId?: string | null;
+    stadiumCompetitionName?: string | null;
+    stadiumMatchUtc?: Date | null;
+    stadiumHomeClub?: string | null;
+    stadiumAwayClub?: string | null;
+    stadiumHomeCrestUrl?: string | null;
+    stadiumAwayCrestUrl?: string | null;
+    stadiumHomeScore?: number | null;
+    stadiumAwayScore?: number | null;
+    stadiumAttendance?: number | null;
   } = {};
   if (input.contactId !== undefined) data.contactId = input.contactId;
   if (input.feedbackAt) data.feedbackAt = input.feedbackAt;
@@ -262,6 +340,16 @@ export async function updateFeedbackEntry(
     data.evidencePreviewTitle = null;
     data.evidencePreviewImage = null;
     data.evidencePreviewSiteName = null;
+    data.stadiumMatchExternalId = null;
+    data.stadiumCompetitionName = null;
+    data.stadiumMatchUtc = null;
+    data.stadiumHomeClub = null;
+    data.stadiumAwayClub = null;
+    data.stadiumHomeCrestUrl = null;
+    data.stadiumAwayCrestUrl = null;
+    data.stadiumHomeScore = null;
+    data.stadiumAwayScore = null;
+    data.stadiumAttendance = null;
   } else if (input.evidenceUrl !== undefined) {
     nextEvidenceUrl = cleanEvidenceUrl(input.evidenceUrl);
     data.evidenceUrl = nextEvidenceUrl;
@@ -272,10 +360,30 @@ export async function updateFeedbackEntry(
     const kindForValidation = data.entryKind ?? nextEntryKind;
     if (row.feedbackBatchId || kindForValidation === FeedbackEntryKind.comment) {
       if (!text) throw new Error("Feedback text is required");
+    } else if (kindForValidation === FeedbackEntryKind.play) {
+      const hasStadiumDetails =
+        nextStadiumPlay?.hasClubs ||
+        row.entryKind === FeedbackEntryKind.play;
+      if (!text && !nextEvidenceUrl && !hasStadiumDetails) {
+        throw new Error("Add notes, evidence link, or match details");
+      }
     } else if (!text && !nextEvidenceUrl) {
       throw new Error("Add a note and/or an evidence link");
     }
     data.feedbackText = text;
+  }
+
+  if (!row.feedbackBatchId && (data.entryKind === FeedbackEntryKind.play || (input.stadiumPlay && nextEntryKind === FeedbackEntryKind.play))) {
+    data.stadiumMatchExternalId = nextStadiumPlay?.matchExternalId ?? null;
+    data.stadiumCompetitionName = nextStadiumPlay?.competitionName ?? null;
+    data.stadiumMatchUtc = nextStadiumPlay?.matchUtc ?? null;
+    data.stadiumHomeClub = nextStadiumPlay?.homeClub ?? null;
+    data.stadiumAwayClub = nextStadiumPlay?.awayClub ?? null;
+    data.stadiumHomeCrestUrl = nextStadiumPlay?.homeCrestUrl ?? null;
+    data.stadiumAwayCrestUrl = nextStadiumPlay?.awayCrestUrl ?? null;
+    data.stadiumHomeScore = nextStadiumPlay?.homeScore ?? null;
+    data.stadiumAwayScore = nextStadiumPlay?.awayScore ?? null;
+    data.stadiumAttendance = nextStadiumPlay?.attendance ?? null;
   }
 
   const urlChanged =

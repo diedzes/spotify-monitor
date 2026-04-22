@@ -285,6 +285,42 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                     <p className="mb-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">Feedback</p>
                   )}
                   {f.feedbackText ? <p className="whitespace-pre-wrap">{truncate(f.feedbackText, 400)}</p> : null}
+                  {f.stadiumHomeClub && f.stadiumAwayClub ? (
+                    <div className="mt-2 rounded border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1">
+                          {f.stadiumHomeCrestUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={f.stadiumHomeCrestUrl} alt="" className="h-4 w-4 object-contain" />
+                          ) : null}
+                          <span>{f.stadiumHomeClub}</span>
+                        </div>
+                        <span className="font-semibold">
+                          {typeof f.stadiumHomeScore === "number" && typeof f.stadiumAwayScore === "number"
+                            ? `${f.stadiumHomeScore}-${f.stadiumAwayScore}`
+                            : "vs"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {f.stadiumAwayCrestUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={f.stadiumAwayCrestUrl} alt="" className="h-4 w-4 object-contain" />
+                          ) : null}
+                          <span>{f.stadiumAwayClub}</span>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-[11px] text-zinc-500">
+                        {[
+                          f.stadiumCompetitionName,
+                          f.stadiumMatchUtc ? new Date(f.stadiumMatchUtc).toLocaleDateString("en-GB") : null,
+                          typeof f.stadiumAttendance === "number"
+                            ? `Attendance ${f.stadiumAttendance.toLocaleString("en-GB")}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  ) : null}
                   {f.evidenceUrl ? (
                     <div className="mt-2">
                       <EvidenceLinkPreview

@@ -21,12 +21,11 @@ export async function GET(request: Request) {
     playlists: report.playlists.map((p) => ({
       ...p,
       firstSeenAt: p.firstSeenAt.toISOString(),
-      lastSeenAt: p.lastSeenAt.toISOString(),
-      latestSnapshotSyncedAt: p.latestSnapshotSyncedAt?.toISOString() ?? null,
     })),
     feedback: report.feedback.map((f) => ({
       ...f,
       feedbackAt: f.feedbackAt.toISOString(),
+      stadiumMatchUtc: f.stadiumMatchUtc?.toISOString() ?? null,
     })),
   });
 }

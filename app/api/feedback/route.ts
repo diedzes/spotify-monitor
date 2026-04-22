@@ -21,6 +21,18 @@ export async function POST(request: Request) {
     feedbackBatchId?: string | null;
     entryKind?: string | null;
     evidenceUrl?: string | null;
+    stadiumPlay?: {
+      matchExternalId?: string | null;
+      competitionName?: string | null;
+      matchUtc?: string | null;
+      homeClub?: string | null;
+      awayClub?: string | null;
+      homeCrestUrl?: string | null;
+      awayCrestUrl?: string | null;
+      homeScore?: number | null;
+      awayScore?: number | null;
+      attendance?: number | null;
+    } | null;
     tracks?: Array<{
       spotifyTrackId: string;
       title: string;
@@ -42,6 +54,12 @@ export async function POST(request: Request) {
       tracks: body.tracks ?? [],
       entryKind: body.entryKind ?? null,
       evidenceUrl: body.evidenceUrl ?? null,
+      stadiumPlay: body.stadiumPlay
+        ? {
+            ...body.stadiumPlay,
+            matchUtc: body.stadiumPlay.matchUtc ? new Date(body.stadiumPlay.matchUtc) : null,
+          }
+        : null,
     });
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

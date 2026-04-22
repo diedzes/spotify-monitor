@@ -15,6 +15,16 @@ type Track = {
 type Batch = { id: string; name: string; tracks: Track[]; lastUsedAt?: string | null; updatedAt?: string };
 type Step = 1 | 2 | 3 | 4;
 type EntryKind = "comment" | "sync" | "play";
+type RecentMatch = {
+  id: number;
+  utcDate: string;
+  competitionName: string | null;
+  homeTeam: { name: string; crest: string | null };
+  awayTeam: { name: string; crest: string | null };
+  scoreHome: number | null;
+  scoreAway: number | null;
+  attendance: number | null;
+};
 
 function artistsLabel(artistsJson: string): string {
   try {
@@ -50,6 +60,15 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastChosenBatchId, setLastChosenBatchId] = useState<string | null>(null);
+  const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<string>("");
+  const [manualHomeClub, setManualHomeClub] = useState("");
+  const [manualAwayClub, setManualAwayClub] = useState("");
+  const [manualHomeScore, setManualHomeScore] = useState("");
+  const [manualAwayScore, setManualAwayScore] = useState("");
+  const [manualAttendance, setManualAttendance] = useState("");
 
   useEffect(() => {
     fetch(`/api/feedback/main-tracks?query=${encodeURIComponent(trackQuery)}`, { credentials: "include" })
@@ -83,7 +102,12 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
       ? Boolean(feedbackText.trim())
       : entryKind === "comment"
         ? Boolean(feedbackText.trim())
-        : Boolean(feedbackText.trim()) || Boolean(evidenceUrl.trim()));
+        : entryKind === "play"
+          ? Boolean(feedbackText.trim()) ||
+            Boolean(evidenceUrl.trim()) ||
+            Boolean(selectedMatchId) ||
+            Boolean(manualHomeClub.trim() && manualAwayClub.trim())
+          : Boolean(feedbackText.trim()) || Boolean(evidenceUrl.trim()));
   const selectedBatch = useMemo(() => batches.find((batch) => batch.id === selectedBatchId) ?? null, [batches, selectedBatchId]);
   const selectedContact = useMemo(() => {
     return [...recentContacts, ...contacts].find((contact) => contact.id === selectedContactId) ?? null;
@@ -110,6 +134,42 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
   useEffect(() => {
     if (entryKind === "comment") setEvidenceUrl("");
   }, [entryKind]);
+
+  useEffect(() => {
+    if (entryKind !== "play") {
+      setSelectedMatchId("");
+      setManualHomeClub("");
+      setManualAwayClub("");
+      setManualHomeScore("");
+      setManualAwayScore("");
+      setManualAttendance("");
+      setMatchesError(null);
+    }
+  }, [entryKind]);
+
+  const selectedMatch = useMemo(
+    () => recentMatches.find((m) => String(m.id) === selectedMatchId) ?? null,
+    [recentMatches, selectedMatchId]
+  );
+
+  async function loadRecentMatches() {
+    setMatchesError(null);
+    setMatchesLoading(true);
+    try {
+      const res = await fetch("/api/football/recent-matches?days=14", { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMatchesError(data.error ?? "Could not load matches");
+        setMatchesLoading(false);
+        return;
+      }
+      setRecentMatches(data.matches ?? []);
+    } catch {
+      setMatchesError("Could not load matches");
+    } finally {
+      setMatchesLoading(false);
+    }
+  }
 
   const steps: Array<{ id: Step; label: string }> = [
     { id: 1, label: "Type" },
@@ -158,6 +218,27 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
             tracks: selectedTrack ? [selectedTrack] : [],
             entryKind,
             evidenceUrl: entryKind !== "comment" && evidenceUrl.trim() ? evidenceUrl.trim() : null,
+            stadiumPlay:
+              entryKind === "play"
+                ? {
+                    matchExternalId: selectedMatch ? String(selectedMatch.id) : null,
+                    competitionName: selectedMatch?.competitionName ?? null,
+                    matchUtc: selectedMatch?.utcDate ?? null,
+                    homeClub: selectedMatch?.homeTeam.name ?? (manualHomeClub.trim() || null),
+                    awayClub: selectedMatch?.awayTeam.name ?? (manualAwayClub.trim() || null),
+                    homeCrestUrl: selectedMatch?.homeTeam.crest ?? null,
+                    awayCrestUrl: selectedMatch?.awayTeam.crest ?? null,
+                    homeScore:
+                      selectedMatch?.scoreHome ??
+                      (manualHomeScore.trim() ? Number.parseInt(manualHomeScore.trim(), 10) : null),
+                    awayScore:
+                      selectedMatch?.scoreAway ??
+                      (manualAwayScore.trim() ? Number.parseInt(manualAwayScore.trim(), 10) : null),
+                    attendance:
+                      selectedMatch?.attendance ??
+                      (manualAttendance.trim() ? Number.parseInt(manualAttendance.trim(), 10) : null),
+                  }
+                : null,
           }
         : {
             contactId: selectedContactId || null,
@@ -421,6 +502,86 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
                 className="w-full rounded border px-3 py-2 text-sm"
               />
               <p className="mt-1 text-xs text-zinc-500">We fetch a preview (title, image) when possible.</p>
+            </div>
+          ) : null}
+          {mode === "single" && entryKind === "play" ? (
+            <div className="space-y-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Recent matches (football-data.org)</p>
+                <button
+                  type="button"
+                  onClick={() => void loadRecentMatches()}
+                  disabled={matchesLoading}
+                  className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:hover:bg-zinc-800"
+                >
+                  {matchesLoading ? "Loading..." : "Load recent matches"}
+                </button>
+              </div>
+              {matchesError ? <p className="text-xs text-red-600">{matchesError}</p> : null}
+              {recentMatches.length > 0 ? (
+                <select
+                  value={selectedMatchId}
+                  onChange={(e) => setSelectedMatchId(e.target.value)}
+                  className="w-full rounded border px-3 py-2 text-sm"
+                >
+                  <option value="">No match selected (manual input below)</option>
+                  {recentMatches.map((m) => (
+                    <option key={m.id} value={String(m.id)}>
+                      {new Date(m.utcDate).toLocaleDateString("en-GB")} - {m.homeTeam.name} vs {m.awayTeam.name}
+                      {typeof m.scoreHome === "number" && typeof m.scoreAway === "number"
+                        ? ` (${m.scoreHome}-${m.scoreAway})`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-zinc-500">No recent matches loaded yet.</p>
+              )}
+
+              {!selectedMatch ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input
+                    value={manualHomeClub}
+                    onChange={(e) => setManualHomeClub(e.target.value)}
+                    placeholder="Home club"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={manualAwayClub}
+                    onChange={(e) => setManualAwayClub(e.target.value)}
+                    placeholder="Away club"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={manualHomeScore}
+                    onChange={(e) => setManualHomeScore(e.target.value)}
+                    placeholder="Home score (optional)"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={manualAwayScore}
+                    onChange={(e) => setManualAwayScore(e.target.value)}
+                    placeholder="Away score (optional)"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={manualAttendance}
+                    onChange={(e) => setManualAttendance(e.target.value)}
+                    placeholder="Attendance (optional)"
+                    className="w-full rounded border px-3 py-2 text-sm sm:col-span-2"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  Match selected. Clubs, score, crest and attendance (if available) will be saved.
+                </p>
+              )}
             </div>
           ) : null}
           <input type="datetime-local" value={feedbackAt} onChange={(e) => setFeedbackAt(e.target.value)} className="w-full rounded border px-3 py-2 text-sm" />

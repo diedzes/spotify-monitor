@@ -24,6 +24,18 @@ export async function PATCH(request: Request, { params }: Params) {
     feedbackAt?: string;
     entryKind?: string | null;
     evidenceUrl?: string | null;
+    stadiumPlay?: {
+      matchExternalId?: string | null;
+      competitionName?: string | null;
+      matchUtc?: string | null;
+      homeClub?: string | null;
+      awayClub?: string | null;
+      homeCrestUrl?: string | null;
+      awayCrestUrl?: string | null;
+      homeScore?: number | null;
+      awayScore?: number | null;
+      attendance?: number | null;
+    } | null;
   };
   try {
     body = await request.json();
@@ -37,6 +49,12 @@ export async function PATCH(request: Request, { params }: Params) {
       feedbackAt: body.feedbackAt ? new Date(body.feedbackAt) : undefined,
       entryKind: body.entryKind,
       evidenceUrl: body.evidenceUrl,
+      stadiumPlay: body.stadiumPlay
+        ? {
+            ...body.stadiumPlay,
+            matchUtc: body.stadiumPlay.matchUtc ? new Date(body.stadiumPlay.matchUtc) : null,
+          }
+        : undefined,
     });
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

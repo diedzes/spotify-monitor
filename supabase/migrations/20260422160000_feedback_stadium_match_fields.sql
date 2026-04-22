@@ -1,0 +1,10 @@
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumMatchExternalId" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumCompetitionName" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumMatchUtc" TIMESTAMP;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumHomeClub" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumAwayClub" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumHomeCrestUrl" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumAwayCrestUrl" TEXT;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumHomeScore" INTEGER;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumAwayScore" INTEGER;
+ALTER TABLE public.feedback_entries ADD COLUMN IF NOT EXISTS "stadiumAttendance" INTEGER;
