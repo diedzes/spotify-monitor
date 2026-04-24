@@ -176,6 +176,8 @@ function PlaylistsPageContent() {
   const [mainToggleLoading, setMainToggleLoading] = useState<string | null>(null);
   const [excludeToggleLoading, setExcludeToggleLoading] = useState<string | null>(null);
   const [bulkMainLoading, setBulkMainLoading] = useState(false);
+  const [bulkExcludeLoading, setBulkExcludeLoading] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   const refreshPlaylists = useCallback(() => {
     const h = getSessionHeaders(sidFromUrl);
@@ -576,6 +578,90 @@ function PlaylistsPageContent() {
     [sidFromUrl, selectedIds, clearSelection, refreshPlaylists]
   );
 
+  const handleBulkExcludeFromHitlist = useCallback(
+    async (exclude: boolean) => {
+      if (selectedIds.size === 0) return;
+      setHitlistNotice(null);
+      setBulkExcludeLoading(true);
+      try {
+        const res = await fetch("/api/playlists/bulk-exclude", {
+          method: "POST",
+          credentials: "include",
+          headers: getSessionHeaders(sidFromUrl),
+          body: JSON.stringify({ trackedPlaylistIds: Array.from(selectedIds), excludeFromHitlist: exclude }),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          hitlistNewMatches?: number;
+          hitlistRemovedMatches?: number;
+          hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (!res.ok || !data.ok) {
+          setSyncError(data.error ?? "Failed to update hitlist counting setting");
+          return;
+        }
+        await refreshPlaylists();
+        const hl = formatHitlistSummary(
+          data.hitlistNewMatches ?? 0,
+          data.hitlistRemovedMatches ?? 0,
+          data.hitlistSampleNew
+        );
+        setHitlistNotice(hl);
+        clearSelection();
+      } catch {
+        setSyncError("Failed to update hitlist counting setting");
+      } finally {
+        setBulkExcludeLoading(false);
+      }
+    },
+    [sidFromUrl, selectedIds, clearSelection, refreshPlaylists]
+  );
+
+  const handleBulkDeleteSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const ok = window.confirm(
+      `Delete ${count} selected playlist${count === 1 ? "" : "s"}?\n\nThis removes them from the app and updates hitlist matches.`
+    );
+    if (!ok) return;
+
+    setHitlistNotice(null);
+    setBulkDeleteLoading(true);
+    try {
+      const res = await fetch("/api/playlists/bulk-delete", {
+        method: "POST",
+        credentials: "include",
+        headers: getSessionHeaders(sidFromUrl),
+        body: JSON.stringify({ trackedPlaylistIds: Array.from(selectedIds) }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        deleted?: number;
+        hitlistNewMatches?: number;
+        hitlistRemovedMatches?: number;
+        hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+      };
+      if (!res.ok || !data.ok) {
+        setSyncError(data.error ?? "Failed to delete selected playlists");
+        return;
+      }
+      await refreshPlaylists();
+      const hl = formatHitlistSummary(
+        data.hitlistNewMatches ?? 0,
+        data.hitlistRemovedMatches ?? 0,
+        data.hitlistSampleNew
+      );
+      setHitlistNotice(hl);
+      clearSelection();
+    } catch {
+      setSyncError("Failed to delete selected playlists");
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  }, [sidFromUrl, selectedIds, clearSelection, refreshPlaylists]);
+
   const openBulkAddModal = useCallback(() => {
     setBulkAddResult(null);
     setBulkAddGroupId("");
@@ -823,6 +909,30 @@ function PlaylistsPageContent() {
               className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             >
               Remove from Hitlist main group
+            </button>
+            <button
+              type="button"
+              disabled={bulkExcludeLoading}
+              onClick={() => void handleBulkExcludeFromHitlist(true)}
+              className="rounded-full border border-amber-400/70 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50"
+            >
+              {bulkExcludeLoading ? "…" : "Stop counting in Hitlist"}
+            </button>
+            <button
+              type="button"
+              disabled={bulkExcludeLoading}
+              onClick={() => void handleBulkExcludeFromHitlist(false)}
+              className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            >
+              {bulkExcludeLoading ? "…" : "Count in Hitlist again"}
+            </button>
+            <button
+              type="button"
+              disabled={bulkDeleteLoading}
+              onClick={handleBulkDeleteSelected}
+              className="rounded-full border border-red-300 bg-red-50 px-4 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50"
+            >
+              {bulkDeleteLoading ? "Deleting…" : "Delete selected"}
             </button>
             <button
               type="button"
