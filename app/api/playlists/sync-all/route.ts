@@ -5,6 +5,7 @@ import { syncTrackedPlaylist } from "@/lib/sync-playlists";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export type SyncAllResponse = {
   ok: boolean;
@@ -30,13 +31,25 @@ export async function POST(request: Request): Promise<NextResponse<SyncAllRespon
   const errors: Array<{ playlistId: string; error: string }> = [];
   let synced = 0;
 
-  for (const p of playlists) {
-    const result = await syncTrackedPlaylist(p.id, session.access_token);
-    if (result.ok) {
-      synced++;
-    } else {
-      errors.push({ playlistId: p.id, error: result.error });
-    }
+  const CONCURRENCY = 5;
+  for (let i = 0; i < playlists.length; i += CONCURRENCY) {
+    const batch = playlists.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map((p) => syncTrackedPlaylist(p.id, session.access_token))
+    );
+    results.forEach((settled, idx) => {
+      const playlistId = batch[idx].id;
+      if (settled.status === "fulfilled") {
+        if (settled.value.ok) {
+          synced++;
+        } else {
+          errors.push({ playlistId, error: settled.value.error });
+        }
+      } else {
+        const msg = settled.reason instanceof Error ? settled.reason.message : "Onbekende fout";
+        errors.push({ playlistId, error: msg });
+      }
+    });
   }
 
   let hitlistNewMatches = 0;

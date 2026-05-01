@@ -5,6 +5,7 @@ import { syncTrackedPlaylist } from "@/lib/sync-playlists";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function POST(
   request: Request,

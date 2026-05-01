@@ -10,6 +10,28 @@ const DEFAULT_RETRY_AFTER_MS = 1000;
 const MAX_429_RETRIES = 5;
 
 /**
+ * Vertaal een Spotify API HTTP-statuscode naar een leesbare Nederlandse foutmelding.
+ */
+export function formatSpotifyError(status: number, raw: string): string {
+  switch (status) {
+    case 401:
+      return "Spotify-sessie verlopen — log opnieuw in om te synchen.";
+    case 403:
+      return "Geen toegang tot deze playlist (privé of verwijderd van Spotify).";
+    case 404:
+      return "Playlist niet gevonden op Spotify (mogelijk verwijderd).";
+    case 429:
+      return "Spotify rate limit bereikt — probeer het over een minuut opnieuw.";
+    case 500:
+    case 502:
+    case 503:
+      return "Spotify is tijdelijk niet beschikbaar, probeer het later opnieuw.";
+    default:
+      return raw || `Spotify API-fout (${status})`;
+  }
+}
+
+/**
  * Fetch met retry bij 429 (Rate Limit). Wacht op Retry-After of 1s en probeer opnieuw.
  */
 export async function spotifyFetch(
@@ -91,7 +113,7 @@ export async function fetchPlaylistMetadata(
   );
   if (!res.ok) {
     const text = await res.text();
-    const err = new Error(`Spotify API ${res.status}: ${text || res.statusText}`) as Error & { status: number };
+    const err = new Error(formatSpotifyError(res.status, text || res.statusText)) as Error & { status: number };
     err.status = res.status;
     throw err;
   }
@@ -157,7 +179,7 @@ export async function fetchPlaylistTracksPage(
   const res = await spotifyFetch(url, { accessToken });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Spotify API ${res.status}: ${text || res.statusText}`);
+    throw new Error(formatSpotifyError(res.status, text || res.statusText));
   }
   return res.json() as Promise<SpotifyPlaylistTracksResponse>;
 }
@@ -186,7 +208,7 @@ export async function fetchTrackMetadata(accessToken: string, trackId: string): 
   });
   if (!res.ok) {
     const text = await res.text();
-    const err = new Error(`Spotify API ${res.status}: ${text || res.statusText}`) as Error & { status: number };
+    const err = new Error(formatSpotifyError(res.status, text || res.statusText)) as Error & { status: number };
     err.status = res.status;
     throw err;
   }
