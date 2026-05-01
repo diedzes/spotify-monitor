@@ -44,7 +44,11 @@ export default async function HitlistPage({ searchParams }: Props) {
         </p>
         {rows.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-            No hitlist titles yet. Sync playlists and refresh hitlist from Dashboard.
+            Nog geen hitlist titels.{" "}
+            <a href={signedId ? `/playlists?sid=${encodeURIComponent(signedId)}` : "/playlists"} className="text-[#1DB954] hover:underline">
+              Sync je playlists
+            </a>{" "}
+            en gebruik daarna Refresh op het Dashboard.
           </p>
         ) : (
           <HitlistTable

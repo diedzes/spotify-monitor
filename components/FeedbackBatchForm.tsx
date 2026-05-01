@@ -37,9 +37,12 @@ export function FeedbackBatchForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/feedback/main-tracks?query=${encodeURIComponent(query)}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setTracks(d.tracks ?? []));
+    const id = setTimeout(() => {
+      fetch(`/api/feedback/main-tracks?query=${encodeURIComponent(query)}`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => setTracks(d.tracks ?? []));
+    }, 300);
+    return () => clearTimeout(id);
   }, [query]);
 
   async function onSubmit(e: React.FormEvent) {

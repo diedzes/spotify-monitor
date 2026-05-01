@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { getStoredSessionId, clearStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { GroupChip } from "@/components/GroupChip";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -141,6 +143,7 @@ function formatHitlistSummary(
 
 function PlaylistsPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const sidFromUrl = searchParams.get("sid");
   const [user, setUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
@@ -152,13 +155,14 @@ function PlaylistsPageContent() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  const [filterSearch, setFilterSearch] = useState("");
-  const [filterOwner, setFilterOwner] = useState("");
-  const [filterGroup, setFilterGroup] = useState("");
-  const [filterSyncStatus, setFilterSyncStatus] = useState<SyncStatusFilter>("all");
-  const [filterIsPublic, setFilterIsPublic] = useState<IsPublicFilter>("all");
-  const [filterHitlistMain, setFilterHitlistMain] = useState<HitlistMainFilter>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("name_asc");
+  const [filterSearch, setFilterSearch] = useState(searchParams.get("q") ?? "");
+  const [filterOwner, setFilterOwner] = useState(searchParams.get("owner") ?? "");
+  const [filterGroup, setFilterGroup] = useState(searchParams.get("group") ?? "");
+  const [filterSyncStatus, setFilterSyncStatus] = useState<SyncStatusFilter>((searchParams.get("sync") as SyncStatusFilter) ?? "all");
+  const [filterIsPublic, setFilterIsPublic] = useState<IsPublicFilter>((searchParams.get("visibility") as IsPublicFilter) ?? "all");
+  const [filterHitlistMain, setFilterHitlistMain] = useState<HitlistMainFilter>((searchParams.get("hitlist") as HitlistMainFilter) ?? "all");
+  const [sortBy, setSortBy] = useState<SortOption>((searchParams.get("sort") as SortOption) ?? "name_asc");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncAllLoading, setSyncAllLoading] = useState(false);
@@ -178,6 +182,21 @@ function PlaylistsPageContent() {
   const [bulkMainLoading, setBulkMainLoading] = useState(false);
   const [bulkExcludeLoading, setBulkExcludeLoading] = useState(false);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+  // Sla actieve filters op in de URL zodat ze behouden blijven na refresh of delen
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (sidFromUrl) params.set("sid", sidFromUrl);
+    if (filterSearch) params.set("q", filterSearch);
+    if (filterOwner) params.set("owner", filterOwner);
+    if (filterGroup) params.set("group", filterGroup);
+    if (filterSyncStatus !== "all") params.set("sync", filterSyncStatus);
+    if (filterIsPublic !== "all") params.set("visibility", filterIsPublic);
+    if (filterHitlistMain !== "all") params.set("hitlist", filterHitlistMain);
+    if (sortBy !== "name_asc") params.set("sort", sortBy);
+    const qs = params.toString();
+    router.replace(qs ? `/playlists?${qs}` : "/playlists", { scroll: false });
+  }, [filterSearch, filterOwner, filterGroup, filterSyncStatus, filterIsPublic, filterHitlistMain, sortBy, sidFromUrl, router]);
 
   const refreshPlaylists = useCallback(() => {
     const h = getSessionHeaders(sidFromUrl);
@@ -620,12 +639,11 @@ function PlaylistsPageContent() {
 
   const handleBulkDeleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
-    const ok = window.confirm(
-      `Delete ${count} selected playlist${count === 1 ? "" : "s"}?\n\nThis removes them from the app and updates hitlist matches.`
-    );
-    if (!ok) return;
+    setConfirmDelete(true);
+  }, [selectedIds]);
 
+  const executeBulkDelete = useCallback(async () => {
+    setConfirmDelete(false);
     setHitlistNotice(null);
     setBulkDeleteLoading(true);
     try {
@@ -653,7 +671,8 @@ function PlaylistsPageContent() {
         data.hitlistRemovedMatches ?? 0,
         data.hitlistSampleNew
       );
-      setHitlistNotice(hl);
+      toast.success(`${data.deleted ?? selectedIds.size} playlist${(data.deleted ?? selectedIds.size) === 1 ? "" : "s"} verwijderd`);
+      if (hl) toast.success(`Hitlist: ${hl}`);
       clearSelection();
     } catch {
       setSyncError("Failed to delete selected playlists");
@@ -685,9 +704,26 @@ function PlaylistsPageContent() {
     return (
       <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
         <AppHeader />
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
-        </div>
+        <main className="mx-auto max-w-6xl px-4 py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+            <div className="flex gap-2">
+              <div className="h-9 w-24 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-28 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+          <div className="mb-4 h-14 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b border-zinc-100 px-4 py-3 last:border-0 dark:border-zinc-800">
+                <div className="h-4 w-4 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                <div className="h-4 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                <div className="ml-auto h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -974,10 +1010,10 @@ function PlaylistsPageContent() {
                   ) : null}
                 </th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Name</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Owner</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Groups</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Tracks</th>
-                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Last sync</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">Owner</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-900 md:table-cell dark:text-zinc-100">Groups</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">Tracks</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-900 md:table-cell dark:text-zinc-100">Last sync</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Actions</th>
                 <th className="px-3 py-3 text-center font-medium text-zinc-900 dark:text-zinc-100">Counts</th>
                 <th className="px-3 py-3 text-right font-medium text-zinc-900 dark:text-zinc-100">Hitlist source</th>
@@ -987,9 +1023,21 @@ function PlaylistsPageContent() {
               {filteredPlaylists.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
-                    {playlists.length === 0
-                      ? "No playlists yet. Click \"Add playlist\" to add a Spotify playlist."
-                      : "No playlists match the filters."}
+                    {playlists.length === 0 ? (
+                      <span>
+                        Nog geen playlists.{" "}
+                        <Link href="/playlists/new" className="font-medium text-[#1DB954] hover:underline">
+                          Voeg een playlist toe
+                        </Link>{" "}
+                        of importeer via{" "}
+                        <Link href="/playlists/from-user" className="font-medium text-[#1DB954] hover:underline">
+                          Spotify-account
+                        </Link>
+                        .
+                      </span>
+                    ) : (
+                      "Geen playlists gevonden met de huidige filters."
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -1009,8 +1057,8 @@ function PlaylistsPageContent() {
                         {p.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.ownerName}</td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell dark:text-zinc-400">{p.ownerName}</td>
+                    <td className="hidden px-4 py-3 md:table-cell">
                       <span className="flex flex-wrap gap-1">
                         {p.groups.length === 0 ? (
                           <span className="text-zinc-400 dark:text-zinc-500">—</span>
@@ -1033,8 +1081,8 @@ function PlaylistsPageContent() {
                         </Link>
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{p.trackCount}</td>
-                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{formatDate(p.lastSyncedAt)}</td>
+                    <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell dark:text-zinc-400">{p.trackCount}</td>
+                    <td className="hidden px-4 py-3 text-zinc-600 md:table-cell dark:text-zinc-400">{formatDate(p.lastSyncedAt)}</td>
                     <td className="px-4 py-3">
                       <span className="flex items-center gap-2">
                         <button
@@ -1204,6 +1252,16 @@ function PlaylistsPageContent() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`${selectedIds.size} playlist${selectedIds.size === 1 ? "" : "s"} verwijderen?`}
+        message="Dit verwijdert de geselecteerde playlists uit de app en werkt de hitlist matches bij. Dit is niet ongedaan te maken."
+        confirmLabel="Verwijderen"
+        destructive
+        onConfirm={executeBulkDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
@@ -1212,8 +1270,28 @@ export default function PlaylistsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading…</p>
+        <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
+          <AppHeader />
+          <main className="mx-auto max-w-6xl px-4 py-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+              <div className="flex gap-2">
+                <div className="h-9 w-24 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-9 w-28 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+            </div>
+            <div className="mb-4 h-14 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 border-b border-zinc-100 px-4 py-3 last:border-0 dark:border-zinc-800">
+                  <div className="h-4 w-4 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                  <div className="h-4 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                  <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                  <div className="ml-auto h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                </div>
+              ))}
+            </div>
+          </main>
         </div>
       }
     >
