@@ -9,7 +9,10 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate:apply": "supabase db push && prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:backfill-contact-roles": "node scripts/backfill-contact-roles.mjs",
+    "db:backfill-contact-roles:apply": "node scripts/backfill-contact-roles.mjs --apply",
+    "db:export-playlists": "node scripts/export-followed-playlists.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",

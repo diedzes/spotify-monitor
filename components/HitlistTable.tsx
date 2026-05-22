@@ -27,20 +27,44 @@ type Props = {
   rows: HitlistTableRow[];
   signedId: string | null;
   initialOpenKey?: string | null;
+  /** Playlists in the "Owned" group — hidden when hideOwned is on. */
+  ownedPlaylistIds?: string[];
 };
+
+function filterRowsHideOwned(rows: HitlistTableRow[], ownedIds: Set<string>, hide: boolean): HitlistTableRow[] {
+  if (!hide || ownedIds.size === 0) return rows;
+  return rows
+    .map((row) => {
+      const playlistPresences = row.playlistPresences.filter((p) => !ownedIds.has(p.playlistId));
+      return {
+        ...row,
+        playlistPresences,
+        activePlaylistCount: playlistPresences.filter((p) => p.isActive).length,
+      };
+    })
+    .filter((row) => row.activePlaylistCount > 0);
+}
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
+export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlaylistIds = [] }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("firstAdded");
   const [sortAsc, setSortAsc] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(initialOpenKey);
+  const [hideOwned, setHideOwned] = useState(true);
+
+  const ownedIds = useMemo(() => new Set(ownedPlaylistIds), [ownedPlaylistIds]);
+
+  const visibleRows = useMemo(
+    () => filterRowsHideOwned(rows, ownedIds, hideOwned),
+    [rows, ownedIds, hideOwned]
+  );
 
   const sorted = useMemo(() => {
-    const out = [...rows];
+    const out = [...visibleRows];
     out.sort((a, b) => {
       let cmp = 0;
       if (sortKey === "title") cmp = a.title.localeCompare(b.title, "en");
@@ -51,7 +75,7 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
       return sortAsc ? cmp : -cmp;
     });
     return out;
-  }, [rows, sortKey, sortAsc]);
+  }, [visibleRows, sortKey, sortAsc]);
 
   const setSort = (k: SortKey) => {
     if (k === sortKey) setSortAsc((v) => !v);
@@ -61,7 +85,27 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
     }
   };
 
+  const ownedHiddenCount = hideOwned && ownedIds.size > 0 ? rows.length - visibleRows.length : 0;
+
   return (
+    <div className="space-y-3">
+      {ownedIds.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={hideOwned}
+              onChange={(e) => setHideOwned(e.target.checked)}
+              className="rounded border-zinc-300 text-[#1DB954] focus:ring-[#1DB954] dark:border-zinc-600"
+            />
+            Hide matches on playlists in group <strong>Owned</strong>
+          </label>
+          <span className="text-zinc-500 dark:text-zinc-400">
+            {visibleRows.length} title{visibleRows.length === 1 ? "" : "s"}
+            {ownedHiddenCount > 0 ? ` (${ownedHiddenCount} hidden)` : ""}
+          </span>
+        </div>
+      ) : null}
     <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead>
@@ -181,6 +225,7 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null }: Props) {
           })}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

@@ -4,7 +4,12 @@ import { getSpotifySession, getSessionFromSignedValue, getSessionSignedIdFromCoo
 import { prisma } from "@/lib/db";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
-import { formatArtistsLabel, getHitlistTitleRows } from "@/lib/hitlist";
+import {
+  formatArtistsLabel,
+  filterHitlistTitleRowsExcludingPlaylists,
+  getHitlistTitleRows,
+  getPlaylistIdsInNamedGroup,
+} from "@/lib/hitlist";
 import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 import { getRecentFeedbackItems } from "@/lib/feedback";
 
@@ -30,24 +35,38 @@ export default async function DashboardPage({ searchParams }: Props) {
     redirect("/");
   }
 
-  const [trackedPlaylistCount, mainPlaylistCount, reportCount, recentReports, recentSchedulers, activeHitlistTitles, recentFeedback] =
-    await Promise.all([
-      prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
-      prisma.groupPlaylist.count({
-        where: { group: { userId: session.user.id, isMainGroup: true } },
-      }),
-      prisma.report.count({ where: { userId: session.user.id } }),
-      prisma.report.findMany({
-        where: { userId: session.user.id },
-        select: { id: true, name: true, updatedAt: true },
-      }),
-      prisma.scheduler.findMany({
-        where: { userId: session.user.id },
-        select: { id: true, name: true, updatedAt: true },
-      }),
-      getHitlistTitleRows(session.user.id, { activeOnly: true, limit: 10 }),
-      getRecentFeedbackItems(session.user.id, 4),
-    ]);
+  const [
+    trackedPlaylistCount,
+    mainPlaylistCount,
+    reportCount,
+    recentReports,
+    recentSchedulers,
+    activeHitlistTitlesRaw,
+    ownedPlaylistIds,
+    recentFeedback,
+  ] = await Promise.all([
+    prisma.trackedPlaylist.count({ where: { userId: session.user.id } }),
+    prisma.groupPlaylist.count({
+      where: { group: { userId: session.user.id, isMainGroup: true } },
+    }),
+    prisma.report.count({ where: { userId: session.user.id } }),
+    prisma.report.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, updatedAt: true },
+    }),
+    prisma.scheduler.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, updatedAt: true },
+    }),
+    getHitlistTitleRows(session.user.id, { activeOnly: true, limit: 40 }),
+    getPlaylistIdsInNamedGroup(session.user.id, "Owned"),
+    getRecentFeedbackItems(session.user.id, 4),
+  ]);
+
+  const activeHitlistTitles = filterHitlistTitleRowsExcludingPlaylists(
+    activeHitlistTitlesRaw,
+    new Set(ownedPlaylistIds)
+  ).slice(0, 10);
 
   type RecentItem =
     | { kind: "report"; id: string; name: string; updatedAt: Date }
@@ -154,7 +173,8 @@ export default async function DashboardPage({ searchParams }: Props) {
           <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Tracks that appear in the Hitlist main group and (via the same Spotify track ID or artist+title) also on a
             tracked playlist that is <strong>not</strong> in that main group. Overlap between main-group playlists only
-            does not count. <strong>Refresh</strong> recomputes from the latest snapshots (e.g. after a sync).
+            does not count. Matches on playlists in group <strong>Owned</strong> are hidden here; use the full hitlist
+            page to toggle. <strong>Refresh</strong> recomputes from the latest snapshots (e.g. after a sync).
           </p>
           {mainPlaylistCount === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">

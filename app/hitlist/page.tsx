@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { HitlistTable } from "@/components/HitlistTable";
-import { getHitlistTitleRows } from "@/lib/hitlist";
+import { getHitlistTitleRows, getPlaylistIdsInNamedGroup } from "@/lib/hitlist";
 import { getSessionFromSignedValue, getSessionSignedIdFromCookie, getSpotifySession } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,10 @@ export default async function HitlistPage({ searchParams }: Props) {
 
   const params = await searchParams;
   const open = typeof params.open === "string" ? params.open : null;
-  const rows = await getHitlistTitleRows(session.user.id);
+  const [rows, ownedPlaylistIds] = await Promise.all([
+    getHitlistTitleRows(session.user.id),
+    getPlaylistIdsInNamedGroup(session.user.id, "Owned"),
+  ]);
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -54,6 +57,7 @@ export default async function HitlistPage({ searchParams }: Props) {
           <HitlistTable
             signedId={signedId}
             initialOpenKey={open}
+            ownedPlaylistIds={ownedPlaylistIds}
             rows={rows.map((r) => ({
               key: r.key,
               title: r.title,

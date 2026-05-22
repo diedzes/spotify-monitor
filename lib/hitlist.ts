@@ -316,6 +316,33 @@ export type HitlistTitleRow = {
   playlistPresences: HitlistPlaylistPresence[];
 };
 
+/** Playlist ids in a named group (e.g. "Owned"). */
+export async function getPlaylistIdsInNamedGroup(userId: string, groupName: string): Promise<string[]> {
+  const links = await prisma.groupPlaylist.findMany({
+    where: { group: { userId, name: groupName } },
+    select: { trackedPlaylistId: true },
+  });
+  return links.map((l) => l.trackedPlaylistId);
+}
+
+/** Remove presences on excluded playlists; drop titles with no active matches left. */
+export function filterHitlistTitleRowsExcludingPlaylists<T extends Pick<HitlistTitleRow, "playlistPresences" | "activePlaylistCount">>(
+  rows: T[],
+  excludePlaylistIds: ReadonlySet<string>
+): T[] {
+  if (excludePlaylistIds.size === 0) return rows;
+  return rows
+    .map((row) => {
+      const playlistPresences = row.playlistPresences.filter((p) => !excludePlaylistIds.has(p.playlistId));
+      return {
+        ...row,
+        playlistPresences,
+        activePlaylistCount: playlistPresences.filter((p) => p.isActive).length,
+      };
+    })
+    .filter((row) => row.activePlaylistCount > 0);
+}
+
 function titleKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, " ");
 }
