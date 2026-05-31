@@ -173,7 +173,19 @@ export default function ContactsPage() {
       if (!res.ok || !d.ok || !d.contact) {
         throw new Error(d.error ?? "Could not update status");
       }
-      setAllRows((prev) => prev.map((c) => (c.id === contactId ? { ...c, ...d.contact! } : c)));
+      setAllRows((prev) =>
+        prev.map((c) =>
+          c.id === contactId
+            ? {
+                ...c,
+                ...d.contact!,
+                contactStatus: d.contact!.contactStatus ?? contactStatus,
+                organizationName:
+                  d.contact!.organizationName ?? c.organizationName,
+              }
+            : c
+        )
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update status");
     } finally {

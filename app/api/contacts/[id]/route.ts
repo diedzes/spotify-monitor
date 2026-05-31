@@ -72,6 +72,7 @@ export async function PATCH(request: Request, { params }: Params) {
         email: contact.email,
         phone: contact.phone,
         role: contact.role,
+        contactStatus: contact.contactStatus,
         notes: contact.notes,
         source: contact.source,
         createdAt: contact.createdAt.toISOString(),
