@@ -23,6 +23,13 @@ model Session {
   @@map("sessions")
 }
 
+enum ContactStatus {
+  warm
+  do_not_contact
+  no_recent_contact
+  cold
+}
+
 model Organization {
   id        String    @id @default(cuid())
   userId    String
@@ -47,6 +54,7 @@ model Contact {
   email                    String?
   phone                    String?
   role                     String?
+  contactStatus            ContactStatus?
   notes                    String?
   source                   String?
   createdAt                DateTime      @default(now())
@@ -57,6 +65,7 @@ model Contact {
   @@index([userId, fullName])
   @@index([userId, email])
   @@index([userId, organizationNameSnapshot])
+  @@index([userId, contactStatus])
   @@index([organizationId])
   @@map("contacts")
 }

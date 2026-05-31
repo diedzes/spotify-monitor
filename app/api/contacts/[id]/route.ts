@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteContact, getContactById, updateContact } from "@/lib/contacts";
+import { parseContactStatus } from "@/lib/contact-status";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export async function GET(request: Request, { params }: Params) {
       email: contact.email,
       phone: contact.phone,
       role: contact.role,
+      contactStatus: contact.contactStatus,
       notes: contact.notes,
       source: contact.source,
       createdAt: contact.createdAt.toISOString(),
@@ -44,6 +46,7 @@ export async function PATCH(request: Request, { params }: Params) {
     email?: string | null;
     phone?: string | null;
     role?: string | null;
+    contactStatus?: string | null;
     notes?: string | null;
     source?: string | null;
   };
@@ -54,7 +57,10 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   try {
-    const contact = await updateContact(session.user.id, id, body);
+    const contact = await updateContact(session.user.id, id, {
+      ...body,
+      contactStatus: body.contactStatus !== undefined ? parseContactStatus(body.contactStatus) : undefined,
+    });
     return NextResponse.json({
       ok: true,
       contact: {

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { parseContactStatus, type ContactStatus } from "@/lib/contact-status";
 
 type OrganizationInput = {
   name: string;
@@ -19,6 +20,7 @@ type ContactInput = {
   email?: string | null;
   phone?: string | null;
   role?: string | null;
+  contactStatus?: ContactStatus | null;
   notes?: string | null;
   source?: string | null;
 };
@@ -30,6 +32,7 @@ type ContactUpdateInput = {
   email?: string | null;
   phone?: string | null;
   role?: string | null;
+  contactStatus?: ContactStatus | null;
   notes?: string | null;
   source?: string | null;
 };
@@ -37,6 +40,7 @@ type ContactUpdateInput = {
 type ContactQuery = {
   query?: string;
   organizationId?: string;
+  contactStatus?: ContactStatus;
   limit?: number;
 };
 
@@ -135,6 +139,7 @@ export async function createContact(userId: string, data: ContactInput) {
       email: toEmail(data.email),
       phone: cleanString(data.phone),
       role: cleanString(data.role),
+      contactStatus: data.contactStatus === undefined ? undefined : parseContactStatus(data.contactStatus ?? null),
       notes: cleanString(data.notes),
       source: cleanString(data.source),
     },
@@ -153,6 +158,7 @@ export async function updateContact(userId: string, contactId: string, data: Con
     email?: string | null;
     phone?: string | null;
     role?: string | null;
+    contactStatus?: ContactStatus | null;
     notes?: string | null;
     source?: string | null;
   } = {};
@@ -167,6 +173,7 @@ export async function updateContact(userId: string, contactId: string, data: Con
   if (data.email !== undefined) patch.email = toEmail(data.email);
   if (data.phone !== undefined) patch.phone = cleanString(data.phone);
   if (data.role !== undefined) patch.role = cleanString(data.role);
+  if (data.contactStatus !== undefined) patch.contactStatus = parseContactStatus(data.contactStatus ?? null);
   if (data.notes !== undefined) patch.notes = cleanString(data.notes);
   if (data.source !== undefined) patch.source = cleanString(data.source);
 
@@ -193,6 +200,7 @@ export async function getContacts(userId: string, query?: ContactQuery) {
     where: {
       userId,
       ...(query?.organizationId ? { organizationId: query.organizationId } : {}),
+      ...(query?.contactStatus ? { contactStatus: query.contactStatus } : {}),
       ...(q
         ? {
             OR: [

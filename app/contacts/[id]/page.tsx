@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { ContactStatusBadge } from "@/components/ContactStatusBadge";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { CONTACT_STATUSES, CONTACT_STATUS_LABELS, type ContactStatus } from "@/lib/contact-status";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -32,6 +34,7 @@ type ContactDetail = {
   email: string | null;
   phone: string | null;
   role: string | null;
+  contactStatus: ContactStatus | null;
   notes: string | null;
   source: string | null;
   createdAt: string;
@@ -62,6 +65,7 @@ export default function ContactDetailPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
+  const [contactStatus, setContactStatus] = useState<ContactStatus | "">("");
   const [notes, setNotes] = useState("");
   const [source, setSource] = useState("");
 
@@ -81,6 +85,7 @@ export default function ContactDetailPage() {
         setEmail(c.contact.email ?? "");
         setPhone(c.contact.phone ?? "");
         setRole(c.contact.role ?? "");
+        setContactStatus(c.contact.contactStatus ?? "");
         setNotes(c.contact.notes ?? "");
         setSource(c.contact.source ?? "");
 
@@ -111,6 +116,7 @@ export default function ContactDetailPage() {
           email,
           phone,
           role,
+          contactStatus: contactStatus || null,
           notes,
           source,
         }),
@@ -246,9 +252,22 @@ export default function ContactDetailPage() {
                   <input value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Source</label>
-                  <input value={source} onChange={(e) => setSource(e.target.value)} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800" />
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact status</label>
+                  <select
+                    value={contactStatus}
+                    onChange={(e) => setContactStatus(e.target.value as ContactStatus | "")}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  >
+                    <option value="">Not set</option>
+                    {CONTACT_STATUSES.map((s) => (
+                      <option key={s} value={s}>{CONTACT_STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Source</label>
+                <input value={source} onChange={(e) => setSource(e.target.value)} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Notes</label>
@@ -268,6 +287,7 @@ export default function ContactDetailPage() {
               </div>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Organization</dt><dd className="text-zinc-900 dark:text-zinc-100">{contact.organizationName ?? "—"}</dd></div>
+                <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Contact status</dt><dd><ContactStatusBadge status={contact.contactStatus} /></dd></div>
                 <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Role</dt><dd className="text-zinc-900 dark:text-zinc-100">{contact.role ?? "—"}</dd></div>
                 <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Email</dt><dd className="text-zinc-900 dark:text-zinc-100">{contact.email ?? "—"}</dd></div>
                 <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Phone</dt><dd className="text-zinc-900 dark:text-zinc-100">{contact.phone ?? "—"}</dd></div>

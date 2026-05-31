@@ -12,7 +12,11 @@
     "db:studio": "prisma studio",
     "db:backfill-contact-roles": "node scripts/backfill-contact-roles.mjs",
     "db:backfill-contact-roles:apply": "node scripts/backfill-contact-roles.mjs --apply",
-    "db:export-playlists": "node scripts/export-followed-playlists.mjs"
+    "db:export-playlists": "node scripts/export-followed-playlists.mjs",
+    "db:inventory": "node scripts/db-inventory.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:migrate-user": "node scripts/migrate-spotify-user.mjs",
+    "db:migrate-user:apply": "node scripts/migrate-spotify-user.mjs --apply"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",

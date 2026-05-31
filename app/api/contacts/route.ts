@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createContact, getContacts, getRecentContacts } from "@/lib/contacts";
+import { parseContactStatus } from "@/lib/contact-status";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get("query") ?? undefined;
   const organizationId = url.searchParams.get("organizationId") ?? undefined;
+  const contactStatusParam = url.searchParams.get("contactStatus");
+  const parsedStatus = contactStatusParam ? parseContactStatus(contactStatusParam) : undefined;
+  const contactStatus = parsedStatus ?? undefined;
+  const limitParam = url.searchParams.get("limit");
+  const limit = limitParam ? parseInt(limitParam, 10) : undefined;
   const recent = url.searchParams.get("recent") === "1";
   const contacts = recent
     ? await getRecentContacts(session.user.id)
-    : await getContacts(session.user.id, { query, organizationId });
+    : await getContacts(session.user.id, { query, organizationId, contactStatus, limit });
 
   return NextResponse.json({
     contacts: contacts.map((c) => ({
@@ -26,6 +32,7 @@ export async function GET(request: Request) {
       email: c.email,
       phone: c.phone,
       role: c.role,
+      contactStatus: c.contactStatus,
       notes: c.notes,
       source: c.source,
       createdAt: c.createdAt.toISOString(),
@@ -45,6 +52,7 @@ export async function POST(request: Request) {
     email?: string | null;
     phone?: string | null;
     role?: string | null;
+    contactStatus?: string | null;
     notes?: string | null;
     source?: string | null;
   };
@@ -62,6 +70,7 @@ export async function POST(request: Request) {
       email: body.email,
       phone: body.phone,
       role: body.role,
+      contactStatus: body.contactStatus !== undefined ? parseContactStatus(body.contactStatus) : undefined,
       notes: body.notes,
       source: body.source,
     });
@@ -76,6 +85,7 @@ export async function POST(request: Request) {
         email: contact.email,
         phone: contact.phone,
         role: contact.role,
+        contactStatus: contact.contactStatus,
         notes: contact.notes,
         source: contact.source,
         createdAt: contact.createdAt.toISOString(),

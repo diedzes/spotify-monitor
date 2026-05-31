@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { CONTACT_STATUSES, CONTACT_STATUS_LABELS, type ContactStatus } from "@/lib/contact-status";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -33,6 +34,7 @@ export default function NewContactPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
+  const [contactStatus, setContactStatus] = useState<ContactStatus | "">("");
   const [notes, setNotes] = useState("");
   const [source, setSource] = useState("manual");
   const [orgs, setOrgs] = useState<OrganizationOption[]>([]);
@@ -70,6 +72,7 @@ export default function NewContactPage() {
           email,
           phone,
           role,
+          contactStatus: contactStatus || null,
           notes,
           source,
         }),
@@ -162,13 +165,26 @@ export default function NewContactPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Source</label>
-              <input
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
+              <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact status</label>
+              <select
+                value={contactStatus}
+                onChange={(e) => setContactStatus(e.target.value as ContactStatus | "")}
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-              />
+              >
+                <option value="">Not set</option>
+                {CONTACT_STATUSES.map((s) => (
+                  <option key={s} value={s}>{CONTACT_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Source</label>
+            <input
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Notes</label>
