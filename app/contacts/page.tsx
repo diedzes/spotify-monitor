@@ -11,6 +11,7 @@ import {
   CONTACT_STATUS_SORT_ORDER,
   type ContactStatus,
 } from "@/lib/contact-status";
+import { contactEmailsForMailApp, downloadContactsCsv, type ContactCsvRow } from "@/lib/contacts-csv";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -118,6 +119,7 @@ export default function ContactsPage() {
   const [filterOrganization, setFilterOrganization] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("name_asc");
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const loadContacts = useCallback(() => {
     setError(null);
@@ -158,6 +160,47 @@ export default function ContactsPage() {
   );
 
   const hasFilters = !!(query.trim() || filterStatus || filterRole || filterOrganization);
+
+  const csvRows = useMemo((): ContactCsvRow[] => rows.map((c) => ({
+    fullName: c.fullName,
+    email: c.email,
+    organizationName: c.organizationName,
+    phone: c.phone,
+    role: c.role,
+    contactStatus: c.contactStatus,
+    updatedAt: c.updatedAt,
+  })), [rows]);
+
+  const emailCount = useMemo(
+    () => csvRows.filter((c) => c.email?.trim()).length,
+    [csvRows]
+  );
+
+  function showExportNotice(message: string) {
+    setExportNotice(message);
+    window.setTimeout(() => setExportNotice(null), 2500);
+  }
+
+  function exportCsv() {
+    if (csvRows.length === 0) return;
+    downloadContactsCsv(csvRows, "contacts-filtered");
+    showExportNotice(`CSV downloaded (${csvRows.length} contact${csvRows.length === 1 ? "" : "s"}).`);
+  }
+
+  async function copyEmails() {
+    const list = contactEmailsForMailApp(csvRows);
+    if (!list) {
+      showExportNotice("No email addresses in the current selection.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(list);
+      const n = list.split(";").length;
+      showExportNotice(`Copied ${n} email address${n === 1 ? "" : "es"} to clipboard.`);
+    } catch {
+      showExportNotice("Could not copy to clipboard.");
+    }
+  }
 
   async function updateStatus(contactId: string, contactStatus: ContactStatus | null) {
     setStatusSavingId(contactId);
@@ -294,22 +337,44 @@ export default function ContactsPage() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span>
               {rows.length} of {allRows.length} contact{allRows.length === 1 ? "" : "s"} shown
+              {emailCount > 0 ? ` · ${emailCount} with email` : ""}
             </span>
-            {hasFilters ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {hasFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setFilterStatus("");
+                    setFilterRole("");
+                    setFilterOrganization("");
+                  }}
+                  className="text-[#1DB954] hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => {
-                  setQuery("");
-                  setFilterStatus("");
-                  setFilterRole("");
-                  setFilterOrganization("");
-                }}
-                className="text-[#1DB954] hover:underline"
+                disabled={loading || rows.length === 0}
+                onClick={() => copyEmails()}
+                className="text-[#1DB954] hover:underline disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Clear filters
+                Copy emails
               </button>
-            ) : null}
+              <button
+                type="button"
+                disabled={loading || rows.length === 0}
+                onClick={() => exportCsv()}
+                className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
+          {exportNotice ? (
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">{exportNotice}</p>
+          ) : null}
         </div>
 
         {error ? (
