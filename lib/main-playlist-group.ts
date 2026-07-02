@@ -21,6 +21,18 @@ export async function getMainSourcePlaylistIds(userId: string): Promise<Set<stri
   return new Set(rows.map((r) => r.trackedPlaylistId));
 }
 
+/** Hitlist-bron playlists tellen altijd mee; wis excludeFromHitlist voor playlists in de hoofdgroep. */
+export async function ensureMainSourcePlaylistsCounted(userId: string, trackedPlaylistIds?: string[]) {
+  const ids =
+    trackedPlaylistIds ??
+    [...(await getMainSourcePlaylistIds(userId))];
+  if (ids.length === 0) return;
+  await prisma.trackedPlaylist.updateMany({
+    where: { userId, id: { in: ids }, excludeFromHitlist: true },
+    data: { excludeFromHitlist: false },
+  });
+}
+
 /**
  * Zorgt dat de gebruiker precies één Hitlist main group heeft (lege groep als die nog niet bestond).
  */

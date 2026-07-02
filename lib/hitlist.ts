@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
+import { getMainSourcePlaylistIds, ensureMainSourcePlaylistsCounted } from "@/lib/main-playlist-group";
 
 export type HitlistRebuildResult = {
   newMatches: number;
@@ -52,13 +52,14 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
- * - Bron: playlists in de Hitlist main group (isMainGroup), met excludeFromHitlist=false.
+ * - Bron: playlists in de Hitlist main group (isMainGroup); excludeFromHitlist geldt niet voor bronnen.
  * - Match-kant: overige tracked playlists met excludeFromHitlist=false, niet in hoofdgroep (geen kruisingen hoofdgroep-onderling).
  * - Match 1: dezelfde spotifyTrackId op bron- en andere playlist.
  * - Match 2: zelfde genormaliseerde (eerste artiest + titel) als Spotify-ids verschillen (bijv. NL/BE-release).
  * - Nieuwe intersecties → insert of heractiveer; verdwenen → isActive=false, removedAt=now.
  */
 export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<HitlistRebuildResult> {
+  await ensureMainSourcePlaylistsCounted(userId);
   const mainIdSet = await getMainSourcePlaylistIds(userId);
 
   const playlists = await prisma.trackedPlaylist.findMany({
@@ -118,7 +119,7 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
     canonByPlaylist.set(plId, canonicalSetForPlaylist(tm));
   }
 
-  const mains = playlists.filter((p) => mainIdSet.has(p.id) && !p.excludeFromHitlist && p.isPublic);
+  const mains = playlists.filter((p) => mainIdSet.has(p.id) && p.isPublic);
   for (const main of mains) {
     const mainMap = playlistTracks.get(main.id);
     if (!mainMap) continue;
@@ -243,7 +244,6 @@ export async function getActiveHitlist(userId: string) {
       isActive: true,
       mainPlaylist: {
         isPublic: true,
-        excludeFromHitlist: false,
         groupPlaylists: {
           some: {
             group: {
@@ -357,7 +357,6 @@ export async function getHitlistTitleRows(
       ...(opts?.activeOnly ? { isActive: true } : {}),
       mainPlaylist: {
         isPublic: true,
-        excludeFromHitlist: false,
         groupPlaylists: {
           some: {
             group: {

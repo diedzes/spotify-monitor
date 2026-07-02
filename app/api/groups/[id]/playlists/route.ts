@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { addPlaylistToGroup, removePlaylistFromGroup } from "@/lib/playlist-groups";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
-import { isMainHitlistGroup } from "@/lib/main-playlist-group";
+import { isMainHitlistGroup, ensureMainSourcePlaylistsCounted } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,7 @@ export async function POST(
   try {
     await addPlaylistToGroup(session.user.id, groupId, trackedPlaylistId);
     if (await isMainHitlistGroup(session.user.id, groupId)) {
+      await ensureMainSourcePlaylistsCounted(session.user.id, [trackedPlaylistId]);
       await rebuildOrUpdateHitlistForUser(session.user.id);
     }
     return NextResponse.json({ ok: true });

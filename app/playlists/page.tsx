@@ -1140,10 +1140,14 @@ function PlaylistsPageContent() {
                         <input
                           type="checkbox"
                           checked={!p.excludeFromHitlist}
-                          disabled={excludeToggleLoading === p.id}
+                          disabled={excludeToggleLoading === p.id || p.inHitlistMainGroup}
                           onChange={(e) => void toggleExcludeFromHitlist(p.id, !e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
-                          title="Off = playlist does not count toward the hitlist (no source, no match)"
+                          className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500 disabled:opacity-60"
+                          title={
+                            p.inHitlistMainGroup
+                              ? "Hitlist source playlists are always used for comparison"
+                              : "Off = playlist does not count as a hitlist match target"
+                          }
                         />
                         <span className="max-w-[5rem] text-[10px] leading-tight text-zinc-500 dark:text-zinc-400">
                           {p.excludeFromHitlist ? "No" : "Yes"}

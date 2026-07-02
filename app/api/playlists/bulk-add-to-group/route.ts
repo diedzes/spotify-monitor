@@ -3,7 +3,7 @@ import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { addPlaylistToGroup } from "@/lib/playlist-groups";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
-import { isMainHitlistGroup } from "@/lib/main-playlist-group";
+import { isMainHitlistGroup, ensureMainSourcePlaylistsCounted } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export async function POST(
 
   const result: BulkAddToGroupResult = { ok: true, added: 0, skipped: 0, errors: [] };
   const uniqueIds = [...new Set(ids)];
+  const addedIds: string[] = [];
 
   for (const trackedPlaylistId of uniqueIds) {
     const existing = await prisma.groupPlaylist.findUnique({
@@ -54,6 +55,7 @@ export async function POST(
     try {
       await addPlaylistToGroup(session.user.id, groupId, trackedPlaylistId);
       result.added += 1;
+      addedIds.push(trackedPlaylistId);
     } catch (e) {
       result.errors.push({
         trackedPlaylistId,
@@ -63,6 +65,7 @@ export async function POST(
   }
 
   if (result.added > 0 && (await isMainHitlistGroup(session.user.id, groupId))) {
+    await ensureMainSourcePlaylistsCounted(session.user.id, addedIds);
     await rebuildOrUpdateHitlistForUser(session.user.id);
   }
 

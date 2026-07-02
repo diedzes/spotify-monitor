@@ -3,7 +3,7 @@ import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 import { addPlaylistToGroup, removePlaylistFromGroup } from "@/lib/playlist-groups";
-import { ensureMainPlaylistGroup } from "@/lib/main-playlist-group";
+import { ensureMainPlaylistGroup, ensureMainSourcePlaylistsCounted } from "@/lib/main-playlist-group";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     try {
       if (body.inHitlistMainGroup) {
         await addPlaylistToGroup(session.user.id, mainGroup.id, playlistId);
+        await ensureMainSourcePlaylistsCounted(session.user.id, [playlistId]);
       } else {
         await removePlaylistFromGroup(session.user.id, mainGroup.id, playlistId);
       }
