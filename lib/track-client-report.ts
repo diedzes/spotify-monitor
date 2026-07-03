@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { formatArtistsLabel } from "@/lib/hitlist";
+import { formatArtistsLabel, trackCanonicalKey } from "@/lib/hitlist";
 import { getTrackFeedback } from "@/lib/feedback";
 import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
 import { fetchTrackMetadata } from "@/lib/spotify-api";
@@ -64,6 +64,60 @@ function spotifyTrackUrl(trackId: string): string | null {
   return `https://open.spotify.com/track/${trackId}`;
 }
 
+/** Same identity rules as hitlist: exact Spotify id or first-artist + title. */
+function snapshotTrackMatchesTarget(
+  targetTrackId: string,
+  targetCanonical: string | null,
+  row: { spotifyTrackId: string; title: string; artistsJson: string }
+): boolean {
+  if (row.spotifyTrackId === targetTrackId) return true;
+  if (!targetCanonical) return false;
+  const c = trackCanonicalKey(row.title, row.artistsJson);
+  return c === targetCanonical;
+}
+
+async function resolveTrackMetadata(
+  userId: string,
+  spotifyTrackId: string
+): Promise<{ title: string; artistsJson: string; spotifyUrl: string | null }> {
+  let title = "Unknown track";
+  let artistsJson = "[]";
+  let spotifyUrl: string | null = spotifyTrackUrl(spotifyTrackId);
+
+  const snapMeta = await prisma.snapshotTrack.findFirst({
+    where: { spotifyTrackId, snapshot: { trackedPlaylist: { userId } } },
+    select: { title: true, artistsJson: true, spotifyUrl: true },
+    orderBy: { snapshot: { syncedAt: "desc" } },
+  });
+  if (snapMeta) {
+    title = snapMeta.title;
+    artistsJson = snapMeta.artistsJson;
+    if (snapMeta.spotifyUrl) spotifyUrl = snapMeta.spotifyUrl;
+  }
+
+  const ft = await prisma.feedbackEntryTrack.findFirst({
+    where: { spotifyTrackId, feedbackEntry: { userId } },
+    select: { title: true, artistsJson: true, spotifyUrl: true },
+  });
+  if (ft) {
+    title = ft.title;
+    artistsJson = ft.artistsJson;
+    if (ft.spotifyUrl) spotifyUrl = ft.spotifyUrl;
+  }
+
+  const bt = await prisma.feedbackBatchTrack.findFirst({
+    where: { spotifyTrackId, feedbackBatch: { userId } },
+    select: { title: true, artistsJson: true, spotifyUrl: true },
+  });
+  if (bt) {
+    title = bt.title;
+    artistsJson = bt.artistsJson;
+    if (bt.spotifyUrl) spotifyUrl = bt.spotifyUrl;
+  }
+
+  return { title, artistsJson, spotifyUrl };
+}
+
 /**
  * Customer-facing report: playlists (from sync history), cover art, and feedback with contact context.
  */
@@ -73,13 +127,23 @@ export async function getTrackClientReportData(
   accessToken?: string
 ): Promise<TrackClientReportData | null> {
   const mainPlaylistIds = await getMainSourcePlaylistIds(userId);
+  const { title, artistsJson, spotifyUrl: resolvedSpotifyUrl } = await resolveTrackMetadata(userId, spotifyTrackId);
+  const targetCanonical = trackCanonicalKey(title, artistsJson);
 
   const snapshotRows = await prisma.snapshotTrack.findMany({
     where: {
-      spotifyTrackId,
       snapshot: { trackedPlaylist: { userId } },
+      OR: [
+        { spotifyTrackId },
+        ...(title !== "Unknown track"
+          ? [{ title: { equals: title, mode: "insensitive" as const } }]
+          : []),
+      ],
     },
     select: {
+      spotifyTrackId: true,
+      title: true,
+      artistsJson: true,
       snapshot: {
         select: {
           id: true,
@@ -109,6 +173,7 @@ export async function getTrackClientReportData(
   >();
 
   for (const row of snapshotRows) {
+    if (!snapshotTrackMatchesTarget(spotifyTrackId, targetCanonical, row)) continue;
     const pl = row.snapshot.trackedPlaylist;
     const syncedAt = row.snapshot.syncedAt;
     const sid = row.snapshot.id;
@@ -188,41 +253,8 @@ export async function getTrackClientReportData(
     return b.feedbackAt.getTime() - a.feedbackAt.getTime();
   });
 
-  let title = "Unknown track";
-  let artistsJson = "[]";
-  let spotifyUrl: string | null = spotifyTrackUrl(spotifyTrackId);
+  let spotifyUrl: string | null = resolvedSpotifyUrl;
   let trackImageUrl: string | null = null;
-
-  const snapMeta = await prisma.snapshotTrack.findFirst({
-    where: { spotifyTrackId, snapshot: { trackedPlaylist: { userId } } },
-    select: { title: true, artistsJson: true, spotifyUrl: true },
-    orderBy: { snapshot: { syncedAt: "desc" } },
-  });
-  if (snapMeta) {
-    title = snapMeta.title;
-    artistsJson = snapMeta.artistsJson;
-    if (snapMeta.spotifyUrl) spotifyUrl = snapMeta.spotifyUrl;
-  }
-
-  const ft = await prisma.feedbackEntryTrack.findFirst({
-    where: { spotifyTrackId, feedbackEntry: { userId } },
-    select: { title: true, artistsJson: true, spotifyUrl: true },
-  });
-  if (ft) {
-    title = ft.title;
-    artistsJson = ft.artistsJson;
-    if (ft.spotifyUrl) spotifyUrl = ft.spotifyUrl;
-  }
-
-  const bt = await prisma.feedbackBatchTrack.findFirst({
-    where: { spotifyTrackId, feedbackBatch: { userId } },
-    select: { title: true, artistsJson: true, spotifyUrl: true },
-  });
-  if (bt) {
-    title = bt.title;
-    artistsJson = bt.artistsJson;
-    if (bt.spotifyUrl) spotifyUrl = bt.spotifyUrl;
-  }
 
   if (accessToken && spotifyTrackId && !spotifyTrackId.startsWith("local-")) {
     try {
