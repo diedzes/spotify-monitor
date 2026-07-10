@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 import { prisma } from "@/lib/db";
-import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
+import {
+  rebuildOrUpdateHitlistForUser,
+  getHitlistHistoryForMatchedPlaylist,
+  getMainSourceTrackIdentities,
+  trackMatchesMainSourceIdentities,
+} from "@/lib/hitlist";
 import { addPlaylistToGroup, removePlaylistFromGroup } from "@/lib/playlist-groups";
 import { ensureMainPlaylistGroup, getMainSourcePlaylistIds, ensureMainSourcePlaylistsCounted } from "@/lib/main-playlist-group";
 
@@ -37,16 +42,24 @@ export async function GET(
   }
 
   const mainIds = await getMainSourcePlaylistIds(session.user.id);
+  const inHitlistMainGroup = mainIds.has(playlist.id);
+
+  const [hitlistHistory, mainSourceIdentities] = await Promise.all([
+    inHitlistMainGroup ? Promise.resolve([]) : getHitlistHistoryForMatchedPlaylist(session.user.id, playlist.id),
+    inHitlistMainGroup ? Promise.resolve({ trackIds: new Set<string>(), canonicalKeys: new Set<string>() }) : getMainSourceTrackIdentities(session.user.id),
+  ]);
 
   const latestSnapshot = playlist.snapshots[0] ?? null;
   let latestTracks: Array<{
     id: string;
     position: number;
+    spotifyTrackId: string;
     title: string;
     artistsJson: string;
     album: string;
     durationMs: number | null;
     spotifyUrl: string;
+    isHitlistHit: boolean;
   }> = [];
 
   if (latestSnapshot) {
@@ -56,6 +69,7 @@ export async function GET(
       select: {
         id: true,
         position: true,
+        spotifyTrackId: true,
         title: true,
         artistsJson: true,
         album: true,
@@ -63,7 +77,15 @@ export async function GET(
         spotifyUrl: true,
       },
     });
-    latestTracks = rows;
+    latestTracks = rows.map((row) => ({
+      ...row,
+      isHitlistHit: trackMatchesMainSourceIdentities(
+        row.spotifyTrackId,
+        row.title,
+        row.artistsJson,
+        mainSourceIdentities
+      ),
+    }));
   }
 
   return NextResponse.json({
@@ -77,7 +99,7 @@ export async function GET(
       trackCount: playlist.trackCount,
       lastSyncedAt: playlist.lastSyncedAt?.toISOString() ?? null,
       snapshotId: playlist.snapshotId,
-      inHitlistMainGroup: mainIds.has(playlist.id),
+      inHitlistMainGroup,
       excludeFromHitlist: playlist.excludeFromHitlist,
       groups: playlist.groupPlaylists.map((gp) => ({
         id: gp.group.id,
@@ -86,6 +108,18 @@ export async function GET(
         isMainGroup: gp.group.isMainGroup,
       })),
     },
+    hitlistHistory: hitlistHistory.map((h) => ({
+      id: h.id,
+      spotifyTrackId: h.spotifyTrackId,
+      title: h.title,
+      artistsJson: h.artistsJson,
+      mainPlaylistId: h.mainPlaylistId,
+      mainPlaylistName: h.mainPlaylistName,
+      firstDetectedAt: h.firstDetectedAt.toISOString(),
+      lastSeenAt: h.lastSeenAt.toISOString(),
+      removedAt: h.removedAt?.toISOString() ?? null,
+      isActive: h.isActive,
+    })),
     snapshots: playlist.snapshots.map((s) => ({
       id: s.id,
       spotifySnapshotId: s.spotifySnapshotId,

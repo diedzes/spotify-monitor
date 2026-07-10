@@ -73,11 +73,25 @@ type PlaylistDetail = {
   latestTracks: Array<{
     id: string;
     position: number;
+    spotifyTrackId: string;
     title: string;
     artistsJson: string;
     album: string;
     durationMs: number | null;
     spotifyUrl: string;
+    isHitlistHit: boolean;
+  }>;
+  hitlistHistory: Array<{
+    id: string;
+    spotifyTrackId: string;
+    title: string;
+    artistsJson: string;
+    mainPlaylistId: string;
+    mainPlaylistName: string;
+    firstDetectedAt: string;
+    lastSeenAt: string;
+    removedAt: string | null;
+    isActive: boolean;
   }>;
 };
 
@@ -206,7 +220,8 @@ export default function PlaylistDetailPage() {
 
   if (!data) return null;
 
-  const { playlist, snapshots, latestTracks } = data;
+  const { playlist, snapshots, latestTracks, hitlistHistory = [] } = data;
+  const hitlistHitCount = latestTracks.filter((t) => t.isHitlistHit).length;
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -347,6 +362,78 @@ export default function PlaylistDetailPage() {
           </label>
         </section>
 
+        {!playlist.inHitlistMainGroup && (
+          <section className="mb-8">
+            <h2 className="mb-2 text-lg font-medium text-zinc-900 dark:text-zinc-100">Hitlist history</h2>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Tracks from hitlist source playlists that were also detected on this playlist.
+            </p>
+            {hitlistHistory.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                No hitlist matches recorded for this playlist yet. Sync source playlists and this playlist, then refresh the hitlist.
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Artist</th>
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Title</th>
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Source playlist</th>
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">First seen</th>
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Last seen</th>
+                      <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hitlistHistory.map((h) => (
+                      <tr
+                        key={h.id}
+                        className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${h.isActive ? "" : "opacity-70"}`}
+                      >
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">{parseArtists(h.artistsJson)}</td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/feedback/track/${encodeURIComponent(h.spotifyTrackId)}/report`}
+                            className="font-semibold text-[#1DB954] hover:underline"
+                          >
+                            {h.title}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/playlists/${h.mainPlaylistId}`}
+                            className="text-zinc-700 hover:text-[#1DB954] hover:underline dark:text-zinc-300"
+                          >
+                            {h.mainPlaylistName}
+                          </Link>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                          {formatDate(h.firstDetectedAt)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                          {formatDate(h.lastSeenAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                              h.isActive
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                                : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            {h.isActive ? "Active" : h.removedAt ? `Removed ${formatDate(h.removedAt)}` : "Removed"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
         <section className="mb-8">
           <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">
             Snapshots
@@ -396,6 +483,12 @@ export default function PlaylistDetailPage() {
             <>
               <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
                 Tracks from the latest snapshot.
+                {!playlist.inHitlistMainGroup && hitlistHitCount > 0 ? (
+                  <span className="ml-1">
+                    <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{hitlistHitCount}</strong>{" "}
+                    also on a hitlist source playlist (shown in <strong className="font-semibold">bold</strong>).
+                  </span>
+                ) : null}
               </p>
               {latestTracks.length === 0 ? (
                 <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
@@ -418,14 +511,25 @@ export default function PlaylistDetailPage() {
                       {latestTracks.map((t) => (
                         <tr
                           key={t.id}
-                          className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
+                          className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${t.isHitlistHit ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
                         >
-                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{t.position + 1}</td>
-                          <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                          <td className={`px-4 py-3 text-zinc-500 dark:text-zinc-400 ${t.isHitlistHit ? "font-semibold" : ""}`}>
+                            {t.position + 1}
+                          </td>
+                          <td className={`px-4 py-3 text-zinc-700 dark:text-zinc-300 ${t.isHitlistHit ? "font-semibold" : ""}`}>
                             {parseArtists(t.artistsJson)}
                           </td>
-                          <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{t.title}</td>
-                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{t.album}</td>
+                          <td className={`px-4 py-3 text-zinc-900 dark:text-zinc-100 ${t.isHitlistHit ? "font-bold" : ""}`}>
+                            {t.title}
+                            {t.isHitlistHit ? (
+                              <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                                Hitlist
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className={`px-4 py-3 text-zinc-600 dark:text-zinc-400 ${t.isHitlistHit ? "font-semibold" : ""}`}>
+                            {t.album}
+                          </td>
                           <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400">
                             {formatDuration(t.durationMs)}
                           </td>

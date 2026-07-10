@@ -442,3 +442,94 @@ export async function getHitlistTitleRows(
   if (opts?.limit && opts.limit > 0) out = out.slice(0, opts.limit);
   return out;
 }
+
+export type MainSourceTrackIdentities = {
+  trackIds: Set<string>;
+  canonicalKeys: Set<string>;
+};
+
+/** Track ids + canonical keys from latest snapshots of hitlist main-group playlists. */
+export async function getMainSourceTrackIdentities(userId: string): Promise<MainSourceTrackIdentities> {
+  const mainIdSet = await getMainSourcePlaylistIds(userId);
+  const trackIds = new Set<string>();
+  const canonicalKeys = new Set<string>();
+  if (mainIdSet.size === 0) return { trackIds, canonicalKeys };
+
+  const playlists = await prisma.trackedPlaylist.findMany({
+    where: { userId, id: { in: [...mainIdSet] } },
+    select: {
+      snapshots: {
+        orderBy: { syncedAt: "desc" },
+        take: 12,
+        select: { id: true, _count: { select: { tracks: true } } },
+      },
+    },
+  });
+
+  const snapshotIds: string[] = [];
+  for (const p of playlists) {
+    const withTracks = p.snapshots.find((s) => s._count.tracks > 0);
+    const chosen = withTracks ?? p.snapshots[0];
+    if (chosen?.id) snapshotIds.push(chosen.id);
+  }
+  if (snapshotIds.length === 0) return { trackIds, canonicalKeys };
+
+  const tracks = await prisma.snapshotTrack.findMany({
+    where: { snapshotId: { in: snapshotIds } },
+    select: { spotifyTrackId: true, title: true, artistsJson: true },
+  });
+  for (const t of tracks) {
+    trackIds.add(t.spotifyTrackId);
+    const c = trackCanonicalKey(t.title, t.artistsJson);
+    if (c) canonicalKeys.add(c);
+  }
+  return { trackIds, canonicalKeys };
+}
+
+export function trackMatchesMainSourceIdentities(
+  spotifyTrackId: string,
+  title: string,
+  artistsJson: string,
+  main: MainSourceTrackIdentities
+): boolean {
+  if (main.trackIds.has(spotifyTrackId)) return true;
+  const c = trackCanonicalKey(title, artistsJson);
+  return c != null && main.canonicalKeys.has(c);
+}
+
+export type PlaylistHitlistHistoryRow = {
+  id: string;
+  spotifyTrackId: string;
+  title: string;
+  artistsJson: string;
+  mainPlaylistId: string;
+  mainPlaylistName: string;
+  firstDetectedAt: Date;
+  lastSeenAt: Date;
+  removedAt: Date | null;
+  isActive: boolean;
+};
+
+/** Hitlist match history where this playlist is the matched (non-main) side. */
+export async function getHitlistHistoryForMatchedPlaylist(
+  userId: string,
+  matchedPlaylistId: string
+): Promise<PlaylistHitlistHistoryRow[]> {
+  const rows = await prisma.hitlistMatch.findMany({
+    where: { userId, matchedTrackedPlaylistId: matchedPlaylistId },
+    orderBy: [{ isActive: "desc" }, { lastSeenAt: "desc" }],
+    include: { mainPlaylist: { select: { id: true, name: true } } },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    spotifyTrackId: r.spotifyTrackId,
+    title: r.title,
+    artistsJson: r.artistsJson,
+    mainPlaylistId: r.mainPlaylist.id,
+    mainPlaylistName: r.mainPlaylist.name,
+    firstDetectedAt: r.firstDetectedAt,
+    lastSeenAt: r.lastSeenAt,
+    removedAt: r.removedAt,
+    isActive: r.isActive,
+  }));
+}
