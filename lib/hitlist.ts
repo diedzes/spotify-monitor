@@ -316,6 +316,19 @@ export type HitlistTitleRow = {
   playlistPresences: HitlistPlaylistPresence[];
 };
 
+export type HitlistRow = {
+  id: string;
+  title: string;
+  artistsJson: string;
+  spotifyTrackId: string;
+  playlistId: string;
+  playlistName: string;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  removedAt: Date | null;
+  isActive: boolean;
+};
+
 /** Playlist ids in a named group (e.g. "Owned"). */
 export async function getPlaylistIdsInNamedGroup(userId: string, groupName: string): Promise<string[]> {
   const links = await prisma.groupPlaylist.findMany({
@@ -323,6 +336,54 @@ export async function getPlaylistIdsInNamedGroup(userId: string, groupName: stri
     select: { trackedPlaylistId: true },
   });
   return links.map((l) => l.trackedPlaylistId);
+}
+
+export async function getHitlistRows(userId: string): Promise<HitlistRow[]> {
+  const rows = await prisma.hitlistMatch.findMany({
+    where: {
+      userId,
+      mainPlaylist: {
+        isPublic: true,
+        groupPlaylists: {
+          some: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
+      },
+      matchedPlaylist: {
+        isPublic: true,
+        excludeFromHitlist: false,
+        groupPlaylists: {
+          none: {
+            group: {
+              userId,
+              isMainGroup: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { firstDetectedAt: "asc" },
+    include: {
+      matchedPlaylist: { select: { id: true, name: true } },
+    },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    artistsJson: r.artistsJson,
+    spotifyTrackId: r.spotifyTrackId,
+    playlistId: r.matchedPlaylist.id,
+    playlistName: r.matchedPlaylist.name,
+    firstSeenAt: r.firstDetectedAt,
+    lastSeenAt: r.lastSeenAt,
+    removedAt: r.removedAt,
+    isActive: r.isActive,
+  }));
 }
 
 /** Remove presences on excluded playlists; drop titles with no active matches left. */

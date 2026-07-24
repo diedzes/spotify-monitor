@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { HitlistTable } from "@/components/HitlistTable";
-import { getHitlistTitleRows, getPlaylistIdsInNamedGroup } from "@/lib/hitlist";
+import { getHitlistRows, getPlaylistIdsInNamedGroup } from "@/lib/hitlist";
 import { getSessionFromSignedValue, getSessionSignedIdFromCookie, getSpotifySession } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +26,8 @@ export default async function HitlistPage({ searchParams }: Props) {
   }
   if (!session) redirect("/");
 
-  const params = await searchParams;
-  const open = typeof params.open === "string" ? params.open : null;
   const [rows, ownedPlaylistIds] = await Promise.all([
-    getHitlistTitleRows(session.user.id),
+    getHitlistRows(session.user.id),
     getPlaylistIdsInNamedGroup(session.user.id, "Owned"),
   ]);
 
@@ -43,7 +41,7 @@ export default async function HitlistPage({ searchParams }: Props) {
           <HitlistRefreshButton signedId={signedId} />
         </div>
         <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Full hitlist overview. Click a title to see per-playlist history (added and removed times).
+          Full hitlist overview. Every row is one hit on one playlist, sorted by First Seen by default.
         </p>
         {rows.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
@@ -56,23 +54,18 @@ export default async function HitlistPage({ searchParams }: Props) {
         ) : (
           <HitlistTable
             signedId={signedId}
-            initialOpenKey={open}
             ownedPlaylistIds={ownedPlaylistIds}
             rows={rows.map((r) => ({
-              key: r.key,
+              id: r.id,
               title: r.title,
               artistsJson: r.artistsJson,
               spotifyTrackId: r.spotifyTrackId,
-              firstDetectedAt: r.firstDetectedAt.toISOString(),
+              playlistId: r.playlistId,
+              playlistName: r.playlistName,
+              firstSeenAt: r.firstSeenAt.toISOString(),
               lastSeenAt: r.lastSeenAt.toISOString(),
-              activePlaylistCount: r.activePlaylistCount,
-              playlistPresences: r.playlistPresences.map((p) => ({
-                playlistId: p.playlistId,
-                playlistName: p.playlistName,
-                addedAt: p.addedAt.toISOString(),
-                removedAt: p.removedAt ? p.removedAt.toISOString() : null,
-                isActive: p.isActive,
-              })),
+              removedAt: r.removedAt ? r.removedAt.toISOString() : null,
+              isActive: r.isActive,
             }))}
           />
         )}

@@ -1,48 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatArtistsLabel, spotifyTrackHref } from "@/lib/hitlist";
 
 export type HitlistTableRow = {
-  key: string;
+  id: string;
   title: string;
   artistsJson: string;
   spotifyTrackId: string;
-  firstDetectedAt: string;
+  playlistId: string;
+  playlistName: string;
+  firstSeenAt: string;
   lastSeenAt: string;
-  activePlaylistCount: number;
-  playlistPresences: Array<{
-    playlistId: string;
-    playlistName: string;
-    addedAt: string;
-    removedAt: string | null;
-    isActive: boolean;
-  }>;
+  removedAt: string | null;
+  isActive: boolean;
 };
 
-type SortKey = "title" | "artists" | "playlistedAt" | "firstAdded" | "lastSeen";
+type SortKey = "artists" | "title" | "playlist" | "firstSeen" | "lastSeen";
 
 type Props = {
   rows: HitlistTableRow[];
   signedId: string | null;
-  initialOpenKey?: string | null;
   /** Playlists in the "Owned" group — hidden when hideOwned is on. */
   ownedPlaylistIds?: string[];
 };
 
 function filterRowsHideOwned(rows: HitlistTableRow[], ownedIds: Set<string>, hide: boolean): HitlistTableRow[] {
   if (!hide || ownedIds.size === 0) return rows;
-  return rows
-    .map((row) => {
-      const playlistPresences = row.playlistPresences.filter((p) => !ownedIds.has(p.playlistId));
-      return {
-        ...row,
-        playlistPresences,
-        activePlaylistCount: playlistPresences.filter((p) => p.isActive).length,
-      };
-    })
-    .filter((row) => row.activePlaylistCount > 0);
+  return rows.filter((row) => !ownedIds.has(row.playlistId));
 }
 
 function fmt(iso: string | null): string {
@@ -50,17 +36,52 @@ function fmt(iso: string | null): string {
   return new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlaylistIds = [] }: Props) {
-  const [sortKey, setSortKey] = useState<SortKey>("firstAdded");
-  const [sortAsc, setSortAsc] = useState(false);
-  const [openKey, setOpenKey] = useState<string | null>(initialOpenKey);
+function dateText(iso: string): string {
+  return fmt(iso).toLowerCase();
+}
+
+function matches(value: string, filter: string): boolean {
+  const q = filter.trim().toLowerCase();
+  return q.length === 0 || value.toLowerCase().includes(q);
+}
+
+export function HitlistTable({ rows, signedId, ownedPlaylistIds = [] }: Props) {
+  const [sortKey, setSortKey] = useState<SortKey>("firstSeen");
+  const [sortAsc, setSortAsc] = useState(true);
   const [hideOwned, setHideOwned] = useState(true);
+  const [onlyActive, setOnlyActive] = useState(false);
+  const [filters, setFilters] = useState<Record<SortKey, string>>({
+    artists: "",
+    title: "",
+    playlist: "",
+    firstSeen: "",
+    lastSeen: "",
+  });
 
   const ownedIds = useMemo(() => new Set(ownedPlaylistIds), [ownedPlaylistIds]);
 
   const visibleRows = useMemo(
-    () => filterRowsHideOwned(rows, ownedIds, hideOwned),
-    [rows, ownedIds, hideOwned]
+    () => {
+      let out = filterRowsHideOwned(rows, ownedIds, hideOwned);
+      if (onlyActive) out = out.filter((row) => row.isActive);
+      out = out.filter((row) => {
+        const artists = formatArtistsLabel(row.artistsJson);
+        const lastSeenText = [
+          dateText(row.lastSeenAt),
+          row.isActive ? "active" : "inactive removed niet meer actief",
+          row.removedAt ? dateText(row.removedAt) : "",
+        ].join(" ");
+        return (
+          matches(artists, filters.artists) &&
+          matches(row.title, filters.title) &&
+          matches(row.playlistName, filters.playlist) &&
+          matches(dateText(row.firstSeenAt), filters.firstSeen) &&
+          matches(lastSeenText, filters.lastSeen)
+        );
+      });
+      return out;
+    },
+    [rows, ownedIds, hideOwned, onlyActive, filters]
   );
 
   const sorted = useMemo(() => {
@@ -69,8 +90,8 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlayl
       let cmp = 0;
       if (sortKey === "title") cmp = a.title.localeCompare(b.title, "en");
       if (sortKey === "artists") cmp = formatArtistsLabel(a.artistsJson).localeCompare(formatArtistsLabel(b.artistsJson), "en");
-      if (sortKey === "playlistedAt") cmp = a.activePlaylistCount - b.activePlaylistCount;
-      if (sortKey === "firstAdded") cmp = new Date(a.firstDetectedAt).getTime() - new Date(b.firstDetectedAt).getTime();
+      if (sortKey === "playlist") cmp = a.playlistName.localeCompare(b.playlistName, "en");
+      if (sortKey === "firstSeen") cmp = new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime();
       if (sortKey === "lastSeen") cmp = new Date(a.lastSeenAt).getTime() - new Date(b.lastSeenAt).getTime();
       return sortAsc ? cmp : -cmp;
     });
@@ -81,16 +102,26 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlayl
     if (k === sortKey) setSortAsc((v) => !v);
     else {
       setSortKey(k);
-      setSortAsc(k === "title" || k === "artists");
+      setSortAsc(k === "artists" || k === "title" || k === "playlist" || k === "firstSeen");
     }
   };
 
-  const ownedHiddenCount = hideOwned && ownedIds.size > 0 ? rows.length - visibleRows.length : 0;
+  const ownedHiddenCount = hideOwned && ownedIds.size > 0 ? rows.filter((row) => ownedIds.has(row.playlistId)).length : 0;
+  const inactiveCount = rows.filter((row) => !row.isActive).length;
+  const sortMark = (k: SortKey) => (sortKey === k ? (sortAsc ? " asc" : " desc") : "");
+  const filterInput = (k: SortKey, label: string) => (
+    <input
+      value={filters[k]}
+      onChange={(e) => setFilters((prev) => ({ ...prev, [k]: e.target.value }))}
+      placeholder={label}
+      className="mt-1 w-full rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-normal text-zinc-900 placeholder:text-zinc-400 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+    />
+  );
 
   return (
     <div className="space-y-3">
-      {ownedIds.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        {ownedIds.size > 0 ? (
           <label className="inline-flex cursor-pointer items-center gap-2 text-zinc-700 dark:text-zinc-300">
             <input
               type="checkbox"
@@ -100,53 +131,59 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlayl
             />
             Hide matches on playlists in group <strong>Owned</strong>
           </label>
-          <span className="text-zinc-500 dark:text-zinc-400">
-            {visibleRows.length} title{visibleRows.length === 1 ? "" : "s"}
-            {ownedHiddenCount > 0 ? ` (${ownedHiddenCount} hidden)` : ""}
-          </span>
-        </div>
-      ) : null}
+        ) : null}
+        <label className="inline-flex cursor-pointer items-center gap-2 text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={onlyActive}
+            onChange={(e) => setOnlyActive(e.target.checked)}
+            className="rounded border-zinc-300 text-[#1DB954] focus:ring-[#1DB954] dark:border-zinc-600"
+          />
+          Alleen hits die bij de laatste check nog op de playlist stonden
+        </label>
+        <span className="text-zinc-500 dark:text-zinc-400">
+          {visibleRows.length} hit{visibleRows.length === 1 ? "" : "s"}
+          {ownedHiddenCount > 0 ? ` (${ownedHiddenCount} owned hidden)` : ""}
+          {onlyActive && inactiveCount > 0 ? ` (${inactiveCount} inactive hidden)` : ""}
+        </span>
+      </div>
     <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
-              <button type="button" onClick={() => setSort("artists")} className="hover:underline">Artists</button>
+              <button type="button" onClick={() => setSort("artists")} className="hover:underline">Artist{sortMark("artists")}</button>
+              {filterInput("artists", "Filter artist")}
             </th>
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
-              <button type="button" onClick={() => setSort("title")} className="hover:underline">Title</button>
+              <button type="button" onClick={() => setSort("title")} className="hover:underline">Title{sortMark("title")}</button>
+              {filterInput("title", "Filter title")}
             </th>
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
-              <button type="button" onClick={() => setSort("playlistedAt")} className="hover:underline">Playlisted at</button>
+              <button type="button" onClick={() => setSort("playlist")} className="hover:underline">Playlist{sortMark("playlist")}</button>
+              {filterInput("playlist", "Filter playlist")}
             </th>
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
-              <button type="button" onClick={() => setSort("firstAdded")} className="hover:underline">First added</button>
+              <button type="button" onClick={() => setSort("firstSeen")} className="hover:underline">First Seen{sortMark("firstSeen")}</button>
+              {filterInput("firstSeen", "Filter date")}
             </th>
             <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">
-              <button type="button" onClick={() => setSort("lastSeen")} className="hover:underline">Last seen</button>
+              <button type="button" onClick={() => setSort("lastSeen")} className="hover:underline">Last Seen{sortMark("lastSeen")}</button>
+              {filterInput("lastSeen", "Filter date")}
             </th>
-            <th className="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-300">Feedback</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((row) => {
-            const active = row.playlistPresences.filter((p) => p.isActive);
-            const show = active.slice(0, 3);
-            const more = active.length - show.length;
             const trackHref = spotifyTrackHref(row.spotifyTrackId);
-            const isOpen = openKey === row.key;
+            const playlistHref = signedId ? `/playlists/${row.playlistId}?sid=${encodeURIComponent(signedId)}` : `/playlists/${row.playlistId}`;
             return (
-              <Fragment key={row.key}>
-                <tr key={row.key} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
-                  <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{formatArtistsLabel(row.artistsJson)}</td>
+              <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                  <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                    {formatArtistsLabel(row.artistsJson)}
+                  </td>
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setOpenKey((k) => (k === row.key ? null : row.key))}
-                      className="text-left font-medium text-[#1DB954] hover:underline"
-                    >
-                      {row.title}
-                    </button>
+                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{row.title}</span>
                     {trackHref ? (
                       <a href={trackHref} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-zinc-500 hover:underline">
                         Spotify
@@ -154,75 +191,27 @@ export function HitlistTable({ rows, signedId, initialOpenKey = null, ownedPlayl
                     ) : null}
                   </td>
                   <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                    {show.map((p, idx) => {
-                      const href = signedId ? `/playlists/${p.playlistId}?sid=${encodeURIComponent(signedId)}` : `/playlists/${p.playlistId}`;
-                      return (
-                        <span key={p.playlistId}>
-                          {idx > 0 ? ", " : ""}
-                          <Link href={href} className="text-[#1DB954] hover:underline">{p.playlistName}</Link>
-                        </span>
-                      );
-                    })}
-                    {more > 0 ? ` +${more}` : ""}
+                    <Link href={playlistHref} className="text-[#1DB954] hover:underline">{row.playlistName}</Link>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.firstDetectedAt)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.lastSeenAt)}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <div className="flex flex-col gap-1">
-                      <Link
-                        href={`/feedback/new?trackId=${encodeURIComponent(row.spotifyTrackId)}${signedId ? `&sid=${encodeURIComponent(signedId)}` : ""}`}
-                        className="text-xs text-[#1DB954] hover:underline"
-                      >
-                        Add feedback
-                      </Link>
-                      <Link
-                        href={`/feedback/track/${encodeURIComponent(row.spotifyTrackId)}/report${signedId ? `?sid=${encodeURIComponent(signedId)}` : ""}`}
-                        className="text-xs text-zinc-600 hover:underline dark:text-zinc-400"
-                      >
-                        Client report
-                      </Link>
-                    </div>
+                  <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmt(row.firstSeenAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                    <div>{fmt(row.lastSeenAt)}</div>
+                    {!row.isActive ? (
+                      <div className="text-xs text-amber-700 dark:text-amber-300">
+                        Niet meer actief{row.removedAt ? ` sinds ${fmt(row.removedAt)}` : ""}
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
-                {isOpen ? (
-                  <tr className="border-b border-zinc-100 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-900/50">
-                    <td colSpan={6} className="px-3 py-3">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Playlist history for this title
-                      </div>
-                      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-700">
-                        <table className="w-full min-w-[760px] text-xs">
-                          <thead>
-                            <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                              <th className="px-2 py-1.5 text-left">Playlist</th>
-                              <th className="px-2 py-1.5 text-left">Added at</th>
-                              <th className="px-2 py-1.5 text-left">Removed at</th>
-                              <th className="px-2 py-1.5 text-left">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {row.playlistPresences.map((p) => {
-                              const href = signedId ? `/playlists/${p.playlistId}?sid=${encodeURIComponent(signedId)}` : `/playlists/${p.playlistId}`;
-                              return (
-                                <tr key={p.playlistId} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
-                                  <td className="px-2 py-1.5">
-                                    <Link href={href} className="text-[#1DB954] hover:underline">{p.playlistName}</Link>
-                                  </td>
-                                  <td className="px-2 py-1.5">{fmt(p.addedAt)}</td>
-                                  <td className="px-2 py-1.5">{fmt(p.removedAt)}</td>
-                                  <td className="px-2 py-1.5">{p.isActive ? "Active" : "Removed"}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
             );
           })}
+          {sorted.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-3 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                Geen hits gevonden met deze filters.
+              </td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </div>
