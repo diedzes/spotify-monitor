@@ -156,6 +156,36 @@ model FeedbackEntryTrack {
   @@map("feedback_entry_tracks")
 }
 
+model ClientReportExport {
+  id             String                   @id @default(cuid())
+  userId         String
+  spotifyTrackId String
+  title          String
+  artistsJson    String
+  headerText     String
+  introText      String
+  createdAt      DateTime                 @default(now())
+  items          ClientReportExportItem[]
+
+  @@index([userId, spotifyTrackId, createdAt])
+  @@map("client_report_exports")
+}
+
+model ClientReportExportItem {
+  id           String             @id @default(cuid())
+  exportId     String
+  itemType     String
+  itemId       String
+  label        String
+  snapshotJson Json?
+  createdAt    DateTime           @default(now())
+  export       ClientReportExport @relation(fields: [exportId], references: [id], onDelete: Cascade)
+
+  @@unique([exportId, itemType, itemId])
+  @@index([itemType, itemId])
+  @@map("client_report_export_items")
+}
+
 model TrackedPlaylist {
   id                String             @id @default(cuid())
   userId            String             // Spotify user id uit sessie

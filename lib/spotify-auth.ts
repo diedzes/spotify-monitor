@@ -78,6 +78,41 @@ export interface TokenResponse {
   scope?: string;
 }
 
+type SpotifyTokenErrorBody = {
+  error?: string;
+  error_description?: string;
+};
+
+export class SpotifyTokenRefreshError extends Error {
+  status: number;
+  spotifyError?: string;
+  spotifyErrorDescription?: string;
+
+  constructor(status: number, bodyText: string, body?: SpotifyTokenErrorBody) {
+    const spotifyError = body?.error;
+    const spotifyErrorDescription = body?.error_description;
+    const details = spotifyErrorDescription ?? spotifyError ?? bodyText;
+    super(`Spotify refresh ${status}: ${details}`);
+    this.name = "SpotifyTokenRefreshError";
+    this.status = status;
+    this.spotifyError = spotifyError;
+    this.spotifyErrorDescription = spotifyErrorDescription;
+  }
+}
+
+function parseSpotifyTokenError(text: string): SpotifyTokenErrorBody | undefined {
+  try {
+    const parsed = JSON.parse(text) as SpotifyTokenErrorBody;
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function isInvalidGrantError(err: unknown): boolean {
+  return err instanceof SpotifyTokenRefreshError && err.spotifyError === "invalid_grant";
+}
+
 export async function exchangeCodeForTokens(code: string): Promise<TokenResponse> {
   const clientId = process.env.AUTH_SPOTIFY_ID ?? process.env.SPOTIFY_CLIENT_ID ?? "";
   const clientSecret = process.env.AUTH_SPOTIFY_SECRET ?? process.env.SPOTIFY_CLIENT_SECRET ?? "";
@@ -127,7 +162,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
   const text = await res.text();
   if (!res.ok) {
     console.error("[Spotify refresh token]", res.status, text);
-    throw new Error(`Spotify refresh ${res.status}: ${text}`);
+    throw new SpotifyTokenRefreshError(res.status, text, parseSpotifyTokenError(text));
   }
   return JSON.parse(text) as TokenResponse;
 }
@@ -198,7 +233,17 @@ export async function getSessionFromSignedValue(signedValue: string): Promise<Sp
       refresh_token: tokens.refresh_token ?? row.refreshToken,
       expires_at: Math.floor(expiresAt.getTime() / 1000),
     };
-  } catch {
+  } catch (err) {
+    if (isInvalidGrantError(err)) {
+      await prisma.session.updateMany({
+        where: {
+          userId: row.userId,
+          createdAt: { lte: row.createdAt },
+          refreshToken: { not: null },
+        },
+        data: { refreshToken: null },
+      });
+    }
     return null;
   }
 }
@@ -244,6 +289,7 @@ export async function getValidSessionFromRow(row: {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date;
+  createdAt: Date;
 }): Promise<SpotifySession | null> {
   const now = new Date();
   const bufferMs = 5 * 60 * 1000;
@@ -274,7 +320,17 @@ export async function getValidSessionFromRow(row: {
       refresh_token: tokens.refresh_token ?? row.refreshToken,
       expires_at: Math.floor(expiresAt.getTime() / 1000),
     };
-  } catch {
+  } catch (err) {
+    if (isInvalidGrantError(err)) {
+      await prisma.session.updateMany({
+        where: {
+          userId: row.userId,
+          createdAt: { lte: row.createdAt },
+          refreshToken: { not: null },
+        },
+        data: { refreshToken: null },
+      });
+    }
     return null;
   }
 }

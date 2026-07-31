@@ -3,6 +3,7 @@ import { formatArtistsLabel, trackCanonicalKey } from "@/lib/hitlist";
 import { getTrackFeedback } from "@/lib/feedback";
 import { getMainSourcePlaylistIds } from "@/lib/main-playlist-group";
 import { fetchTrackMetadata } from "@/lib/spotify-api";
+import type { Prisma } from "@prisma/client";
 
 export type TrackPlaylistPresenceRow = {
   playlistId: string;
@@ -53,6 +54,43 @@ export type TrackClientReportData = {
   playlists: TrackPlaylistPresenceRow[];
   feedback: TrackFeedbackReportRow[];
   generatedAt: Date;
+};
+
+export type ClientReportItemType = "feedback" | "playlist";
+
+export type ClientReportSentItemSummary = {
+  itemType: ClientReportItemType;
+  itemId: string;
+  firstSentAt: Date;
+  lastSentAt: Date;
+  sentCount: number;
+};
+
+export type ClientReportHistoryExport = {
+  id: string;
+  headerText: string;
+  introText: string;
+  createdAt: Date;
+  items: Array<{
+    id: string;
+    itemType: ClientReportItemType;
+    itemId: string;
+    label: string;
+  }>;
+};
+
+export type TrackClientReportComposerData = TrackClientReportData & {
+  defaultHeaderText: string;
+  defaultIntroText: string;
+  history: ClientReportHistoryExport[];
+  sentItems: ClientReportSentItemSummary[];
+};
+
+export type CreateClientReportExportInput = {
+  spotifyTrackId: string;
+  headerText: string;
+  introText: string;
+  items: Array<{ itemType: ClientReportItemType; itemId: string }>;
 };
 
 function spotifyPlaylistHref(spotifyPlaylistId: string): string {
@@ -253,7 +291,7 @@ export async function getTrackClientReportData(
     return b.feedbackAt.getTime() - a.feedbackAt.getTime();
   });
 
-  let spotifyUrl: string | null = resolvedSpotifyUrl;
+  const spotifyUrl: string | null = resolvedSpotifyUrl;
   let trackImageUrl: string | null = null;
 
   if (accessToken && spotifyTrackId && !spotifyTrackId.startsWith("local-")) {
@@ -275,6 +313,186 @@ export async function getTrackClientReportData(
     playlists: playlistsNoMain,
     feedback,
     generatedAt: new Date(),
+  };
+}
+
+function defaultHeaderText(): string {
+  return "Sport Sounds / Shoot Client Report";
+}
+
+function defaultIntroText(data: Pick<TrackClientReportData, "title" | "artistsLabel">): string {
+  return `This report highlights recent playlist traction and feedback for "${data.title}" by ${data.artistsLabel}.`;
+}
+
+function parseItemType(value: string): ClientReportItemType | null {
+  return value === "feedback" || value === "playlist" ? value : null;
+}
+
+export async function getTrackClientReportComposerData(
+  userId: string,
+  spotifyTrackId: string,
+  accessToken?: string
+): Promise<TrackClientReportComposerData | null> {
+  const data = await getTrackClientReportData(userId, spotifyTrackId, accessToken);
+  if (!data) return null;
+
+  const exports = await prisma.clientReportExport.findMany({
+    where: { userId, spotifyTrackId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      items: { orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  const sent = new Map<string, ClientReportSentItemSummary>();
+  for (const ex of exports) {
+    for (const item of ex.items) {
+      const itemType = parseItemType(item.itemType);
+      if (!itemType) continue;
+      const key = `${itemType}:${item.itemId}`;
+      const existing = sent.get(key);
+      if (!existing) {
+        sent.set(key, {
+          itemType,
+          itemId: item.itemId,
+          firstSentAt: ex.createdAt,
+          lastSentAt: ex.createdAt,
+          sentCount: 1,
+        });
+      } else {
+        if (ex.createdAt < existing.firstSentAt) existing.firstSentAt = ex.createdAt;
+        if (ex.createdAt > existing.lastSentAt) existing.lastSentAt = ex.createdAt;
+        existing.sentCount += 1;
+      }
+    }
+  }
+
+  return {
+    ...data,
+    defaultHeaderText: exports[0]?.headerText || defaultHeaderText(),
+    defaultIntroText: exports[0]?.introText || defaultIntroText(data),
+    history: exports.map((ex) => ({
+      id: ex.id,
+      headerText: ex.headerText,
+      introText: ex.introText,
+      createdAt: ex.createdAt,
+      items: ex.items
+        .map((item) => {
+          const itemType = parseItemType(item.itemType);
+          if (!itemType) return null;
+          return {
+            id: item.id,
+            itemType,
+            itemId: item.itemId,
+            label: item.label,
+          };
+        })
+        .filter((item): item is ClientReportHistoryExport["items"][number] => item != null),
+    })),
+    sentItems: Array.from(sent.values()),
+  };
+}
+
+function feedbackLabel(item: TrackFeedbackReportRow): string {
+  const kind = item.entryKind === "sync" ? "Media sync" : item.entryKind === "play" ? "Stadium play" : "Feedback";
+  const contact = item.contact?.fullName ?? item.contact?.organizationName ?? "No contact";
+  return `${kind}: ${contact} (${item.feedbackAt.toLocaleDateString("en-GB")})`;
+}
+
+function playlistLabel(item: TrackPlaylistPresenceRow): string {
+  return `Playlist: ${item.playlistName}`;
+}
+
+export async function createTrackClientReportExport(
+  userId: string,
+  input: CreateClientReportExportInput,
+  accessToken?: string
+): Promise<ClientReportHistoryExport> {
+  const data = await getTrackClientReportData(userId, input.spotifyTrackId, accessToken);
+  if (!data) throw new Error("No data for this track");
+
+  const feedbackById = new Map(data.feedback.map((item) => [item.id, item]));
+  const playlistById = new Map(data.playlists.map((item) => [item.playlistId, item]));
+  const seenKeys = new Set<string>();
+  const items: Array<{
+    itemType: ClientReportItemType;
+    itemId: string;
+    label: string;
+    snapshotJson: Prisma.InputJsonValue;
+  }> = [];
+
+  for (const raw of input.items) {
+    const itemType = parseItemType(raw.itemType);
+    if (!itemType) continue;
+    const key = `${itemType}:${raw.itemId}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    if (itemType === "feedback") {
+      const item = feedbackById.get(raw.itemId);
+      if (!item) continue;
+      items.push({
+        itemType,
+        itemId: item.id,
+        label: feedbackLabel(item),
+        snapshotJson: {
+          feedbackText: item.feedbackText,
+          feedbackAt: item.feedbackAt.toISOString(),
+          entryKind: item.entryKind,
+          contact: item.contact,
+          evidenceUrl: item.evidenceUrl,
+        },
+      });
+    } else {
+      const item = playlistById.get(raw.itemId);
+      if (!item) continue;
+      items.push({
+        itemType,
+        itemId: item.playlistId,
+        label: playlistLabel(item),
+        snapshotJson: {
+          playlistName: item.playlistName,
+          ownerName: item.ownerName,
+          firstSeenAt: item.firstSeenAt.toISOString(),
+          spotifyPlaylistId: item.spotifyPlaylistId,
+        },
+      });
+    }
+  }
+
+  const headerText = input.headerText.trim() || defaultHeaderText();
+  const introText = input.introText.trim() || defaultIntroText(data);
+  const created = await prisma.clientReportExport.create({
+    data: {
+      userId,
+      spotifyTrackId: input.spotifyTrackId,
+      title: data.title,
+      artistsJson: data.artistsJson,
+      headerText,
+      introText,
+      items: {
+        create: items.map((item) => ({
+          itemType: item.itemType,
+          itemId: item.itemId,
+          label: item.label,
+          snapshotJson: item.snapshotJson,
+        })),
+      },
+    },
+    include: { items: { orderBy: { createdAt: "asc" } } },
+  });
+
+  return {
+    id: created.id,
+    headerText: created.headerText,
+    introText: created.introText,
+    createdAt: created.createdAt,
+    items: created.items.map((item) => ({
+      id: item.id,
+      itemType: item.itemType as ClientReportItemType,
+      itemId: item.itemId,
+      label: item.label,
+    })),
   };
 }
 

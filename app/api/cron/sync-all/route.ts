@@ -68,6 +68,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
       accessToken: true,
       refreshToken: true,
       expiresAt: true,
+      createdAt: true,
     },
   });
 
@@ -89,7 +90,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     const session = await getValidSessionFromRow(row);
     if (!session) {
       usersSkipped++;
-      perUser.push({ userId: row.userId, synced: 0, failed: 0, error: "No valid session (refresh failed?)" });
+      perUser.push({ userId: row.userId, synced: 0, failed: 0, error: "Reauthorization required" });
       continue;
     }
 
