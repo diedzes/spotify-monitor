@@ -458,3 +458,16 @@ model ReportResult {
 
   @@map("report_results")
 }
+
+model PromoTrack {
+  id             String   @id @default(cuid())
+  userId         String
+  label          String   // bijv. "Jungle - The Wave"
+  fatdropUrl     String
+  spotifyTrackId String?  // optionele koppeling aan bestaand track
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@map("promo_tracks")
+}
