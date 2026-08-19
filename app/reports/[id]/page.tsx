@@ -91,6 +91,7 @@ export default function ReportDetailPage() {
   const [exportingPlaylist, setExportingPlaylist] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [updatingSourceId, setUpdatingSourceId] = useState<string | null>(null);
+  const [promoByTrackId, setPromoByTrackId] = useState<Record<string, string>>({});
 
   const loadReport = () => {
     setError(null);
@@ -133,6 +134,25 @@ export default function ReportDetailPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Laad FatDrop-links zodra er resultaat-rows zijn
+  useEffect(() => {
+    if (!report?.latestResult) return;
+    const rows: ChartRow[] = JSON.parse(report.latestResult.rowsJson);
+    const ids = rows.map((r) => r.spotifyTrackId).filter(Boolean).join(",");
+    if (!ids) return;
+    fetch(`/api/promo-tracks/link?spotifyTrackIds=${encodeURIComponent(ids)}`, {
+      credentials: "include",
+      headers: getSessionHeaders(),
+    })
+      .then((r) => r.json())
+      .then((d: { map?: Record<string, { fatdropUrl: string }> }) => {
+        const flat: Record<string, string> = {};
+        for (const [tid, val] of Object.entries(d.map ?? {})) flat[tid] = val.fatdropUrl;
+        setPromoByTrackId(flat);
+      })
+      .catch(() => {});
+  }, [report?.latestResult?.id]);
 
   const handleAddSource = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -843,7 +863,8 @@ export default function ReportDetailPage() {
                       <th className="pb-2 pr-2">Titel</th>
                       <th className="pb-2 pr-2">Score</th>
                       <th className="pb-2 pr-2">Occurrences</th>
-                      <th className="pb-2">Spotify</th>
+                      <th className="pb-2 pr-2">Spotify</th>
+                      <th className="pb-2">FatDrop</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -886,7 +907,7 @@ export default function ReportDetailPage() {
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.title}</td>
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.score.toFixed(3)}</td>
                         <td className="py-2 pr-2 text-zinc-700 dark:text-zinc-300">{row.occurrences}</td>
-                        <td className="py-2">
+                        <td className="py-2 pr-2">
                           <a
                             href={row.spotifyUrl}
                             target="_blank"
@@ -895,6 +916,20 @@ export default function ReportDetailPage() {
                           >
                             Open
                           </a>
+                        </td>
+                        <td className="py-2">
+                          {promoByTrackId[row.spotifyTrackId] ? (
+                            <a
+                              href={promoByTrackId[row.spotifyTrackId]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/70"
+                            >
+                              FatDrop
+                            </a>
+                          ) : (
+                            <span className="text-zinc-300 dark:text-zinc-600">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

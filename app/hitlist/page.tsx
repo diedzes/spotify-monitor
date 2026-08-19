@@ -4,6 +4,7 @@ import { HitlistRefreshButton } from "@/components/HitlistRefreshButton";
 import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { HitlistTable } from "@/components/HitlistTable";
 import { getHitlistRows, getPlaylistIdsInNamedGroup } from "@/lib/hitlist";
+import { getPromoUrlsBySpotifyIds } from "@/lib/promo-tracks";
 import { getSessionFromSignedValue, getSessionSignedIdFromCookie, getSpotifySession } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ export default async function HitlistPage({ searchParams }: Props) {
     getPlaylistIdsInNamedGroup(session.user.id, "Owned"),
   ]);
 
+  const spotifyTrackIds = rows.map((r) => r.spotifyTrackId).filter(Boolean);
+  const promoByTrackId = await getPromoUrlsBySpotifyIds(session.user.id, spotifyTrackIds);
+
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
       <StoreSessionFromUrl />
@@ -55,6 +59,7 @@ export default async function HitlistPage({ searchParams }: Props) {
           <HitlistTable
             signedId={signedId}
             ownedPlaylistIds={ownedPlaylistIds}
+            promoByTrackId={promoByTrackId}
             rows={rows.map((r) => ({
               id: r.id,
               title: r.title,

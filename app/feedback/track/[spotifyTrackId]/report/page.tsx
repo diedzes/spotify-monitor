@@ -3,6 +3,7 @@ import { StoreSessionFromUrl } from "@/components/StoreSessionFromUrl";
 import { TrackClientReportComposer } from "@/components/TrackClientReportComposer";
 import { getTrackClientReportComposerData } from "@/lib/track-client-report";
 import { getSessionFromSignedValue, getSpotifySession } from "@/lib/spotify-auth";
+import { getPromoUrlsBySpotifyIds } from "@/lib/promo-tracks";
 import type { Metadata } from "next";
 
 type Props = {
@@ -25,9 +26,13 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
   const { spotifyTrackId: rawId } = await params;
   const spotifyTrackId = decodeURIComponent(rawId);
 
-  const data = await getTrackClientReportComposerData(session.user.id, spotifyTrackId, session.access_token);
+  const [data, promoMap] = await Promise.all([
+    getTrackClientReportComposerData(session.user.id, spotifyTrackId, session.access_token),
+    getPromoUrlsBySpotifyIds(session.user.id, [spotifyTrackId]),
+  ]);
   if (!data) notFound();
 
+  const fatdropUrl = promoMap[spotifyTrackId] ?? null;
   const backHref = qp.sid ? `/feedback?sid=${encodeURIComponent(qp.sid)}` : "/feedback";
 
   return (
@@ -37,6 +42,7 @@ export default async function TrackClientReportPage({ params, searchParams }: Pr
         backHref={backHref}
         data={{
           ...data,
+          fatdropUrl,
           generatedAt: data.generatedAt.toISOString(),
           playlists: data.playlists.map((p) => ({
             ...p,

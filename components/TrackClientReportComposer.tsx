@@ -69,6 +69,7 @@ type ComposerData = {
   title: string;
   artistsLabel: string;
   spotifyUrl: string | null;
+  fatdropUrl?: string | null;
   trackImageUrl: string | null;
   playlists: PlaylistRow[];
   feedback: FeedbackRow[];
@@ -316,6 +317,11 @@ export function TrackClientReportComposer({ backHref, data }: Props) {
             {data.spotifyUrl ? (
               <a href={data.spotifyUrl} target="_blank" rel="noopener noreferrer" className="text-[#1DB954] hover:underline">
                 Open on Spotify
+              </a>
+            ) : null}
+            {data.fatdropUrl ? (
+              <a href={data.fatdropUrl} target="_blank" rel="noopener noreferrer" className="rounded bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-200">
+                FatDrop
               </a>
             ) : null}
           </div>

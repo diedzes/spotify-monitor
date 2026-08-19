@@ -24,6 +24,8 @@ type Props = {
   signedId: string | null;
   /** Playlists in the "Owned" group — hidden when hideOwned is on. */
   ownedPlaylistIds?: string[];
+  /** Mapping van spotifyTrackId → fatdropUrl voor tracks met een FatDrop-link. */
+  promoByTrackId?: Record<string, string>;
 };
 
 function filterRowsHideOwned(rows: HitlistTableRow[], ownedIds: Set<string>, hide: boolean): HitlistTableRow[] {
@@ -45,7 +47,7 @@ function matches(value: string, filter: string): boolean {
   return q.length === 0 || value.toLowerCase().includes(q);
 }
 
-export function HitlistTable({ rows, signedId, ownedPlaylistIds = [] }: Props) {
+export function HitlistTable({ rows, signedId, ownedPlaylistIds = [], promoByTrackId = {} }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("firstSeen");
   const [sortAsc, setSortAsc] = useState(true);
   const [hideOwned, setHideOwned] = useState(true);
@@ -176,6 +178,7 @@ export function HitlistTable({ rows, signedId, ownedPlaylistIds = [] }: Props) {
         <tbody>
           {sorted.map((row) => {
             const trackHref = spotifyTrackHref(row.spotifyTrackId);
+            const fatdropUrl = promoByTrackId[row.spotifyTrackId];
             const playlistHref = signedId ? `/playlists/${row.playlistId}?sid=${encodeURIComponent(signedId)}` : `/playlists/${row.playlistId}`;
             return (
               <tr key={row.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
@@ -187,6 +190,11 @@ export function HitlistTable({ rows, signedId, ownedPlaylistIds = [] }: Props) {
                     {trackHref ? (
                       <a href={trackHref} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-zinc-500 hover:underline">
                         Spotify
+                      </a>
+                    ) : null}
+                    {fatdropUrl ? (
+                      <a href={fatdropUrl} target="_blank" rel="noopener noreferrer" className="ml-2 rounded bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/70">
+                        FatDrop
                       </a>
                     ) : null}
                   </td>
