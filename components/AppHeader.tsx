@@ -9,6 +9,7 @@ const navItems = [
   { href: "/feedback", label: "Feedback" },
   { href: "/contacts", label: "Contacts" },
   { href: "/mail-drafter", label: "Mail Drafter" },
+  { href: "/fatdrop", label: "FatDrop" },
   { href: "/playlists", label: "Playlists" },
   { href: "/groups", label: "Groups" },
   { href: "/reports", label: "Reports" },
