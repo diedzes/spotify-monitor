@@ -31,6 +31,15 @@ export async function GET(request: Request) {
           include: { group: { select: { id: true, name: true, color: true, isMainGroup: true } } },
         })
       : [];
+    const curatorLinks = playlistIds.length
+      ? await prisma.contactPlaylist.findMany({
+          where: {
+            trackedPlaylistId: { in: playlistIds },
+            contact: { userId: session.user.id },
+          },
+          include: { contact: { select: { id: true, fullName: true } } },
+        })
+      : [];
     const groupsByPlaylistId = new Map<string, Array<{ id: string; name: string; color: string; isMainGroup: boolean }>>();
     for (const link of groupLinks) {
       const list = groupsByPlaylistId.get(link.trackedPlaylistId) ?? [];
@@ -41,6 +50,12 @@ export async function GET(request: Request) {
         isMainGroup: link.group.isMainGroup,
       });
       groupsByPlaylistId.set(link.trackedPlaylistId, list);
+    }
+    const curatorsByPlaylistId = new Map<string, Array<{ id: string; fullName: string }>>();
+    for (const link of curatorLinks) {
+      const list = curatorsByPlaylistId.get(link.trackedPlaylistId) ?? [];
+      list.push({ id: link.contact.id, fullName: link.contact.fullName });
+      curatorsByPlaylistId.set(link.trackedPlaylistId, list);
     }
     return NextResponse.json({
       user: session.user,
@@ -58,6 +73,7 @@ export async function GET(request: Request) {
         inHitlistMainGroup: mainPlaylistIds.has(p.id),
         excludeFromHitlist: p.excludeFromHitlist,
         groups: groupsByPlaylistId.get(p.id) ?? [],
+        curators: curatorsByPlaylistId.get(p.id) ?? [],
       })),
     });
   }

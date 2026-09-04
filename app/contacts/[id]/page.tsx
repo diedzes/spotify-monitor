@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ContactStatusBadge } from "@/components/ContactStatusBadge";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
+import { ContactCuratedPlaylists, type CuratedPlaylistOption } from "@/components/ContactCuratedPlaylists";
 import { CONTACT_STATUSES, CONTACT_STATUS_LABELS, type ContactStatus } from "@/lib/contact-status";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
@@ -39,6 +40,7 @@ type ContactDetail = {
   source: string | null;
   createdAt: string;
   updatedAt: string;
+  curatedPlaylists?: CuratedPlaylistOption[];
 };
 
 type OrgOption = { id: string; name: string };
@@ -302,6 +304,13 @@ export default function ContactDetailPage() {
             </div>
           )}
         </section>
+
+        <ContactCuratedPlaylists
+          contactId={contact.id}
+          playlists={contact.curatedPlaylists ?? []}
+          sessionHeaders={getSessionHeaders()}
+          onChange={(curatedPlaylists) => setContact({ ...contact, curatedPlaylists })}
+        />
       </main>
     </div>
   );

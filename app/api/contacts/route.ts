@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createContact, getContacts, getRecentContacts } from "@/lib/contacts";
+import { createContact, getContacts, getRecentContacts, toContactApi } from "@/lib/contacts";
 import { parseContactStatus } from "@/lib/contact-status";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
@@ -23,21 +23,7 @@ export async function GET(request: Request) {
     : await getContacts(session.user.id, { query, organizationId, contactStatus, limit });
 
   return NextResponse.json({
-    contacts: contacts.map((c) => ({
-      id: c.id,
-      fullName: c.fullName,
-      organizationId: c.organizationId,
-      organizationName: c.organization?.name ?? c.organizationNameSnapshot ?? null,
-      organizationNameSnapshot: c.organizationNameSnapshot,
-      email: c.email,
-      phone: c.phone,
-      role: c.role,
-      contactStatus: c.contactStatus,
-      notes: c.notes,
-      source: c.source,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-    })),
+    contacts: contacts.map(toContactApi),
   });
 }
 
@@ -76,21 +62,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({
       ok: true,
-      contact: {
-        id: contact.id,
-        fullName: contact.fullName,
-        organizationId: contact.organizationId,
-        organizationName: contact.organization?.name ?? contact.organizationNameSnapshot ?? null,
-        organizationNameSnapshot: contact.organizationNameSnapshot,
-        email: contact.email,
-        phone: contact.phone,
-        role: contact.role,
-        contactStatus: contact.contactStatus,
-        notes: contact.notes,
-        source: contact.source,
-        createdAt: contact.createdAt.toISOString(),
-        updatedAt: contact.updatedAt.toISOString(),
-      },
+      contact: toContactApi(contact),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not create contact";

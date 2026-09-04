@@ -1,6 +1,35 @@
 import { prisma } from "@/lib/db";
 import { parseContactStatus, type ContactStatus } from "@/lib/contact-status";
 
+export type CuratedPlaylistSummary = {
+  id: string;
+  name: string;
+  ownerName: string;
+  imageUrl: string | null;
+};
+
+const curatedPlaylistInclude = {
+  curatedPlaylists: {
+    orderBy: { createdAt: "desc" as const },
+    include: {
+      trackedPlaylist: {
+        select: {
+          id: true,
+          name: true,
+          ownerName: true,
+          imageUrl: true,
+        },
+      },
+    },
+  },
+};
+
+function mapCuratedPlaylists(
+  links: Array<{ trackedPlaylist: CuratedPlaylistSummary }>
+): CuratedPlaylistSummary[] {
+  return links.map((l) => l.trackedPlaylist);
+}
+
 type OrganizationInput = {
   name: string;
   type?: string | null;
@@ -143,7 +172,7 @@ export async function createContact(userId: string, data: ContactInput) {
       notes: cleanString(data.notes),
       source: cleanString(data.source),
     },
-    include: { organization: true },
+    include: { organization: true, ...curatedPlaylistInclude },
   });
 }
 
@@ -185,11 +214,16 @@ export async function updateContact(userId: string, contactId: string, data: Con
     patch.organizationNameSnapshot = null;
   }
 
-  if (Object.keys(patch).length === 0) return existing;
+  if (Object.keys(patch).length === 0) {
+    return prisma.contact.findFirstOrThrow({
+      where: { id: contactId },
+      include: { organization: true, ...curatedPlaylistInclude },
+    });
+  }
   return prisma.contact.update({
     where: { id: contactId },
     data: patch,
-    include: { organization: true },
+    include: { organization: true, ...curatedPlaylistInclude },
   });
 }
 
@@ -207,21 +241,58 @@ export async function getContacts(userId: string, query?: ContactQuery) {
               { fullName: { contains: q, mode: "insensitive" } },
               { organizationNameSnapshot: { contains: q, mode: "insensitive" } },
               { email: { contains: q.toLowerCase(), mode: "insensitive" } },
+              { curatedPlaylists: { some: { trackedPlaylist: { name: { contains: q, mode: "insensitive" } } } } },
             ],
           }
         : {}),
     },
     orderBy: [{ updatedAt: "desc" }, { fullName: "asc" }],
     take: limit,
-    include: { organization: true },
+    include: { organization: true, ...curatedPlaylistInclude },
   });
 }
 
 export async function getContactById(userId: string, contactId: string) {
   return prisma.contact.findFirst({
     where: { id: contactId, userId },
-    include: { organization: true },
+    include: { organization: true, ...curatedPlaylistInclude },
   });
+}
+
+export function curatedPlaylistsOf(
+  contact: { curatedPlaylists?: Array<{ trackedPlaylist: CuratedPlaylistSummary }> }
+): CuratedPlaylistSummary[] {
+  return mapCuratedPlaylists(contact.curatedPlaylists ?? []);
+}
+
+export async function linkContactToPlaylist(userId: string, contactId: string, trackedPlaylistId: string) {
+  const [contact, playlist] = await Promise.all([
+    prisma.contact.findFirst({ where: { id: contactId, userId }, select: { id: true } }),
+    prisma.trackedPlaylist.findFirst({ where: { id: trackedPlaylistId, userId }, select: { id: true } }),
+  ]);
+  if (!contact) throw new Error("Contact not found");
+  if (!playlist) throw new Error("Playlist not found");
+
+  await prisma.contactPlaylist.upsert({
+    where: {
+      contactId_trackedPlaylistId: { contactId, trackedPlaylistId },
+    },
+    create: { contactId, trackedPlaylistId },
+    update: {},
+  });
+
+  return getContactById(userId, contactId);
+}
+
+export async function unlinkContactFromPlaylist(userId: string, contactId: string, trackedPlaylistId: string) {
+  const contact = await prisma.contact.findFirst({ where: { id: contactId, userId }, select: { id: true } });
+  if (!contact) throw new Error("Contact not found");
+
+  await prisma.contactPlaylist.deleteMany({
+    where: { contactId, trackedPlaylistId },
+  });
+
+  return getContactById(userId, contactId);
 }
 
 export async function searchContacts(userId: string, query: string) {
@@ -270,4 +341,40 @@ export function contactMatchKey(input: { fullName?: string | null; organizationN
   if (!name) return null;
   const org = cleanString(input.organizationName)?.toLowerCase() ?? "";
   return `${name}\u0000${org}`;
+}
+
+type ContactWithOrgAndPlaylists = {
+  id: string;
+  fullName: string;
+  organizationId: string | null;
+  organizationNameSnapshot: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  contactStatus: ContactStatus | null;
+  notes: string | null;
+  source: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  organization?: { name: string } | null;
+  curatedPlaylists?: Array<{ trackedPlaylist: CuratedPlaylistSummary }>;
+};
+
+export function toContactApi(contact: ContactWithOrgAndPlaylists) {
+  return {
+    id: contact.id,
+    fullName: contact.fullName,
+    organizationId: contact.organizationId,
+    organizationName: contact.organization?.name ?? contact.organizationNameSnapshot ?? null,
+    organizationNameSnapshot: contact.organizationNameSnapshot,
+    email: contact.email,
+    phone: contact.phone,
+    role: contact.role,
+    contactStatus: contact.contactStatus,
+    notes: contact.notes,
+    source: contact.source,
+    createdAt: contact.createdAt.toISOString(),
+    updatedAt: contact.updatedAt.toISOString(),
+    curatedPlaylists: curatedPlaylistsOf(contact),
+  };
 }

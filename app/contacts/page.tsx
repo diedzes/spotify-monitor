@@ -30,6 +30,8 @@ function getSessionHeaders(): HeadersInit {
   return h;
 }
 
+type CuratedPlaylistRow = { id: string; name: string };
+
 type ContactRow = {
   id: string;
   fullName: string;
@@ -40,6 +42,7 @@ type ContactRow = {
   contactStatus: ContactStatus | null;
   createdAt: string;
   updatedAt: string;
+  curatedPlaylists?: CuratedPlaylistRow[];
 };
 
 type SortOption =
@@ -70,7 +73,8 @@ function filterAndSort(
         c.fullName.toLowerCase().includes(q) ||
         (c.organizationName?.toLowerCase().includes(q) ?? false) ||
         (c.email?.toLowerCase().includes(q) ?? false) ||
-        (c.role?.toLowerCase().includes(q) ?? false)
+        (c.role?.toLowerCase().includes(q) ?? false) ||
+        (c.curatedPlaylists?.some((p) => p.name.toLowerCase().includes(q)) ?? false)
     );
   }
   if (filterStatus === "unset") {
@@ -266,7 +270,7 @@ export default function ContactsPage() {
         <div className="mb-4 space-y-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <input
             type="search"
-            placeholder="Search name, organization, email, or role…"
+            placeholder="Search name, organization, email, role, or playlist…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -384,12 +388,13 @@ export default function ContactsPage() {
         ) : null}
 
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <table className="w-full min-w-[980px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-700">
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Name</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Status</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Organization</th>
+                <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Playlists</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Email</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Phone</th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Role</th>
@@ -399,13 +404,13 @@ export default function ContactsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Loading…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     {hasFilters ? "No contacts match your filters." : "No contacts yet."}
                   </td>
                 </tr>
@@ -439,6 +444,19 @@ export default function ContactsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{c.organizationName ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      {(c.curatedPlaylists ?? []).length === 0 ? (
+                        "—"
+                      ) : (
+                        <span className="flex flex-wrap gap-x-2 gap-y-1">
+                          {(c.curatedPlaylists ?? []).map((p) => (
+                            <Link key={p.id} href={`/playlists/${p.id}`} className="text-[#1DB954] hover:underline">
+                              {p.name}
+                            </Link>
+                          ))}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{c.email ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{c.phone ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{c.role ?? "—"}</td>

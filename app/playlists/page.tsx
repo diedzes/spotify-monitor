@@ -39,6 +39,7 @@ type PlaylistRow = {
   inHitlistMainGroup: boolean;
   excludeFromHitlist: boolean;
   groups: Array<{ id: string; name: string; color: string; isMainGroup: boolean }>;
+  curators?: Array<{ id: string; fullName: string }>;
 };
 
 function getSessionHeaders(sidFromUrl: string | null): HeadersInit {
@@ -73,7 +74,7 @@ function filterAndSort(
 
   const searchLower = search.trim().toLowerCase();
   if (searchLower) {
-    list = list.filter((p) => p.name.toLowerCase().includes(searchLower) || p.ownerName.toLowerCase().includes(searchLower));
+    list = list.filter((p) => p.name.toLowerCase().includes(searchLower) || p.ownerName.toLowerCase().includes(searchLower) || (p.curators?.some((c) => c.fullName.toLowerCase().includes(searchLower)) ?? false));
   }
   if (filterOwner) {
     list = list.filter((p) => p.ownerName === filterOwner);
@@ -841,7 +842,7 @@ function PlaylistsPageContent() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <input
             type="search"
-            placeholder="Search by name or owner…"
+            placeholder="Search by name, owner, or curator…"
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
             className="min-w-[180px] rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
@@ -1011,6 +1012,7 @@ function PlaylistsPageContent() {
                 </th>
                 <th className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">Name</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">Owner</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-900 lg:table-cell dark:text-zinc-100">Curator</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-900 md:table-cell dark:text-zinc-100">Groups</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">Tracks</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-900 md:table-cell dark:text-zinc-100">Last sync</th>
@@ -1022,7 +1024,7 @@ function PlaylistsPageContent() {
             <tbody>
               {filteredPlaylists.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     {playlists.length === 0 ? (
                       <span>
                         Nog geen playlists.{" "}
@@ -1058,6 +1060,19 @@ function PlaylistsPageContent() {
                       </Link>
                     </td>
                     <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell dark:text-zinc-400">{p.ownerName}</td>
+                    <td className="hidden px-4 py-3 lg:table-cell">
+                      {(p.curators ?? []).length === 0 ? (
+                        <span className="text-zinc-400 dark:text-zinc-500">—</span>
+                      ) : (
+                        <span className="flex flex-wrap gap-x-2 gap-y-1">
+                          {(p.curators ?? []).map((c) => (
+                            <Link key={c.id} href={`/contacts/${c.id}`} className="text-[#1DB954] hover:underline">
+                              {c.fullName}
+                            </Link>
+                          ))}
+                        </span>
+                      )}
+                    </td>
                     <td className="hidden px-4 py-3 md:table-cell">
                       <span className="flex flex-wrap gap-1">
                         {p.groups.length === 0 ? (

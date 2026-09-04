@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteContact, getContactById, updateContact } from "@/lib/contacts";
+import { deleteContact, getContactById, toContactApi, updateContact } from "@/lib/contacts";
 import { parseContactStatus } from "@/lib/contact-status";
 import { getSpotifySessionFromRequest } from "@/lib/spotify-auth";
 
@@ -16,21 +16,7 @@ export async function GET(request: Request, { params }: Params) {
   if (!contact) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
 
   return NextResponse.json({
-    contact: {
-      id: contact.id,
-      fullName: contact.fullName,
-      organizationId: contact.organizationId,
-      organizationName: contact.organization?.name ?? contact.organizationNameSnapshot ?? null,
-      organizationNameSnapshot: contact.organizationNameSnapshot,
-      email: contact.email,
-      phone: contact.phone,
-      role: contact.role,
-      contactStatus: contact.contactStatus,
-      notes: contact.notes,
-      source: contact.source,
-      createdAt: contact.createdAt.toISOString(),
-      updatedAt: contact.updatedAt.toISOString(),
-    },
+    contact: toContactApi(contact),
   });
 }
 
@@ -63,21 +49,7 @@ export async function PATCH(request: Request, { params }: Params) {
     });
     return NextResponse.json({
       ok: true,
-      contact: {
-        id: contact.id,
-        fullName: contact.fullName,
-        organizationId: contact.organizationId,
-        organizationName: contact.organization?.name ?? contact.organizationNameSnapshot ?? null,
-        organizationNameSnapshot: contact.organizationNameSnapshot,
-        email: contact.email,
-        phone: contact.phone,
-        role: contact.role,
-        contactStatus: contact.contactStatus,
-        notes: contact.notes,
-        source: contact.source,
-        createdAt: contact.createdAt.toISOString(),
-        updatedAt: contact.updatedAt.toISOString(),
-      },
+      contact: toContactApi(contact),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not update contact";

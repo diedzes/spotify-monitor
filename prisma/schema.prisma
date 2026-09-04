@@ -61,6 +61,7 @@ model Contact {
   updatedAt                DateTime      @updatedAt
   organization             Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   feedbackEntries          FeedbackEntry[]
+  curatedPlaylists         ContactPlaylist[]
 
   @@index([userId, fullName])
   @@index([userId, email])
@@ -206,6 +207,7 @@ model TrackedPlaylist {
   updatedAt         DateTime           @updatedAt
   snapshots         PlaylistSnapshot[]
   groupPlaylists    GroupPlaylist[]
+  curators          ContactPlaylist[]
   reportSources     ReportSource[]
   schedulerSources  SchedulerSource[]
   schedulerClockSlots SchedulerClockSlot[]
@@ -271,6 +273,21 @@ model GroupPlaylist {
 
   @@unique([groupId, trackedPlaylistId])
   @@map("group_playlists")
+}
+
+/// Contact as curator of a tracked playlist (many-to-many).
+model ContactPlaylist {
+  id                String          @id @default(cuid())
+  contactId         String
+  trackedPlaylistId String
+  createdAt         DateTime        @default(now())
+  contact           Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  trackedPlaylist   TrackedPlaylist @relation(fields: [trackedPlaylistId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, trackedPlaylistId])
+  @@index([trackedPlaylistId])
+  @@index([contactId])
+  @@map("contact_playlists")
 }
 
 enum SchedulerMode {

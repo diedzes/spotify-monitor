@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getStoredSessionId } from "@/components/StoreSessionFromUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { GroupChip } from "@/components/GroupChip";
+import { PlaylistCurators, type PlaylistCurator } from "@/components/PlaylistCurators";
 
 const SESSION_HEADER_COOKIE = "spotify_session_s";
 
@@ -63,6 +64,7 @@ type PlaylistDetail = {
     groups?: Array<{ id: string; name: string; color: string; isMainGroup?: boolean }>;
     inHitlistMainGroup?: boolean;
     excludeFromHitlist?: boolean;
+    curators?: PlaylistCurator[];
   };
   snapshots: Array<{
     id: string;
@@ -278,6 +280,19 @@ export default function PlaylistDetailPage() {
             {syncMessage}
           </p>
         )}
+
+        <PlaylistCurators
+          playlistId={id}
+          curators={playlist.curators ?? []}
+          sessionHeaders={getSessionHeaders()}
+          onChange={(curators) =>
+            setData((prev) =>
+              prev
+                ? { ...prev, playlist: { ...prev.playlist, curators } }
+                : prev
+            )
+          }
+        />
 
         <section className="mb-8">
           <h2 className="mb-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">

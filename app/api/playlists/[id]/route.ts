@@ -34,6 +34,11 @@ export async function GET(
         where: { group: { userId: session.user.id } },
         include: { group: { select: { id: true, name: true, color: true, isMainGroup: true } } },
       },
+      curators: {
+        where: { contact: { userId: session.user.id } },
+        include: { contact: { select: { id: true, fullName: true, organizationNameSnapshot: true, organization: { select: { name: true } } } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -106,6 +111,11 @@ export async function GET(
         name: gp.group.name,
         color: gp.group.color,
         isMainGroup: gp.group.isMainGroup,
+      })),
+      curators: playlist.curators.map((c) => ({
+        id: c.contact.id,
+        fullName: c.contact.fullName,
+        organizationName: c.contact.organization?.name ?? c.contact.organizationNameSnapshot ?? null,
       })),
     },
     hitlistHistory: hitlistHistory.map((h) => ({
