@@ -146,17 +146,20 @@ export async function syncTrackedPlaylist(
     data: {
       trackedPlaylistId,
       spotifySnapshotId: currentSnapshotId ?? "",
+      // createMany: één bulk-INSERT i.p.v. één INSERT per track.
       tracks: {
-        create: tracks.map((t) => ({
-          spotifyTrackId: t.spotifyTrackId,
-          spotifyUri: t.spotifyUri,
-          spotifyUrl: t.spotifyUrl,
-          title: t.title,
-          artistsJson: t.artistsJson,
-          album: t.album,
-          durationMs: t.durationMs,
-          position: t.position,
-        })),
+        createMany: {
+          data: tracks.map((t) => ({
+            spotifyTrackId: t.spotifyTrackId,
+            spotifyUri: t.spotifyUri,
+            spotifyUrl: t.spotifyUrl,
+            title: t.title,
+            artistsJson: t.artistsJson,
+            album: t.album,
+            durationMs: t.durationMs,
+            position: t.position,
+          })),
+        },
       },
     },
   });

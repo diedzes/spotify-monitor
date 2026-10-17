@@ -167,6 +167,7 @@ function PlaylistsPageContent() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncAllLoading, setSyncAllLoading] = useState(false);
+  const [syncAllProgress, setSyncAllProgress] = useState<{ done: number; total: number } | null>(null);
   const [syncAllResult, setSyncAllResult] = useState<{ synced: number; failed: number; errors: Array<{ playlistId: string; error: string }> } | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [groups, setGroups] = useState<Array<{ id: string; name: string; color: string; isMainGroup?: boolean }>>([]);
@@ -316,45 +317,69 @@ function PlaylistsPageContent() {
     setSyncAllResult(null);
     setHitlistNotice(null);
     setSyncAllLoading(true);
-    try {
-      const res = await fetch("/api/playlists/sync-all", {
-        method: "POST",
-        credentials: "include",
-        headers: getSessionHeaders(sidFromUrl),
-      });
-      const data = (await res.json()) as {
-        synced?: number;
-        failed?: number;
-        errors?: Array<{ playlistId: string; error: string }>;
-        error?: string;
-        hitlistNewMatches?: number;
-        hitlistRemovedMatches?: number;
-        hitlistSampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
-      };
-      if (res.status === 401) return;
-      if (!res.ok) {
-        setSyncError(typeof data.error === "string" ? data.error : "Sync all failed");
-        setSyncAllLoading(false);
-        return;
+    // Eén request per playlist (zoals bulk sync) i.p.v. één lange request: blijft ruim binnen de Vercel-timeout.
+    const ids = playlists.map((p) => p.id);
+    const headers = getSessionHeaders(sidFromUrl);
+    const errors: Array<{ playlistId: string; error: string }> = [];
+    let synced = 0;
+    let done = 0;
+    let signedOut = false;
+    setSyncAllProgress({ done: 0, total: ids.length });
+    const CONCURRENCY = 4;
+    let next = 0;
+    const worker = async () => {
+      while (!signedOut && next < ids.length) {
+        const playlistId = ids[next++];
+        try {
+          const res = await fetch(`/api/playlists/${playlistId}/sync?deferHitlist=1`, {
+            method: "POST",
+            credentials: "include",
+            headers,
+          });
+          if (res.status === 401) {
+            signedOut = true;
+            return;
+          }
+          const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+          if (res.ok && data.ok) synced += 1;
+          else errors.push({ playlistId, error: data.error ?? `Sync failed (${res.status})` });
+        } catch {
+          errors.push({ playlistId, error: "Sync failed" });
+        }
+        done += 1;
+        setSyncAllProgress({ done, total: ids.length });
       }
-      setSyncAllResult({
-        synced: data.synced ?? 0,
-        failed: data.failed ?? 0,
-        errors: data.errors ?? [],
-      });
-      const hl = formatHitlistSummary(
-        data.hitlistNewMatches ?? 0,
-        data.hitlistRemovedMatches ?? 0,
-        data.hitlistSampleNew
-      );
-      setHitlistNotice(hl);
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, ids.length) }, worker));
+      if (signedOut) {
+        setSyncError("Not signed in — log in again to sync.");
+      }
+      setSyncAllResult({ synced, failed: errors.length, errors });
       await refreshPlaylists();
+      if (synced > 0) {
+        const r = await fetch("/api/hitlist/rebuild", {
+          method: "POST",
+          credentials: "include",
+          headers,
+        });
+        const hit = (await r.json().catch(() => ({}))) as {
+          ok?: boolean;
+          newMatches?: number;
+          removedMatches?: number;
+          sampleNew?: Array<{ title: string; artistLabel: string; playlistName: string }>;
+        };
+        if (r.ok && hit.ok) {
+          setHitlistNotice(formatHitlistSummary(hit.newMatches ?? 0, hit.removedMatches ?? 0, hit.sampleNew));
+        }
+      }
     } catch {
       setSyncError("Sync all failed");
     } finally {
       setSyncAllLoading(false);
+      setSyncAllProgress(null);
     }
-  }, [sidFromUrl, refreshPlaylists]);
+  }, [sidFromUrl, playlists, refreshPlaylists]);
 
   const handleBulkAddToGroup = useCallback(async () => {
     const newName = bulkAddNewGroupName.trim();
@@ -799,7 +824,11 @@ function PlaylistsPageContent() {
               onClick={handleSyncAll}
               className="rounded-full bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-500"
             >
-              {syncAllLoading ? "Sync all…" : "Sync all"}
+              {syncAllLoading
+                ? syncAllProgress && syncAllProgress.done < syncAllProgress.total
+                  ? `Syncing ${syncAllProgress.done}/${syncAllProgress.total}…`
+                  : "Updating hitlist…"
+                : "Sync all"}
             </button>
             <Link
               href="/playlists/new"
