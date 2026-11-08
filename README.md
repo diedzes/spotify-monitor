@@ -11,6 +11,7 @@ Create a `.env` or `.env.local` file in the project root (voor lokaal developmen
 - **`NEXTAUTH_URL`** (optioneel) – Base URL van de app, bijv. `http://localhost:3000`. **Op Vercel:** zet dit op je productie-URL (bijv. `https://spotify-monitor-ten.vercel.app`) zodat de Spotify redirect URI niet per deployment wisselt.
 - **`SPOTIFY_REDIRECT_URI`** of **`AUTH_SPOTIFY_REDIRECT_URI`** (optioneel) – Volledige callback-URL voor Spotify (bijv. `https://spotify-monitor-ten.vercel.app/api/auth/spotify/callback`). Overschrijft de afgeleide URL; handig als inloggen op Vercel “plotseling” faalt.
 - **`CRON_SECRET`** (alleen op Vercel, voor wekelijkse sync) – Geheim waarmee de cron-job zich autoriseert. Zet dit in Vercel → Environment Variables; kies een lange willekeurige string. Zonder dit draait de geplande sync niet.
+- **`INTEGRATION_SECRET`** en **`INTEGRATION_SPOTIFY_USER_ID`** (alleen op Vercel, voor de Sport Sounds-app) – `GET /api/integration/tracks` geeft de tracks van de playlists van dít Spotify-account aan het beschikbaarheidsbord van Sport Sounds, alleen met `Authorization: Bearer <INTEGRATION_SECRET>`. Zonder beide variabelen weigert de route.
 
 **Spotify “Inloggen mislukt” op Vercel:** Voeg in het [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) bij jouw app → Settings → **Redirect URIs** exact de URL toe die de app toont (bijv. `https://jouw-project.vercel.app/api/auth/spotify/callback`). Zet op Vercel **NEXTAUTH_URL** of **SPOTIFY_REDIRECT_URI** op diezelfde basis-URL/callback zodat de waarde stabiel blijft.
 
