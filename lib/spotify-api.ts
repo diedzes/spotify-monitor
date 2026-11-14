@@ -147,6 +147,8 @@ export async function fetchPlaylistMetadataPreferringClientCredentials(
 }
 
 export interface SpotifyPlaylistTrackItem {
+  /** When the track was added to the playlist; null or 1970-01-01 on very old or editorial playlists. */
+  added_at?: string | null;
   track: {
     id: string | null;
     uri: string;

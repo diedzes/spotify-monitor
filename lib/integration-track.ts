@@ -26,6 +26,10 @@ export type IntegrationTrackDetail = {
     groups: string[];
     /** First sync in which the track was seen on this playlist. */
     firstSeenAt: string;
+    /** Spotify's own date for when the track was added to the playlist; null when unknown. */
+    addedAt: string | null;
+    /** First sync of this playlist at all: a firstSeenAt equal to this means "on or before". */
+    trackedSince: string | null;
     curators: Array<{ name: string; organization: string | null; organizationType: string | null }>;
   }>;
   feedback: Array<{
@@ -91,6 +95,8 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
         followerCount: extra ? extra.followerCount : null,
         groups: extra?.groupPlaylists.map((gp) => gp.group.name) ?? [],
         firstSeenAt: p.firstSeenAt.toISOString(),
+        addedAt: p.addedAt ? p.addedAt.toISOString() : null,
+        trackedSince: p.trackedSince ? p.trackedSince.toISOString() : null,
         curators:
           extra?.curators.map((c) => ({
             name: c.contact.fullName,

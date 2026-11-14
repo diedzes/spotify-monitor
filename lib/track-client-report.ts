@@ -14,6 +14,10 @@ export type TrackPlaylistPresenceRow = {
   playlistDescription: string | null;
   /** Earliest snapshot sync where this track appeared in this playlist (best proxy for “since when” in our data). */
   firstSeenAt: Date;
+  /** Spotify's own added_at for the track on this playlist; null when Spotify does not give one or it was not synced yet. */
+  addedAt: Date | null;
+  /** First sync we have of this playlist at all: a firstSeenAt equal to this means "on or before". */
+  trackedSince: Date | null;
 };
 
 export type TrackFeedbackReportRow = {
@@ -182,6 +186,7 @@ export async function getTrackClientReportData(
       spotifyTrackId: true,
       title: true,
       artistsJson: true,
+      addedAt: true,
       snapshot: {
         select: {
           id: true,
@@ -207,6 +212,7 @@ export async function getTrackClientReportData(
       playlist: (typeof snapshotRows)[0]["snapshot"]["trackedPlaylist"];
       syncedAts: Date[];
       snapshotIds: Set<string>;
+      addedAt: Date | null;
     }
   >();
 
@@ -217,9 +223,11 @@ export async function getTrackClientReportData(
     const sid = row.snapshot.id;
     let g = grouped.get(pl.id);
     if (!g) {
-      g = { playlist: pl, syncedAts: [], snapshotIds: new Set() };
+      g = { playlist: pl, syncedAts: [], snapshotIds: new Set(), addedAt: null };
       grouped.set(pl.id, g);
     }
+    // Spotify answers 1970-01-01 when it does not know; keep the earliest real date.
+    if (row.addedAt && row.addedAt.getUTCFullYear() >= 2006 && (!g.addedAt || row.addedAt < g.addedAt)) g.addedAt = row.addedAt;
     g.syncedAts.push(syncedAt);
     g.snapshotIds.add(sid);
   }
@@ -236,6 +244,11 @@ export async function getTrackClientReportData(
     if (!hasFeedback) return null;
   }
 
+  const firstSyncs = playlistIds.length
+    ? await prisma.playlistSnapshot.groupBy({ by: ["trackedPlaylistId"], where: { trackedPlaylistId: { in: playlistIds } }, _min: { syncedAt: true } })
+    : [];
+  const trackedSinceById = new Map(firstSyncs.map((f) => [f.trackedPlaylistId, f._min.syncedAt]));
+
   const playlists: TrackPlaylistPresenceRow[] = [];
   for (const [plId, g] of grouped) {
     const times = g.syncedAts.map((d) => d.getTime());
@@ -248,6 +261,8 @@ export async function getTrackClientReportData(
       ownerName: g.playlist.ownerName,
       playlistDescription: g.playlist.description ?? null,
       firstSeenAt,
+      addedAt: g.addedAt,
+      trackedSince: trackedSinceById.get(plId) ?? null,
     });
   }
 

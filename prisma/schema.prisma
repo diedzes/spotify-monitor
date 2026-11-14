@@ -334,6 +334,7 @@ model SnapshotTrack {
   album             String
   durationMs        Int?             // Track lengte in ms
   position          Int              // 0-based index in playlist
+  addedAt           DateTime?        // Spotify added_at: wanneer het nummer op de playlist kwam (1970 = onbekend bij Spotify)
   snapshot          PlaylistSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 
   @@map("snapshot_tracks")

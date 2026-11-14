@@ -21,6 +21,14 @@ export interface TrackForSnapshot {
   artistsJson: string;
   album: string;
   durationMs: number | null;
+  /** Spotify's added_at for this playlist item, as given (1970-01-01 means Spotify does not know). */
+  addedAt: Date | null;
+}
+
+function parseAddedAt(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /**
@@ -54,6 +62,7 @@ export async function getPlaylistTracksWithPagination(
         artistsJson: JSON.stringify(track.artists?.map((a) => ({ id: a.id, name: a.name })) ?? []),
         album: track.album?.name ?? "",
         durationMs,
+        addedAt: parseAddedAt(item.added_at),
       });
     });
     offset += page.items.length;
@@ -97,25 +106,33 @@ export async function syncTrackedPlaylist(
   // Bij net toegevoegde playlists staat snapshotId al uit metadata maar is er nog geen snapshot in DB;
   // dan moeten we wel de eerste snapshot + tracks aanmaken.
   if (currentSnapshotId === lastKnownSnapshotId && lastKnownSnapshotId != null && hasExistingSnapshot) {
-    // Backfill: vul ontbrekende durationMs in bestaande laatste snapshot aan.
+    // Backfill: vul ontbrekende durationMs en addedAt in de bestaande laatste snapshot aan.
+    // De snapshot is ongewijzigd, dus wat Spotify nu geeft hoort bij dezelfde tracks.
     const latestSnapshotId = tracked.snapshots[0]?.id;
     if (latestSnapshotId) {
       const missing = await prisma.snapshotTrack.findMany({
-        where: { snapshotId: latestSnapshotId, durationMs: null },
-        select: { id: true, spotifyTrackId: true },
+        where: { snapshotId: latestSnapshotId, OR: [{ durationMs: null }, { addedAt: null }] },
+        select: { id: true, spotifyTrackId: true, durationMs: true, addedAt: true },
       });
       if (missing.length > 0) {
         try {
           const tracksNow = await getPlaylistTracksWithPagination(accessToken, tracked.spotifyPlaylistId);
           const durationByTrackId = new Map<string, number | null>();
-          for (const t of tracksNow) durationByTrackId.set(t.spotifyTrackId, t.durationMs);
+          // Staat een nummer twee keer op de playlist, dan telt de vroegste toevoeging.
+          const addedByTrackId = new Map<string, Date>();
+          for (const t of tracksNow) {
+            durationByTrackId.set(t.spotifyTrackId, t.durationMs);
+            const known = addedByTrackId.get(t.spotifyTrackId);
+            if (t.addedAt && (!known || t.addedAt < known)) addedByTrackId.set(t.spotifyTrackId, t.addedAt);
+          }
           for (const row of missing) {
+            const data: { durationMs?: number; addedAt?: Date } = {};
             const durationMs = durationByTrackId.get(row.spotifyTrackId);
-            if (durationMs != null) {
-              await prisma.snapshotTrack.update({
-                where: { id: row.id },
-                data: { durationMs },
-              });
+            if (row.durationMs == null && durationMs != null) data.durationMs = durationMs;
+            const addedAt = addedByTrackId.get(row.spotifyTrackId);
+            if (row.addedAt == null && addedAt) data.addedAt = addedAt;
+            if (Object.keys(data).length > 0) {
+              await prisma.snapshotTrack.update({ where: { id: row.id }, data });
             }
           }
         } catch {
@@ -157,6 +174,7 @@ export async function syncTrackedPlaylist(
             artistsJson: t.artistsJson,
             album: t.album,
             durationMs: t.durationMs,
+            addedAt: t.addedAt,
             position: t.position,
           })),
         },
