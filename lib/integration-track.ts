@@ -30,6 +30,11 @@ export type IntegrationTrackDetail = {
     addedAt: string | null;
     /** First sync of this playlist at all: a firstSeenAt equal to this means "on or before". */
     trackedSince: string | null;
+    /** Whether the track is in the playlist's latest synced snapshot, and at which position (1-based). */
+    onPlaylistNow: boolean;
+    position: number | null;
+    trackCount: number | null;
+    lastSyncedAt: string | null;
     curators: Array<{ name: string; organization: string | null; organizationType: string | null }>;
   }>;
   feedback: Array<{
@@ -40,6 +45,7 @@ export type IntegrationTrackDetail = {
     evidenceUrl: string | null;
     evidenceTitle: string | null;
     evidenceSite: string | null;
+    evidenceImage: string | null;
     stadium: {
       competition: string | null;
       matchUtc: string | null;
@@ -68,11 +74,29 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
     select: {
       id: true,
       followerCount: true,
+      trackCount: true,
+      lastSyncedAt: true,
+      snapshots: { orderBy: { syncedAt: "desc" }, take: 1, select: { id: true } },
       groupPlaylists: { select: { group: { select: { name: true } } } },
       curators: { select: { contact: { select: { fullName: true, organizationNameSnapshot: true, organization: { select: { name: true, type: true } } } } } },
     },
   });
   const extraById = new Map(extras.map((e) => [e.id, e]));
+
+  // Is the track still on each playlist? Look in the latest snapshot only,
+  // by Spotify id or (for regional releases) by the same title.
+  const latestSnapshotIds = extras.map((e) => e.snapshots[0]?.id).filter((id): id is string => Boolean(id));
+  const nowRows = latestSnapshotIds.length
+    ? await prisma.snapshotTrack.findMany({
+        where: { snapshotId: { in: latestSnapshotIds }, OR: [{ spotifyTrackId }, { title: { equals: report.title, mode: "insensitive" } }] },
+        select: { snapshotId: true, position: true, spotifyTrackId: true },
+      })
+    : [];
+  const positionBySnapshot = new Map<string, number>();
+  for (const r of nowRows) {
+    const known = positionBySnapshot.get(r.snapshotId);
+    if (known === undefined || r.spotifyTrackId === spotifyTrackId || r.position < known) positionBySnapshot.set(r.snapshotId, r.position);
+  }
 
   // Organisation type per feedback contact (club, broadcaster, ...), for the sector breakdown.
   const contactNames = report.feedback.map((f) => f.contact?.organizationName).filter((n): n is string => Boolean(n));
@@ -97,6 +121,10 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
         firstSeenAt: p.firstSeenAt.toISOString(),
         addedAt: p.addedAt ? p.addedAt.toISOString() : null,
         trackedSince: p.trackedSince ? p.trackedSince.toISOString() : null,
+        onPlaylistNow: positionBySnapshot.has(extra?.snapshots[0]?.id ?? ""),
+        position: positionBySnapshot.has(extra?.snapshots[0]?.id ?? "") ? positionBySnapshot.get(extra!.snapshots[0]!.id)! + 1 : null,
+        trackCount: extra ? extra.trackCount : null,
+        lastSyncedAt: extra?.lastSyncedAt ? extra.lastSyncedAt.toISOString() : null,
         curators:
           extra?.curators.map((c) => ({
             name: c.contact.fullName,
@@ -113,6 +141,7 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
       evidenceUrl: f.evidenceUrl,
       evidenceTitle: f.evidencePreviewTitle,
       evidenceSite: f.evidencePreviewSiteName,
+      evidenceImage: f.evidencePreviewImage,
       stadium:
         f.entryKind === "play"
           ? {
