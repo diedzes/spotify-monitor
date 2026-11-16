@@ -49,6 +49,14 @@ export function spotifyTrackHref(spotifyTrackId: string): string | null {
   return `https://open.spotify.com/track/${spotifyTrackId}`;
 }
 
+const WRITE_CHUNK = 1000;
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 /**
  * Herberekent hitlist-matches op basis van snapshots per tracked playlist.
  * - Per playlist: nieuwste snapshot die nog tracks heeft (valt terug op oudere als de laatste leeg is).
@@ -166,72 +174,69 @@ export async function rebuildOrUpdateHitlistForUser(userId: string): Promise<Hit
   const sampleNew: HitlistRebuildResult["sampleNew"] = [];
   const now = new Date();
 
-  // No interactive $transaction: often breaks behind Supabase PgBouncer (transaction pool mode).
-  for (const [, d] of desired) {
-    const key = matchKey(d.mainId, d.matchedId, d.trackId);
-    const row = existingByKey.get(key);
-    const matchedName = playlistNameById.get(d.matchedId) ?? "Playlist";
+  // Bulk writes (2026-11-17): one statement per kind of change instead of one per
+  // match. With a few hundred playlists the row-by-row version ran past Vercel's
+  // 300 seconds. Still no interactive $transaction: that often breaks behind
+  // Supabase PgBouncer (transaction pool mode).
+  const toCreate: Array<{ mainId: string; matchedId: string; trackId: string; title: string; artistsJson: string }> = [];
+  const reactivateIds: string[] = [];
+  const stillActiveIds: string[] = [];
+  /** Rows whose stored title or artists differ from the snapshot: the few that need their own update. */
+  const renamed: Array<{ id: string; title: string; artistsJson: string }> = [];
 
-    if (!row) {
-      await prisma.hitlistMatch.create({
-        data: {
-          userId,
-          spotifyTrackId: d.trackId,
-          title: d.title,
-          artistsJson: d.artistsJson,
-          mainTrackedPlaylistId: d.mainId,
-          matchedTrackedPlaylistId: d.matchedId,
-          firstDetectedAt: now,
-          lastSeenAt: now,
-          removedAt: null,
-          isActive: true,
-        },
-      });
+  for (const [, d] of desired) {
+    const row = existingByKey.get(matchKey(d.mainId, d.matchedId, d.trackId));
+    if (!row) toCreate.push(d);
+    else {
+      if (row.isActive) stillActiveIds.push(row.id);
+      else reactivateIds.push(row.id);
+      if (row.title !== d.title || row.artistsJson !== d.artistsJson) renamed.push({ id: row.id, title: d.title, artistsJson: d.artistsJson });
+    }
+    if (!row || !row.isActive) {
       newMatches += 1;
       if (sampleNew.length < 5) {
         sampleNew.push({
           title: d.title,
           artistLabel: formatArtistsLabel(d.artistsJson),
-          playlistName: matchedName,
+          playlistName: playlistNameById.get(d.matchedId) ?? "Playlist",
         });
       }
-    } else if (!row.isActive) {
-      await prisma.hitlistMatch.update({
-        where: { id: row.id },
-        data: {
-          isActive: true,
-          removedAt: null,
-          lastSeenAt: now,
-          title: d.title,
-          artistsJson: d.artistsJson,
-        },
-      });
-      newMatches += 1;
-      if (sampleNew.length < 5) {
-        sampleNew.push({
-          title: d.title,
-          artistLabel: formatArtistsLabel(d.artistsJson),
-          playlistName: matchedName,
-        });
-      }
-    } else {
-      await prisma.hitlistMatch.update({
-        where: { id: row.id },
-        data: { lastSeenAt: now, title: d.title, artistsJson: d.artistsJson },
-      });
     }
   }
 
-  for (const row of existing) {
-    const key = matchKey(row.mainTrackedPlaylistId, row.matchedTrackedPlaylistId, row.spotifyTrackId);
-    if (desired.has(key)) continue;
-    if (row.isActive) {
-      await prisma.hitlistMatch.update({
-        where: { id: row.id },
-        data: { isActive: false, removedAt: now },
-      });
-      removedMatches += 1;
-    }
+  const removeIds = existing
+    .filter((row) => row.isActive && !desired.has(matchKey(row.mainTrackedPlaylistId, row.matchedTrackedPlaylistId, row.spotifyTrackId)))
+    .map((row) => row.id);
+  removedMatches = removeIds.length;
+
+  for (const part of chunks(toCreate, WRITE_CHUNK)) {
+    await prisma.hitlistMatch.createMany({
+      data: part.map((d) => ({
+        userId,
+        spotifyTrackId: d.trackId,
+        title: d.title,
+        artistsJson: d.artistsJson,
+        mainTrackedPlaylistId: d.mainId,
+        matchedTrackedPlaylistId: d.matchedId,
+        firstDetectedAt: now,
+        lastSeenAt: now,
+        removedAt: null,
+        isActive: true,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  for (const ids of chunks(reactivateIds, WRITE_CHUNK)) {
+    await prisma.hitlistMatch.updateMany({ where: { id: { in: ids } }, data: { isActive: true, removedAt: null, lastSeenAt: now } });
+  }
+  for (const ids of chunks(stillActiveIds, WRITE_CHUNK)) {
+    await prisma.hitlistMatch.updateMany({ where: { id: { in: ids } }, data: { lastSeenAt: now } });
+  }
+  for (const ids of chunks(removeIds, WRITE_CHUNK)) {
+    await prisma.hitlistMatch.updateMany({ where: { id: { in: ids } }, data: { isActive: false, removedAt: now } });
+  }
+  for (const r of renamed) {
+    await prisma.hitlistMatch.update({ where: { id: r.id }, data: { title: r.title, artistsJson: r.artistsJson } });
   }
 
   return { newMatches, removedMatches, sampleNew };
