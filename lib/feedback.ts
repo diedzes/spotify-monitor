@@ -1,4 +1,5 @@
 import { FeedbackEntryKind } from "@prisma/client";
+import { parseStadiumMoment, parseStadiumProof } from "@/lib/stadium-play-options";
 import { prisma } from "@/lib/db";
 import { fetchOpenGraphPreview } from "@/lib/og-fetch";
 import { getRecentlyRemovedHitlist } from "@/lib/hitlist";
@@ -21,6 +22,9 @@ type StadiumPlayInput = {
   homeScore?: number | null;
   awayScore?: number | null;
   attendance?: number | null;
+  /** When in the match, and how we know: see lib/stadium-play-options.ts. */
+  moment?: string | null;
+  proof?: string | null;
 };
 
 function cleanEvidenceUrl(raw: string | null | undefined): string | null {
@@ -74,6 +78,8 @@ function normalizeStadiumPlay(input: StadiumPlayInput | null | undefined) {
     homeScore: toIntOrNull(input.homeScore),
     awayScore: toIntOrNull(input.awayScore),
     attendance: toIntOrNull(input.attendance),
+    moment: parseStadiumMoment(input.moment),
+    proof: parseStadiumProof(input.proof),
     hasClubs,
   };
 }
@@ -167,6 +173,8 @@ export async function createFeedbackEntry(
       stadiumHomeScore: entryKind === FeedbackEntryKind.play ? stadiumPlay?.homeScore ?? null : null,
       stadiumAwayScore: entryKind === FeedbackEntryKind.play ? stadiumPlay?.awayScore ?? null : null,
       stadiumAttendance: entryKind === FeedbackEntryKind.play ? stadiumPlay?.attendance ?? null : null,
+      stadiumMoment: entryKind === FeedbackEntryKind.play ? stadiumPlay?.moment ?? null : null,
+      stadiumProof: entryKind === FeedbackEntryKind.play ? stadiumPlay?.proof ?? null : null,
       tracks: input.feedbackBatchId
         ? undefined
         : {
@@ -328,6 +336,8 @@ export async function updateFeedbackEntry(
     stadiumHomeScore?: number | null;
     stadiumAwayScore?: number | null;
     stadiumAttendance?: number | null;
+    stadiumMoment?: string | null;
+    stadiumProof?: string | null;
   } = {};
   if (input.contactId !== undefined) data.contactId = input.contactId;
   if (input.feedbackAt) data.feedbackAt = input.feedbackAt;
@@ -350,6 +360,8 @@ export async function updateFeedbackEntry(
     data.stadiumHomeScore = null;
     data.stadiumAwayScore = null;
     data.stadiumAttendance = null;
+    data.stadiumMoment = null;
+    data.stadiumProof = null;
   } else if (input.evidenceUrl !== undefined) {
     nextEvidenceUrl = cleanEvidenceUrl(input.evidenceUrl);
     data.evidenceUrl = nextEvidenceUrl;
@@ -384,6 +396,8 @@ export async function updateFeedbackEntry(
     data.stadiumHomeScore = nextStadiumPlay?.homeScore ?? null;
     data.stadiumAwayScore = nextStadiumPlay?.awayScore ?? null;
     data.stadiumAttendance = nextStadiumPlay?.attendance ?? null;
+    data.stadiumMoment = nextStadiumPlay?.moment ?? null;
+    data.stadiumProof = nextStadiumPlay?.proof ?? null;
   }
 
   const urlChanged =

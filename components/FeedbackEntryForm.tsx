@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { StadiumMomentProofFields } from "@/components/StadiumMomentProofFields";
 
 type Contact = { id: string; fullName: string; organizationName: string | null; email?: string | null };
 type Track = {
@@ -69,6 +70,8 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
   const [manualHomeScore, setManualHomeScore] = useState("");
   const [manualAwayScore, setManualAwayScore] = useState("");
   const [manualAttendance, setManualAttendance] = useState("");
+  const [stadiumMoment, setStadiumMoment] = useState("");
+  const [stadiumProof, setStadiumProof] = useState("");
 
   useEffect(() => {
     fetch(`/api/feedback/main-tracks?query=${encodeURIComponent(trackQuery)}`, { credentials: "include" })
@@ -143,6 +146,8 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
       setManualHomeScore("");
       setManualAwayScore("");
       setManualAttendance("");
+      setStadiumMoment("");
+      setStadiumProof("");
       setMatchesError(null);
     }
   }, [entryKind]);
@@ -237,6 +242,8 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
                     attendance:
                       selectedMatch?.attendance ??
                       (manualAttendance.trim() ? Number.parseInt(manualAttendance.trim(), 10) : null),
+                    moment: stadiumMoment || null,
+                    proof: stadiumProof || null,
                   }
                 : null,
           }
@@ -582,6 +589,7 @@ export function FeedbackEntryForm({ preselectedTrackId = null, preselectedBatchI
                   Match selected. Clubs, score, crest and attendance (if available) will be saved.
                 </p>
               )}
+              <StadiumMomentProofFields moment={stadiumMoment} proof={stadiumProof} onMoment={setStadiumMoment} onProof={setStadiumProof} />
             </div>
           ) : null}
           <input type="datetime-local" value={feedbackAt} onChange={(e) => setFeedbackAt(e.target.value)} className="w-full rounded border px-3 py-2 text-sm" />

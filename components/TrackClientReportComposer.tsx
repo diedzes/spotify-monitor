@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { EvidenceLinkPreview } from "@/components/EvidenceLinkPreview";
 import type { ReactNode } from "react";
+import { stadiumMomentLabel, stadiumProofLabel } from "@/lib/stadium-play-options";
 
 type PlaylistRow = {
   playlistId: string;
@@ -35,6 +36,8 @@ type FeedbackRow = {
   stadiumHomeScore: number | null;
   stadiumAwayScore: number | null;
   stadiumAttendance: number | null;
+  stadiumMoment: string | null;
+  stadiumProof: string | null;
   contact: {
     fullName: string | null;
     role: string | null;
@@ -488,6 +491,9 @@ function FeedbackCard({ item: f }: { item: FeedbackRow }) {
             {[f.stadiumCompetitionName, f.stadiumMatchUtc ? fmt(f.stadiumMatchUtc) : null].filter(Boolean).join(" - ") || "Match details"}
           </p>
           {formatAttendance(f.stadiumAttendance) ? <p className="text-xs text-zinc-600">Attendance: {formatAttendance(f.stadiumAttendance)}</p> : null}
+          {stadiumMomentLabel(f.stadiumMoment) || stadiumProofLabel(f.stadiumProof) ? (
+            <p className="text-xs text-zinc-600">{[stadiumMomentLabel(f.stadiumMoment), stadiumProofLabel(f.stadiumProof)].filter(Boolean).join(" · ")}</p>
+          ) : null}
         </div>
       ) : null}
       {f.evidenceUrl ? (

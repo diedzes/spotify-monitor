@@ -40,6 +40,8 @@ export type TrackFeedbackReportRow = {
   stadiumHomeScore: number | null;
   stadiumAwayScore: number | null;
   stadiumAttendance: number | null;
+  stadiumMoment: string | null;
+  stadiumProof: string | null;
   contact: {
     fullName: string | null;
     role: string | null;
@@ -291,6 +293,8 @@ export async function getTrackClientReportData(
     stadiumHomeScore: e.stadiumHomeScore,
     stadiumAwayScore: e.stadiumAwayScore,
     stadiumAttendance: e.stadiumAttendance,
+    stadiumMoment: e.stadiumMoment,
+    stadiumProof: e.stadiumProof,
     contact: e.contact
       ? {
           fullName: e.contact.fullName,

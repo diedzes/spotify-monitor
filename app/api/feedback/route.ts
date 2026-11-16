@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       homeScore?: number | null;
       awayScore?: number | null;
       attendance?: number | null;
+      moment?: string | null;
+      proof?: string | null;
     } | null;
     tracks?: Array<{
       spotifyTrackId: string;

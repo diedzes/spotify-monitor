@@ -70,6 +70,10 @@ export type IntegrationTrackDetail = {
       homeScore: number | null;
       awayScore: number | null;
       attendance: number | null;
+      /** When in the match (warmup, walkout, lineup, goal, halftime, win, fulltime, other); null when not recorded. */
+      moment: string | null;
+      /** How we know (reported, confirmed, documented, detected); null when not recorded. */
+      proof: string | null;
     } | null;
     contact: { name: string | null; role: string | null; organization: string | null; organizationType: string | null } | null;
   }>;
@@ -231,6 +235,8 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
               homeScore: f.stadiumHomeScore,
               awayScore: f.stadiumAwayScore,
               attendance: f.stadiumAttendance,
+              moment: f.stadiumMoment,
+              proof: f.stadiumProof,
             }
           : null,
       contact: f.contact

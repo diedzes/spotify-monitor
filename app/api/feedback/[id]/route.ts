@@ -35,6 +35,8 @@ export async function PATCH(request: Request, { params }: Params) {
       homeScore?: number | null;
       awayScore?: number | null;
       attendance?: number | null;
+      moment?: string | null;
+      proof?: string | null;
     } | null;
   };
   try {

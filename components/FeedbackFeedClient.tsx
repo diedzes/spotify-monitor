@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EvidenceLinkPreview } from "@/components/EvidenceLinkPreview";
+import { StadiumMomentProofFields } from "@/components/StadiumMomentProofFields";
+import { stadiumMomentLabel, stadiumProofLabel } from "@/lib/stadium-play-options";
 
 type FeedItem = any;
 type RecentMatch = {
@@ -56,6 +58,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
   const [editHomeScore, setEditHomeScore] = useState("");
   const [editAwayScore, setEditAwayScore] = useState("");
   const [editAttendance, setEditAttendance] = useState("");
+  const [editStadiumMoment, setEditStadiumMoment] = useState("");
+  const [editStadiumProof, setEditStadiumProof] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -117,6 +121,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEditHomeScore(typeof cached.stadiumHomeScore === "number" ? String(cached.stadiumHomeScore) : "");
       setEditAwayScore(typeof cached.stadiumAwayScore === "number" ? String(cached.stadiumAwayScore) : "");
       setEditAttendance(typeof cached.stadiumAttendance === "number" ? String(cached.stadiumAttendance) : "");
+      setEditStadiumMoment(cached.stadiumMoment ?? "");
+      setEditStadiumProof(cached.stadiumProof ?? "");
       return;
     }
     setEntryLoading(true);
@@ -140,6 +146,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
       setEditHomeScore(typeof detail.stadiumHomeScore === "number" ? String(detail.stadiumHomeScore) : "");
       setEditAwayScore(typeof detail.stadiumAwayScore === "number" ? String(detail.stadiumAwayScore) : "");
       setEditAttendance(typeof detail.stadiumAttendance === "number" ? String(detail.stadiumAttendance) : "");
+      setEditStadiumMoment(detail.stadiumMoment ?? "");
+      setEditStadiumProof(detail.stadiumProof ?? "");
     }
     setEntryLoading(false);
   }
@@ -179,6 +187,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                       attendance:
                         selectedRecentMatch?.attendance ??
                         (editAttendance.trim() ? Number.parseInt(editAttendance.trim(), 10) : null),
+                      moment: editStadiumMoment || null,
+                      proof: editStadiumProof || null,
                     }
                   : null,
             }),
@@ -403,6 +413,8 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                           typeof f.stadiumAttendance === "number"
                             ? `Attendance ${f.stadiumAttendance.toLocaleString("en-GB")}`
                             : null,
+                          stadiumMomentLabel(f.stadiumMoment),
+                          stadiumProofLabel(f.stadiumProof),
                         ]
                           .filter(Boolean)
                           .join(" · ")}
@@ -534,6 +546,7 @@ export function FeedbackFeedClient({ initialFeed }: { initialFeed: FeedItem[] })
                       Selected match provides clubs, crests, score and attendance (if available).
                     </p>
                   )}
+                  <StadiumMomentProofFields moment={editStadiumMoment} proof={editStadiumProof} onMoment={setEditStadiumMoment} onProof={setEditStadiumProof} />
                 </div>
               ) : null}
               {entryDetail.evidenceUrl && !entryDetail.feedbackBatch ? (
