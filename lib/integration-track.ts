@@ -16,6 +16,8 @@ import { getTrackClientReportData } from "@/lib/track-client-report";
 export type IntegrationTrackDetail = {
   generatedAt: string;
   spotifyTrackId: string;
+  title: string | null;
+  artists: string[];
   imageUrl: string | null;
   playlists: Array<{
     name: string;
@@ -35,6 +37,18 @@ export type IntegrationTrackDetail = {
     position: number | null;
     trackCount: number | null;
     lastSyncedAt: string | null;
+    /**
+     * The track's position (1-based) in every stored snapshot of this playlist that
+     * carries it, oldest first. A snapshot is only stored when the playlist changed,
+     * so the points are changes, not days. At most HISTORY_POINTS, evenly thinned.
+     */
+    history: Array<{ at: string; position: number; trackCount: number }>;
+    /** Best (lowest) position in any snapshot. */
+    peakPosition: number | null;
+    /** Last snapshot that still carried the track. */
+    lastSeenAt: string | null;
+    /** First snapshot without the track after that; null while it is still on the playlist. */
+    removedAt: string | null;
     curators: Array<{ name: string; organization: string | null; organizationType: string | null }>;
   }>;
   feedback: Array<{
@@ -61,12 +75,31 @@ export type IntegrationTrackDetail = {
   }>;
 };
 
+const HISTORY_POINTS = 60;
+
+/** Keeps the first and last point and an even spread in between. */
+function thin<T>(points: T[], max: number): T[] {
+  if (points.length <= max) return points;
+  const step = (points.length - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => points[Math.round(i * step)]);
+}
+
+function parseArtistNames(artistsJson: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(artistsJson);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((a) => (a && typeof a === "object" && "name" in a ? String((a as { name: unknown }).name) : "")).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId: string): Promise<IntegrationTrackDetail> {
   // Cover art needs a Spotify token; without one the report still comes back.
   const accessToken = await getSpotifyClientCredentialsToken().catch(() => undefined);
   const report = await getTrackClientReportData(userId, spotifyTrackId, accessToken);
   if (!report) {
-    return { generatedAt: new Date().toISOString(), spotifyTrackId, imageUrl: null, playlists: [], feedback: [] };
+    return { generatedAt: new Date().toISOString(), spotifyTrackId, title: null, artists: [], imageUrl: null, playlists: [], feedback: [] };
   }
 
   const extras = await prisma.trackedPlaylist.findMany({
@@ -98,6 +131,47 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
     if (known === undefined || r.spotifyTrackId === spotifyTrackId || r.position < known) positionBySnapshot.set(r.snapshotId, r.position);
   }
 
+  // The track's course on each playlist: every snapshot that carries it, and the
+  // first one after that which does not (the moment it was taken off).
+  const playlistIds = extras.map((e) => e.id);
+  const [snapshots, trackRows] = playlistIds.length
+    ? await Promise.all([
+        prisma.playlistSnapshot.findMany({
+          where: { trackedPlaylistId: { in: playlistIds } },
+          orderBy: { syncedAt: "asc" },
+          select: { id: true, trackedPlaylistId: true, syncedAt: true, _count: { select: { tracks: true } } },
+        }),
+        prisma.snapshotTrack.findMany({
+          where: {
+            snapshot: { trackedPlaylistId: { in: playlistIds } },
+            OR: [{ spotifyTrackId }, { title: { equals: report.title, mode: "insensitive" } }],
+          },
+          select: { snapshotId: true, position: true, spotifyTrackId: true },
+        }),
+      ])
+    : [[], []];
+  const positionInSnapshot = new Map<string, number>();
+  for (const r of trackRows) {
+    const known = positionInSnapshot.get(r.snapshotId);
+    if (known === undefined || r.spotifyTrackId === spotifyTrackId || r.position < known) positionInSnapshot.set(r.snapshotId, r.position);
+  }
+  const courseByPlaylist = new Map<string, Pick<IntegrationTrackDetail["playlists"][number], "history" | "peakPosition" | "lastSeenAt" | "removedAt">>();
+  for (const id of playlistIds) {
+    const own = snapshots.filter((s) => s.trackedPlaylistId === id);
+    const points = own
+      .filter((s) => positionInSnapshot.has(s.id))
+      .map((s) => ({ at: s.syncedAt.toISOString(), position: positionInSnapshot.get(s.id)! + 1, trackCount: s._count.tracks }));
+    const lastIndex = own.findLastIndex((s) => positionInSnapshot.has(s.id));
+    // An empty snapshot is a failed fetch, not a playlist without the track.
+    const after = lastIndex >= 0 ? own.slice(lastIndex + 1).find((s) => s._count.tracks > 0) : undefined;
+    courseByPlaylist.set(id, {
+      history: thin(points, HISTORY_POINTS),
+      peakPosition: points.length ? Math.min(...points.map((p) => p.position)) : null,
+      lastSeenAt: lastIndex >= 0 ? own[lastIndex].syncedAt.toISOString() : null,
+      removedAt: after ? after.syncedAt.toISOString() : null,
+    });
+  }
+
   // Organisation type per feedback contact (club, broadcaster, ...), for the sector breakdown.
   const contactNames = report.feedback.map((f) => f.contact?.organizationName).filter((n): n is string => Boolean(n));
   const orgs = contactNames.length
@@ -108,6 +182,8 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
   return {
     generatedAt: report.generatedAt.toISOString(),
     spotifyTrackId,
+    title: report.title,
+    artists: parseArtistNames(report.artistsJson),
     imageUrl: report.trackImageUrl,
     playlists: report.playlists.map((p) => {
       const extra = extraById.get(p.playlistId);
@@ -125,6 +201,7 @@ export async function loadIntegrationTrackDetail(userId: string, spotifyTrackId:
         position: positionBySnapshot.has(extra?.snapshots[0]?.id ?? "") ? positionBySnapshot.get(extra!.snapshots[0]!.id)! + 1 : null,
         trackCount: extra ? extra.trackCount : null,
         lastSyncedAt: extra?.lastSyncedAt ? extra.lastSyncedAt.toISOString() : null,
+        ...(courseByPlaylist.get(p.playlistId) ?? { history: [], peakPosition: null, lastSeenAt: null, removedAt: null }),
         curators:
           extra?.curators.map((c) => ({
             name: c.contact.fullName,
