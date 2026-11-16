@@ -55,7 +55,8 @@ export async function spotifyFetch(
 
   let lastRes: Response | null = null;
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
-    const res = await fetch(url, { ...fetchOptions, headers });
+    // Zonder tijdslimiet kan één vastgelopen verbinding een heel verzoek ophouden.
+    const res = await fetch(url, { ...fetchOptions, headers, signal: fetchOptions.signal ?? AbortSignal.timeout(20_000) });
     lastRes = res;
     if (res.status !== 429) return res;
     const retryAfter = res.headers.get("Retry-After");

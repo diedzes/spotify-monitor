@@ -125,6 +125,9 @@ export async function syncTrackedPlaylist(
             const known = addedByTrackId.get(t.spotifyTrackId);
             if (t.addedAt && (!known || t.addedAt < known)) addedByTrackId.set(t.spotifyTrackId, t.addedAt);
           }
+          // In blokken van 200 per transactie: één update per rij met een eigen
+          // rondje naar de database maakte een playlist van duizend nummers minuten werk.
+          const updates = [];
           for (const row of missing) {
             const data: { durationMs?: number; addedAt?: Date } = {};
             const durationMs = durationByTrackId.get(row.spotifyTrackId);
@@ -132,8 +135,11 @@ export async function syncTrackedPlaylist(
             const addedAt = addedByTrackId.get(row.spotifyTrackId);
             if (row.addedAt == null && addedAt) data.addedAt = addedAt;
             if (Object.keys(data).length > 0) {
-              await prisma.snapshotTrack.update({ where: { id: row.id }, data });
+              updates.push(prisma.snapshotTrack.update({ where: { id: row.id }, data }));
             }
+          }
+          for (let i = 0; i < updates.length; i += 200) {
+            await prisma.$transaction(updates.slice(i, i + 200));
           }
         } catch {
           // Niet blokkeren: metadata-sync moet doorlopen ook als backfill faalt.

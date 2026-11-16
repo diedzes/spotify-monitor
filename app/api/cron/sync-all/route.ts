@@ -38,6 +38,10 @@ export type CronSyncAllResponse = {
   remaining: number;
   /** Spotify weigert verzoeken (429); de ronde is afgebroken. Wacht minstens zo lang voor een nieuwe poging. */
   rateLimited?: { retryAfterSeconds: number | null };
+  /** Waar de tijd heen ging, om een trage ronde te kunnen verklaren. */
+  timing: { totalMs: number; hitlistMs: number; slowestPlaylistMs: number; slowestPlaylistId: string | null };
+  /** Eerste foutmeldingen van deze ronde (maximaal vijf). */
+  errors: string[];
   perUser: Array<{
     userId: string;
     synced: number;
@@ -60,6 +64,10 @@ export type CronSyncAllResponse = {
  *
  *   ?budget=<seconden>  werktijd per verzoek (standaard 200, maximaal 240)
  *   ?stale=<uren>       sla over wat korter dan dit geleden gesynct is (standaard 20)
+ *   ?dry=1              niets syncen, alleen melden hoeveel er wachten
+ *
+ * De hitlijst wordt pas herbouwd in de ronde waarin niets meer wacht: dat is één
+ * zware bewerking over alle playlists, die niet na elke portie hoeft.
  */
 export async function GET(request: Request): Promise<NextResponse<CronSyncAllResponse | { error: string }>> {
   if (!isAuthorized(request)) {
@@ -110,6 +118,12 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
   const perUser: CronSyncAllResponse["perUser"] = [];
   let totalRemaining = 0;
   let rateLimited: CronSyncAllResponse["rateLimited"];
+  const dry = params.get("dry") === "1";
+  const errors: string[] = [];
+  let hitlistMs = 0;
+  let slowestPlaylistMs = 0;
+  let slowestPlaylistId: string | null = null;
+  const usersToRebuild: string[] = [];
   let totalSynced = 0;
   let totalFailed = 0;
   let usersSkipped = 0;
@@ -136,8 +150,15 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     let failed = 0;
     let done = 0;
     for (const p of playlists) {
-      if (outOfTime()) break;
+      if (dry || outOfTime()) break;
+      const t0 = Date.now();
       const result = await syncTrackedPlaylist(p.id, session.access_token);
+      const took = Date.now() - t0;
+      if (took > slowestPlaylistMs) {
+        slowestPlaylistMs = took;
+        slowestPlaylistId = p.id;
+      }
+      if (!result.ok && errors.length < 5) errors.push(result.error);
       if (!result.ok && /rate limit/i.test(result.error)) {
         // Doorgaan heeft geen zin: elke volgende playlist krijgt dezelfde weigering.
         const last = getLastSpotifyRateLimit();
@@ -152,16 +173,22 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     // vanzelf terug; ze tellen hier niet als "wacht nog", anders stopt de aanroeper nooit.
     const remaining = playlists.length - done;
     totalRemaining += remaining;
-    if (synced > 0) {
-      try {
-        await rebuildOrUpdateHitlistForUser(session.user.id);
-      } catch {
-        // hitlist bijwerken mag cron-sync niet laten falen
-      }
-    }
+    if (synced > 0 && remaining === 0) usersToRebuild.push(session.user.id);
     totalSynced += synced;
     totalFailed += failed;
     perUser.push({ userId: row.userId, synced, failed, remaining });
+  }
+
+  if (!rateLimited) {
+    for (const userId of usersToRebuild) {
+      const t0 = Date.now();
+      try {
+        await rebuildOrUpdateHitlistForUser(userId);
+      } catch {
+        // hitlist bijwerken mag cron-sync niet laten falen
+      }
+      hitlistMs += Date.now() - t0;
+    }
   }
 
   return NextResponse.json({
@@ -172,6 +199,8 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     totalFailed,
     remaining: totalRemaining,
     ...(rateLimited ? { rateLimited } : {}),
+    timing: { totalMs: Date.now() - startedAt, hitlistMs, slowestPlaylistMs, slowestPlaylistId },
+    errors,
     perUser,
   });
 }
