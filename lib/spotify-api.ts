@@ -8,6 +8,15 @@ const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 const DEFAULT_RETRY_AFTER_MS = 1000;
 const MAX_429_RETRIES = 5;
+/** Vraagt Spotify om langer dan dit te wachten, dan is wachten zinloos: meteen teruggeven. */
+const MAX_WAIT_WORTH_IT_MS = 30_000;
+
+let lastRateLimit: { retryAfterSeconds: number | null; at: number } | null = null;
+
+/** De laatste 429 van Spotify in dit proces (Retry-After in seconden), of null. */
+export function getLastSpotifyRateLimit(): { retryAfterSeconds: number | null; at: number } | null {
+  return lastRateLimit;
+}
 
 /**
  * Vertaal een Spotify API HTTP-statuscode naar een leesbare Nederlandse foutmelding.
@@ -33,6 +42,8 @@ export function formatSpotifyError(status: number, raw: string): string {
 
 /**
  * Fetch met retry bij 429 (Rate Limit). Wacht op Retry-After of 1s en probeer opnieuw.
+ * Bij een lange Retry-After (Spotify heeft de app tijdelijk geblokkeerd) komt de 429
+ * meteen terug: vijf keer een minuut wachten hield een verzoek anders tot de limiet vast.
  */
 export async function spotifyFetch(
   url: string,
@@ -48,7 +59,10 @@ export async function spotifyFetch(
     lastRes = res;
     if (res.status !== 429) return res;
     const retryAfter = res.headers.get("Retry-After");
-    const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : DEFAULT_RETRY_AFTER_MS;
+    const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : NaN;
+    const waitMs = Number.isFinite(retryAfterSeconds) ? retryAfterSeconds * 1000 : DEFAULT_RETRY_AFTER_MS;
+    lastRateLimit = { retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : null, at: Date.now() };
+    if (waitMs > MAX_WAIT_WORTH_IT_MS) return res;
     if (attempt < MAX_429_RETRIES) await new Promise((r) => setTimeout(r, Math.min(waitMs, 60000)));
   }
   return lastRes!;

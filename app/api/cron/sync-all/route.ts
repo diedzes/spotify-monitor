@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getValidSessionFromRow } from "@/lib/spotify-auth";
 import { syncTrackedPlaylist } from "@/lib/sync-playlists";
+import { getLastSpotifyRateLimit } from "@/lib/spotify-api";
 import { rebuildOrUpdateHitlistForUser } from "@/lib/hitlist";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export type CronSyncAllResponse = {
   totalFailed: number;
   /** Playlists die deze ronde niet aan de beurt kwamen; roep de route opnieuw aan tot dit 0 is. */
   remaining: number;
+  /** Spotify weigert verzoeken (429); de ronde is afgebroken. Wacht minstens zo lang voor een nieuwe poging. */
+  rateLimited?: { retryAfterSeconds: number | null };
   perUser: Array<{
     userId: string;
     synced: number;
@@ -106,11 +109,13 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
 
   const perUser: CronSyncAllResponse["perUser"] = [];
   let totalRemaining = 0;
+  let rateLimited: CronSyncAllResponse["rateLimited"];
   let totalSynced = 0;
   let totalFailed = 0;
   let usersSkipped = 0;
 
   for (const row of rowsToUse) {
+    if (rateLimited) break;
     const session = await getValidSessionFromRow(row);
     if (!session) {
       usersSkipped++;
@@ -133,6 +138,12 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     for (const p of playlists) {
       if (outOfTime()) break;
       const result = await syncTrackedPlaylist(p.id, session.access_token);
+      if (!result.ok && /rate limit/i.test(result.error)) {
+        // Doorgaan heeft geen zin: elke volgende playlist krijgt dezelfde weigering.
+        const last = getLastSpotifyRateLimit();
+        rateLimited = { retryAfterSeconds: last && last.at >= startedAt ? last.retryAfterSeconds : null };
+        break;
+      }
       if (result.ok) synced++;
       else failed++;
       done++;
@@ -160,6 +171,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     totalSynced,
     totalFailed,
     remaining: totalRemaining,
+    ...(rateLimited ? { rateLimited } : {}),
     perUser,
   });
 }
