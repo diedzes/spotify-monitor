@@ -38,6 +38,8 @@ export type CronSyncAllResponse = {
   remaining: number;
   /** Spotify weigert verzoeken (429); de ronde is afgebroken. Wacht minstens zo lang voor een nieuwe poging. */
   rateLimited?: { retryAfterSeconds: number | null };
+  /** Is de hitlijst in deze ronde herbouwd? */
+  hitlistRebuilt: boolean;
   /** Waar de tijd heen ging, om een trage ronde te kunnen verklaren. */
   timing: { totalMs: number; hitlistMs: number; slowestPlaylistMs: number; slowestPlaylistId: string | null };
   /** Eerste foutmeldingen van deze ronde (maximaal vijf). */
@@ -66,8 +68,12 @@ export type CronSyncAllResponse = {
  *   ?stale=<uren>       sla over wat korter dan dit geleden gesynct is (standaard 20)
  *   ?dry=1              niets syncen, alleen melden hoeveel er wachten
  *
- * De hitlijst wordt pas herbouwd in de ronde waarin niets meer wacht: dat is één
- * zware bewerking over alle playlists, die niet na elke portie hoeft.
+ *   ?hitlist=1          niets syncen, alleen de hitlijst herbouwen
+ *
+ * De hitlijst wordt pas herbouwd in de ronde waarin niets meer wacht, en alleen als
+ * die ronde nog tijd over heeft: het is één zware bewerking over alle playlists.
+ * Meldt het antwoord `hitlistRebuilt: false` terwijl er niets meer wacht, roep dan
+ * nog één keer aan met ?hitlist=1.
  */
 export async function GET(request: Request): Promise<NextResponse<CronSyncAllResponse | { error: string }>> {
   if (!isAuthorized(request)) {
@@ -118,7 +124,9 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
   const perUser: CronSyncAllResponse["perUser"] = [];
   let totalRemaining = 0;
   let rateLimited: CronSyncAllResponse["rateLimited"];
-  const dry = params.get("dry") === "1";
+  const hitlistOnly = params.get("hitlist") === "1";
+  const dry = params.get("dry") === "1" || hitlistOnly;
+  let hitlistRebuilt = false;
   const errors: string[] = [];
   let hitlistMs = 0;
   let slowestPlaylistMs = 0;
@@ -173,13 +181,14 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     // vanzelf terug; ze tellen hier niet als "wacht nog", anders stopt de aanroeper nooit.
     const remaining = playlists.length - done;
     totalRemaining += remaining;
-    if (synced > 0 && remaining === 0) usersToRebuild.push(session.user.id);
+    if (hitlistOnly || (synced > 0 && remaining === 0)) usersToRebuild.push(session.user.id);
     totalSynced += synced;
     totalFailed += failed;
     perUser.push({ userId: row.userId, synced, failed, remaining });
   }
 
-  if (!rateLimited) {
+  // Alleen herbouwen als er nog ruim tijd is; anders vraagt de aanroeper het apart.
+  if (!rateLimited && (hitlistOnly || Date.now() - startedAt < 60_000)) {
     for (const userId of usersToRebuild) {
       const t0 = Date.now();
       try {
@@ -188,6 +197,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
         // hitlist bijwerken mag cron-sync niet laten falen
       }
       hitlistMs += Date.now() - t0;
+      hitlistRebuilt = true;
     }
   }
 
@@ -199,6 +209,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     totalFailed,
     remaining: totalRemaining,
     ...(rateLimited ? { rateLimited } : {}),
+    hitlistRebuilt,
     timing: { totalMs: Date.now() - startedAt, hitlistMs, slowestPlaylistMs, slowestPlaylistId },
     errors,
     perUser,
