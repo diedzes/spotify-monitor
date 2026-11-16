@@ -164,16 +164,15 @@ npx prisma generate
 
 De build mag **geen** database-migraties uitvoeren. Gebruik als Build Command in Vercel de standaard: **`npm run build`** (of laat het leeg; dan gebruikt Vercel `npm run build`). In dit project is dat `prisma generate && next build` – alleen client genereren en Next.js bouwen. Voeg geen `prisma migrate deploy` of andere migrate-stap toe aan de build.
 
-## Wekelijkse automatische sync
+## Dagelijkse automatische sync
 
-De route **`GET /api/cron/sync-all`** synchroniseert alle tracked playlists van alle gebruikers die een geldige sessie (met refresh token) hebben. Je kunt dit op een vast moment in de week laten draaien.
+De route **`GET /api/cron/sync-all`** synchroniseert de tracked playlists van alle gebruikers die een geldige sessie (met refresh token) hebben.
 
 - **Beveiliging:** Zet op Vercel **`CRON_SECRET`** als Environment Variable (lange willekeurige string). De route accepteert alleen verzoeken met `Authorization: Bearer <CRON_SECRET>` of `?secret=<CRON_SECRET>`.
-- **Plannen:** Vercel’s eigen cron (uit `vercel.json`) roept de URL aan maar stuurt geen secret mee. Gebruik daarom een **externe cron-service** (bijv. [cron-job.org](https://cron-job.org) of [EasyCron](https://www.easycron.com)): maak een wekelijkse job die **GET** `https://jouw-app.vercel.app/api/cron/sync-all?secret=JOUW_CRON_SECRET` aanroept (zelfde waarde als in Vercel). Kies bijvoorbeeld maandag 04:00 (CET).
+- **In porties:** één verzoek pakt de langst niet gesyncte playlists eerst en stopt na `?budget=` seconden (standaard 200, maximaal 240), ruim vóór de limiet van 300 seconden. Playlists die korter dan `?stale=` uur geleden gesynct zijn (standaard 20) worden overgeslagen. Het antwoord bevat `remaining`: het aantal dat nog wacht. Herhaal de aanroep tot dat 0 is.
+- **Plannen:** de taak `nl.sportsounds.monitor-sync` op de Mac mini doet dat elke nacht (`~/apps/tiktok-sounds/web/scripts/monitor-sync.mjs`).
 - **Handmatig testen:**  
-  `curl "https://jouw-app.vercel.app/api/cron/sync-all?secret=JOUW_CRON_SECRET"`  
-  of met header:  
-  `curl -H "Authorization: Bearer JOUW_CRON_SECRET" https://jouw-app.vercel.app/api/cron/sync-all`
+  `curl -H "Authorization: Bearer JOUW_CRON_SECRET" "https://jouw-app.vercel.app/api/cron/sync-all?budget=30"`
 
 ## Getting Started
 

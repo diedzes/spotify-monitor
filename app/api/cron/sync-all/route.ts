@@ -21,16 +21,25 @@ function isAuthorized(request: Request): boolean {
   }
 }
 
+function clampNumber(raw: string | null, fallback: number, min: number, max: number): number {
+  const n = raw == null || raw.trim() === "" ? NaN : Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 export type CronSyncAllResponse = {
   ok: boolean;
   usersProcessed: number;
   usersSkipped: number;
   totalSynced: number;
   totalFailed: number;
+  /** Playlists die deze ronde niet aan de beurt kwamen; roep de route opnieuw aan tot dit 0 is. */
+  remaining: number;
   perUser: Array<{
     userId: string;
     synced: number;
     failed: number;
+    remaining: number;
     error?: string;
   }>;
 };
@@ -40,7 +49,14 @@ export type CronSyncAllResponse = {
  * Roept voor elke gebruiker met een sessie (en refresh token) de sync voor al zijn playlists aan.
  * Moet worden aangeroepen met Authorization: Bearer <CRON_SECRET>.
  * Configureer in Vercel: Project → Settings → Environment Variables → CRON_SECRET.
- * Plan in vercel.json (bijv. wekelijks maandag 03:00).
+ *
+ * Werkt in porties: de langst niet gesyncte playlists eerst, en stopt ruim vóór de
+ * limiet van 300 seconden. Het antwoord meldt in `remaining` hoeveel er nog wachten;
+ * de aanroeper herhaalt tot dat 0 is. Zo loopt één verzoek niet meer vast op de
+ * limiet en blijven de laatste playlists in de rij niet structureel liggen.
+ *
+ *   ?budget=<seconden>  werktijd per verzoek (standaard 200, maximaal 240)
+ *   ?stale=<uren>       sla over wat korter dan dit geleden gesynct is (standaard 20)
  */
 export async function GET(request: Request): Promise<NextResponse<CronSyncAllResponse | { error: string }>> {
   if (!isAuthorized(request)) {
@@ -81,7 +97,15 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     }
   }
 
+  const startedAt = Date.now();
+  const params = new URL(request.url).searchParams;
+  const budgetMs = clampNumber(params.get("budget"), 200, 10, 240) * 1000;
+  const staleMs = clampNumber(params.get("stale"), 20, 0, 24 * 30) * 3600 * 1000;
+  const staleBefore = new Date(startedAt - staleMs);
+  const outOfTime = () => Date.now() - startedAt > budgetMs;
+
   const perUser: CronSyncAllResponse["perUser"] = [];
+  let totalRemaining = 0;
   let totalSynced = 0;
   let totalFailed = 0;
   let usersSkipped = 0;
@@ -90,22 +114,33 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     const session = await getValidSessionFromRow(row);
     if (!session) {
       usersSkipped++;
-      perUser.push({ userId: row.userId, synced: 0, failed: 0, error: "Reauthorization required" });
+      perUser.push({ userId: row.userId, synced: 0, failed: 0, remaining: 0, error: "Reauthorization required" });
       continue;
     }
 
     const playlists = await prisma.trackedPlaylist.findMany({
-      where: { userId: session.user.id },
+      where: {
+        userId: session.user.id,
+        OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: staleBefore } }],
+      },
+      orderBy: { lastSyncedAt: { sort: "asc", nulls: "first" } },
       select: { id: true },
     });
 
     let synced = 0;
     let failed = 0;
+    let done = 0;
     for (const p of playlists) {
+      if (outOfTime()) break;
       const result = await syncTrackedPlaylist(p.id, session.access_token);
       if (result.ok) synced++;
       else failed++;
+      done++;
     }
+    // Mislukte playlists houden hun oude lastSyncedAt en komen een volgende ronde
+    // vanzelf terug; ze tellen hier niet als "wacht nog", anders stopt de aanroeper nooit.
+    const remaining = playlists.length - done;
+    totalRemaining += remaining;
     if (synced > 0) {
       try {
         await rebuildOrUpdateHitlistForUser(session.user.id);
@@ -115,7 +150,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     }
     totalSynced += synced;
     totalFailed += failed;
-    perUser.push({ userId: row.userId, synced, failed });
+    perUser.push({ userId: row.userId, synced, failed, remaining });
   }
 
   return NextResponse.json({
@@ -124,6 +159,7 @@ export async function GET(request: Request): Promise<NextResponse<CronSyncAllRes
     usersSkipped,
     totalSynced,
     totalFailed,
+    remaining: totalRemaining,
     perUser,
   });
 }

@@ -156,7 +156,9 @@ Spotify Dashboard Redirect URI moet **exact** matchen, o.a. `https://spotify-mon
 `GET /api/cron/sync-all` synct alle tracked playlists van users met geldige refresh token en rebuild de hitlist.
 
 Auth: `Authorization: Bearer <CRON_SECRET>` of `?secret=`.  
-`vercel.json` is leeg: Vercel Cron stuurt geen secret mee. Gebruik een **externe** cron (cron-job.org e.d.) op de productie-URL.
+De route werkt in porties: langst niet gesynct eerst, stopt na `?budget=` seconden (standaard 200) en slaat over wat korter dan `?stale=` uur geleden gesynct is (standaard 20). Het antwoord bevat `remaining`; de aanroeper herhaalt tot dat 0 is.
+
+Aanroeper: de dagelijkse launchd-taak `nl.sportsounds.monitor-sync` op de Mac mini (`~/apps/tiktok-sounds/web/scripts/monitor-sync.mjs`). `vercel.json` is leeg.
 
 Lange jobs: `maxDuration = 300` op die route. Playlist-sync is gevoelig voor timeouts; niet lichtzinnig serialiseren of extra Spotify-calls toevoegen in de hot path.
 
